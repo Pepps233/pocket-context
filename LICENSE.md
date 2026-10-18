@@ -1,7 +1,5 @@
 MIT License
 
-The MIT license below applies to this project except for `suffix_cache_reuse/`, which is covered by the separate license described below.
-
 Copyright (c) 2026 Jay Yu
 Copyright (c) 2025 Kilian A. Lieret and Carlos E. Jimenez
 

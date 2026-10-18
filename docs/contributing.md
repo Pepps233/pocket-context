@@ -1,31 +1,22 @@
-# ❤️ Contributing
+# Contributing
 
-We happily accept contributions!
+Contributions to code, tests, and documentation are welcome.
+Please follow the [Code of Conduct](../.github/CODE_OF_CONDUCT.md).
 
-## Areas of help
+## Issues and suggestions
 
-- Documentation, examples, tutorials, etc. In particular, we're looking for
-    - examples of how this library is used in the wild
-    - additional examples for the [cookbook](advanced/cookbook.md)
-- Support for more models (anything where `litellm` doesn't work out of the box)
-- Support for more environments & deployments (e.g., run it as a github action, etc.)
-- Take a look at the [issues](https://github.com/SWE-agent/mini-swe-agent/issues) and look for issues marked `good-first-issue` or `help-wanted` (please read the guidelines below first)
+Search existing issues before opening a new one in this repository.
+For bugs, include steps to reproduce, expected and actual behavior, and relevant environment details.
+For suggestions, describe the problem and the proposed improvement.
 
-## Design & Architecture
+## Pull requests
 
-- `mini-swe-agent` aims to stay minimalistic, hackable, and of high quality code.
-- To extend features, we prefer to add a new version of the one of the four components (see [cookbook](advanced/cookbook.md)), rather than making the existing components more complex.
-- Components should be relatively self-contained, but if there are utilities that might be shared, add a `utils` folder (like [this one](https://github.com/SWE-agent/mini-swe-agent/tree/main/src/minisweagent/models/utils)). But keep it simple!
-- If your component is a bit more specific, add it into an `extra` folder (like [this one](https://github.com/SWE-agent/mini-swe-agent/tree/main/src/minisweagent/run/extra))
-- Our target audience is anyone who doesn't shy away from modifying a bit of code (especially a run script) to get what they want.
-- Therefore, not everything needs to be configurable with the config files, but it should be easy to create a run script that makes use of it.
-- Many LMs write very verbose code -- please clean it up! Same goes for the tests. They should still be concise and readable.
-- Please install `pre-commit` (`pip install pre-commit && pre-commit install`) and run it before committing. This will enforce our style guide.
+1. Fork the repository and create a branch for your changes.
+2. Follow the repository's [development guidelines](../AGENTS.md) and existing code style.
+3. Keep changes focused and add tests for new or changed behavior where appropriate.
+4. Run relevant tests and `pre-commit run --all-files` before submitting.
+5. Use the pull request template, explain the changes and validation, and link related issues.
 
-## Development setup
+By contributing, you confirm that you have the right to submit your changes under the project's [MIT license](../LICENSE.md).
 
-Make sure to follow the dev setup instructions in [quickstart.md](quickstart.md).
-
-After that you can run `pytest` with `pytest -n auto` (this parallelizes the tests across all cores for speedup).
-
-{% include-markdown "_footer.md" %}
+Adapted from the [CONTRIBUTING.md template](https://contributing.md/example/).

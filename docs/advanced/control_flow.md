@@ -49,11 +49,11 @@ And here is the code that implements it:
 
 ??? note "Default agent class"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/default.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/default.py)
     - [API reference](../reference/agents/default.md)
 
     ```python
-    --8<-- "src/pocketcontextagent/agents/default.py"
+    --8<-- "pocketcontextagent/agents/default.py"
     ```
 
 Essentially, `DefaultAgent.run` calls `DefaultAgent.step` in a loop until the agent has finished its task.

@@ -2,12 +2,12 @@
 
 !!! note "OpenRouter Model class"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models/openrouter_model.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/openrouter_model.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/models/openrouter_model.py"
+        --8<-- "pocketcontextagent/models/openrouter_model.py"
         ```
 
 !!! tip "Guide"

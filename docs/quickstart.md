@@ -80,10 +80,10 @@
         mini-extra  # extra utilities
         ```
 
-        Or pick a [run script](https://github.com/Pepps233/pocket-context/tree/main/src/pocketcontextagent/run):
+        Or pick a [run script](https://github.com/Pepps233/pocket-context/tree/main/pocketcontextagent/run):
 
         ```bash
-        python src/pocketcontextagent/run/hello_world.py
+        python pocketcontextagent/run/hello_world.py
         ```
 
         If you are planning to contribute, please also install the dev dependencies

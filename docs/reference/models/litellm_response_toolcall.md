@@ -2,12 +2,12 @@
 
 !!! note "LiteLLM Response API Model class"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models/litellm_response_model.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/litellm_response_model.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/models/litellm_response_model.py"
+        --8<-- "pocketcontextagent/models/litellm_response_model.py"
         ```
 
 !!! tip "When to use this model"

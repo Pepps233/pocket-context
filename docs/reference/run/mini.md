@@ -2,12 +2,12 @@
 
 !!! note "Mini run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/mini.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/run/mini.py"
+        --8<-- "pocketcontextagent/run/mini.py"
         ```
 
 ::: pocketcontextagent.run.mini

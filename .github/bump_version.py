@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-INIT_FILE = Path(__file__).resolve().parents[1] / "src" / "pocketcontextagent" / "__init__.py"
+INIT_FILE = Path(__file__).resolve().parents[1] / "pocketcontextagent" / "__init__.py"
 VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"', re.MULTILINE)
 
 

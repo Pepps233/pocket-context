@@ -27,7 +27,7 @@
     ```bash
     mini-extra programbench --help
     # or
-    python src/pocketcontextagent/run/benchmarks/programbench.py --help
+    python pocketcontextagent/run/benchmarks/programbench.py --help
     # Example:
     mini-extra programbench \
         --model anthropic/claude-sonnet-4-5-20250929 \
@@ -85,19 +85,19 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.
 
 ??? note "Default config"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/config/benchmarks/programbench.yaml)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/config/benchmarks/programbench.yaml)
 
     ```yaml
-    --8<-- "src/pocketcontextagent/config/benchmarks/programbench.yaml"
+    --8<-- "pocketcontextagent/config/benchmarks/programbench.yaml"
     ```
 
 ??? note "`programbench.py` run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/benchmarks/programbench.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/programbench.py)
     - [API reference](../reference/run/programbench.md)
 
     ```python
-    --8<-- "src/pocketcontextagent/run/benchmarks/programbench.py"
+    --8<-- "pocketcontextagent/run/benchmarks/programbench.py"
     ```
 
 {% include-markdown "../_footer.md" %}

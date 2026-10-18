@@ -55,11 +55,11 @@ For more configuration options, see [global configuration](../advanced/global_co
 
 ??? note "Run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/utilities/config.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/utilities/config.py)
     - [API reference](../reference/run/config.md)
 
     ```python
-    --8<-- "src/pocketcontextagent/run/utilities/config.py"
+    --8<-- "pocketcontextagent/run/utilities/config.py"
     ```
 
 {% include-markdown "../_footer.md" %}

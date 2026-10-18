@@ -2,12 +2,12 @@
 
 !!! note "InteractiveAgent class"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/interactive.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/interactive.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/agents/interactive.py"
+        --8<-- "pocketcontextagent/agents/interactive.py"
         ```
 
 !!! tip "See also"

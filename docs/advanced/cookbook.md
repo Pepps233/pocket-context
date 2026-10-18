@@ -11,16 +11,16 @@
     Make sure to follow the dev setup instructions in [quickstart.md](../quickstart.md).
 
 We provide several different entry points to the agent,
-for example [hello world](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/hello_world.py),
-or the [default when calling `mini`](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/mini.py).
+for example [hello world](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py),
+or the [default when calling `mini`](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py).
 
 Want to cook up your custom version and the config is not enough?
 Just follow the recipe below:
 
-1. What's the control flow you need? Pick an [agent class](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents) (e.g., [simplest example](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/default.py), [with human in the loop](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/interactive.py))
-2. How should actions be executed? Pick an [environment class](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments) (e.g., [local](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/local.py), or [docker](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/docker.py))
-3. How is the LM queried? Pick a [model class](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models) (e.g., [litellm](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models/litellm_model.py))
-4. How to invoke the agent? Bind them all together in a [run script](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run), possibly reading from a [config](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/config) (e.g., [hello world](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/hello_world.py), or [`mini` entry point](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/mini.py))
+1. What's the control flow you need? Pick an [agent class](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents) (e.g., [simplest example](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/default.py), [with human in the loop](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/interactive.py))
+2. How should actions be executed? Pick an [environment class](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments) (e.g., [local](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/local.py), or [docker](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/docker.py))
+3. How is the LM queried? Pick a [model class](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models) (e.g., [litellm](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/litellm_model.py))
+4. How to invoke the agent? Bind them all together in a [run script](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run), possibly reading from a [config](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/config) (e.g., [hello world](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py), or [`mini` entry point](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py))
 
 We aim to keep all of these components very simple, but offer lots of choice between them -- enough to cover a broad range of
 things that you might want to do.

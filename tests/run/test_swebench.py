@@ -1,5 +1,6 @@
 import json
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -53,7 +54,7 @@ def test_swebench_end_to_end(github_test_data, tmp_path, workers, container_exec
             environment_class="docker",
         )
 
-    traj_file_path = package_dir.parent.parent / "tests" / "test_data" / "github_issue.traj.json"
+    traj_file_path = Path(__file__).resolve().parents[1] / "test_data" / "github_issue.traj.json"
     trajectory = json.loads(traj_file_path.read_text())
 
     last_message = trajectory[-1]["content"]
@@ -405,7 +406,7 @@ def test_redo_existing_true_overwrites_existing(github_test_data, tmp_path, cont
         )
 
     # Should have new result from deterministic model
-    traj_file_path = package_dir.parent.parent / "tests" / "test_data" / "github_issue.traj.json"
+    traj_file_path = Path(__file__).resolve().parents[1] / "test_data" / "github_issue.traj.json"
     trajectory = json.loads(traj_file_path.read_text())
     expected_result = trajectory[-1]["content"]
 

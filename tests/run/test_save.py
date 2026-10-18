@@ -11,7 +11,7 @@ def test_agent_save_includes_class_names():
     """Test that agent.save includes the full class names with import paths."""
     import yaml
 
-    config_path = Path("src/pocketcontextagent/config/default.yaml")
+    config_path = Path("pocketcontextagent/config/default.yaml")
     with open(config_path) as f:
         default_config = yaml.safe_load(f)["agent"]
 
@@ -52,7 +52,7 @@ def test_agent_serialize():
     """Test that agent.serialize returns the correct structure."""
     import yaml
 
-    config_path = Path("src/pocketcontextagent/config/default.yaml")
+    config_path = Path("pocketcontextagent/config/default.yaml")
     with open(config_path) as f:
         default_config = yaml.safe_load(f)["agent"]
 

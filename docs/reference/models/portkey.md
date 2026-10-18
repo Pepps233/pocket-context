@@ -2,12 +2,12 @@
 
 !!! note "Portkey Model class"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models/portkey_model.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/portkey_model.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/models/portkey_model.py"
+        --8<-- "pocketcontextagent/models/portkey_model.py"
         ```
 
 !!! tip "Guide"

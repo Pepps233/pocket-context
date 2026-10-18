@@ -2,12 +2,12 @@
 
 !!! note "Trajectory Inspector"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/utilities/inspector.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/utilities/inspector.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/run/utilities/inspector.py"
+        --8<-- "pocketcontextagent/run/utilities/inspector.py"
         ```
 
 ::: pocketcontextagent.run.utilities.inspector

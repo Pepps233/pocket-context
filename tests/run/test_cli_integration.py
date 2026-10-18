@@ -568,7 +568,7 @@ def test_output_file_is_created(tmp_path):
 
     # Create a temporary config file
     config_file = tmp_path / "test_config.yaml"
-    default_config_path = Path("src/pocketcontextagent/config/default.yaml")
+    default_config_path = Path("pocketcontextagent/config/default.yaml")
     config_file.write_text(default_config_path.read_text())
 
     with (

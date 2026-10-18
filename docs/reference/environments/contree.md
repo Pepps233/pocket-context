@@ -2,13 +2,13 @@
 
 !!! note "ConTree Environment class"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/extra/contree.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/extra/contree.py)
     - Requires [ConTree](https://contree.dev) token
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/pocketcontextagent/environments/extra/contree.py"
+        --8<-- "pocketcontextagent/environments/extra/contree.py"
         ```
 
 ::: pocketcontextagent.environments.extra.contree

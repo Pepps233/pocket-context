@@ -100,7 +100,7 @@ include-package-data = true
 version = {attr = "pocketcontextagent.__version__"}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 include = ["pocketcontextagent*"]
 
 [tool.setuptools.package-data]

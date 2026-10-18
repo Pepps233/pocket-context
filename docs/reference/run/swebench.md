@@ -2,7 +2,7 @@
 
 !!! note "SWE-bench run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/benchmarks/swebench.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/swebench.py)
 
 ::: pocketcontextagent.run.benchmarks.swebench
 

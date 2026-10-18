@@ -1,5 +1,6 @@
 MIT License
 
+Copyright (c) 2026 Jay Yu
 Copyright (c) 2025 Kilian A. Lieret and Carlos E. Jimenez
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,5 +21,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This project is a derivative work of mini-SWE-agent
-(https://github.com/SWE-agent/mini-swe-agent), licensed under the MIT License.
+This project is a derivative work of mini-SWE-agent (https://github.com/SWE-agent/mini-swe-agent) by Kilian A. Lieret and Carlos E. Jimenez, licensed under the MIT License.

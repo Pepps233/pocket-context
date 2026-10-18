@@ -11,16 +11,16 @@
     Make sure to follow the dev setup instructions in [quickstart.md](../quickstart.md).
 
 We provide several different entry points to the agent,
-for example [hello world](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/run/hello_world.py),
-or the [default when calling `mini`](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/run/mini.py).
+for example [hello world](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/hello_world.py),
+or the [default when calling `mini`](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/mini.py).
 
 Want to cook up your custom version and the config is not enough?
 Just follow the recipe below:
 
-1. What's the control flow you need? Pick an [agent class](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/agents) (e.g., [simplest example](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/agents/default.py), [with human in the loop](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/agents/interactive.py))
-2. How should actions be executed? Pick an [environment class](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/environments) (e.g., [local](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/environments/local.py), or [docker](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/environments/docker.py))
-3. How is the LM queried? Pick a [model class](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/models) (e.g., [litellm](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/models/litellm_model.py))
-4. How to invoke the agent? Bind them all together in a [run script](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/run), possibly reading from a [config](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/config) (e.g., [hello world](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/run/hello_world.py), or [`mini` entry point](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/run/mini.py))
+1. What's the control flow you need? Pick an [agent class](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents) (e.g., [simplest example](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/default.py), [with human in the loop](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/interactive.py))
+2. How should actions be executed? Pick an [environment class](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments) (e.g., [local](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/local.py), or [docker](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/docker.py))
+3. How is the LM queried? Pick a [model class](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models) (e.g., [litellm](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models/litellm_model.py))
+4. How to invoke the agent? Bind them all together in a [run script](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run), possibly reading from a [config](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/config) (e.g., [hello world](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/hello_world.py), or [`mini` entry point](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/mini.py))
 
 We aim to keep all of these components very simple, but offer lots of choice between them -- enough to cover a broad range of
 things that you might want to do.
@@ -38,9 +38,9 @@ See [Python bindings](../usage/python_bindings.md) for the most basic example.
 === "Hello world (use automatic model selection)"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.models import get_model
-    from minisweagent.environments.local import LocalEnvironment
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.models import get_model
+    from pocketcontextagent.environments.local import LocalEnvironment
 
     model_name = "anthropic/claude-sonnet-4-5-20250929"
 
@@ -54,9 +54,9 @@ See [Python bindings](../usage/python_bindings.md) for the most basic example.
 === "Hello world (Litellm)"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.models.litellm_model import LitellmModel
-    from minisweagent.environments.local import LocalEnvironment
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.models.litellm_model import LitellmModel
+    from pocketcontextagent.environments.local import LocalEnvironment
 
     model_name = "gpt-4o"
 
@@ -72,7 +72,7 @@ See [Python bindings](../usage/python_bindings.md) for the most basic example.
 === "Hello world with local execution"
 
     ```python
-    from minisweagent.environments.local import LocalEnvironment
+    from pocketcontextagent.environments.local import LocalEnvironment
 
     agent = DefaultAgent(
         LitellmModel(model_name=model_name),
@@ -83,7 +83,7 @@ See [Python bindings](../usage/python_bindings.md) for the most basic example.
 === "Hello world with docker execution"
 
     ```python
-    from minisweagent.environments.docker import DockerEnvironment
+    from pocketcontextagent.environments.docker import DockerEnvironment
 
     agent = DefaultAgent(
         LitellmModel(model_name=model_name),
@@ -96,9 +96,9 @@ See [Python bindings](../usage/python_bindings.md) for the most basic example.
 === "Default agent"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.models import get_model
-    from minisweagent.environments.local import LocalEnvironment
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.models import get_model
+    from pocketcontextagent.environments.local import LocalEnvironment
 
     agent = DefaultAgent(
         get_model(input_model_name=model_name),
@@ -109,9 +109,9 @@ See [Python bindings](../usage/python_bindings.md) for the most basic example.
 === "Human in the loop"
 
     ```python
-    from minisweagent.agents.interactive import InteractiveAgent
-    from minisweagent.models import get_model
-    from minisweagent.environments.local import LocalEnvironment
+    from pocketcontextagent.agents.interactive import InteractiveAgent
+    from pocketcontextagent.models import get_model
+    from pocketcontextagent.environments.local import LocalEnvironment
 
     agent = InteractiveAgent(
         get_model(input_model_name=model_name),
@@ -129,7 +129,7 @@ An agent that uses python function for some actions:
 === "Subclassing the agent"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
+    from pocketcontextagent.agents.default import DefaultAgent
     import shlex
 
     def python_function(*args) -> dict:
@@ -153,8 +153,8 @@ An agent that uses python function for some actions:
 === "Subclassing the environment"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.environments.local import LocalEnvironment
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.environments.local import LocalEnvironment
     import shlex
 
     def python_function(*args) -> dict:
@@ -181,8 +181,8 @@ An agent that exits when the `submit` command is issued:
 === "Subclassing the agent"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.exceptions import Submitted
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.exceptions import Submitted
 
     class AgentQuitsOnSubmit(DefaultAgent):
         def execute_actions(self, message: dict) -> list[dict]:
@@ -201,9 +201,9 @@ An agent that exits when the `submit` command is issued:
 === "Subclassing the environment"
 
     ```python
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.environments.local import LocalEnvironment
-    from minisweagent.exceptions import Submitted
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.environments.local import LocalEnvironment
+    from pocketcontextagent.exceptions import Submitted
 
     class EnvironmentQuitsOnSubmit(LocalEnvironment):
         def execute(self, action: dict, cwd: str = "") -> dict:
@@ -228,8 +228,8 @@ An agent that validates actions before execution (also an example of how to use 
 
     ```python
     import re
-    from minisweagent.agents.default import DefaultAgent, AgentConfig
-    from minisweagent.exceptions import FormatError
+    from pocketcontextagent.agents.default import DefaultAgent, AgentConfig
+    from pocketcontextagent.exceptions import FormatError
     from pydantic import BaseModel
 
     class ValidatingAgentConfig(AgentConfig):
@@ -258,9 +258,9 @@ An agent that validates actions before execution (also an example of how to use 
 
     ```python
     import re
-    from minisweagent.agents.default import DefaultAgent
-    from minisweagent.environments.local import LocalEnvironment, LocalEnvironmentConfig
-    from minisweagent.models.litellm_model import LitellmModel
+    from pocketcontextagent.agents.default import DefaultAgent
+    from pocketcontextagent.environments.local import LocalEnvironment, LocalEnvironmentConfig
+    from pocketcontextagent.models.litellm_model import LitellmModel
 
     class EnvironmentWithForbiddenPatternsConfig(LocalEnvironmentConfig):
         forbidden_patterns: list[str] = [

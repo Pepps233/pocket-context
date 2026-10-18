@@ -1,3 +1,5 @@
+exclude: ^suffix_cache_reuse/
+
 ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
 

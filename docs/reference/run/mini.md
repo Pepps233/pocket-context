@@ -2,14 +2,14 @@
 
 !!! note "Mini run script"
 
-    - [Read on GitHub](https://github.com/swe-agent/mini-swe-agent/blob/main/src/minisweagent/run/mini.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/mini.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/minisweagent/run/mini.py"
+        --8<-- "src/pocketcontextagent/run/mini.py"
         ```
 
-::: minisweagent.run.mini
+::: pocketcontextagent.run.mini
 
 {% include-markdown "../../_footer.md" %}

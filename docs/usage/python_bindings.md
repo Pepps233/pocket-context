@@ -10,9 +10,9 @@
 ```python
 import logging
 
-from minisweagent.agents.default import DefaultAgent
-from minisweagent.models import get_model
-from minisweagent.environments.local import LocalEnvironment
+from pocketcontextagent.agents.default import DefaultAgent
+from pocketcontextagent.models import get_model
+from pocketcontextagent.environments.local import LocalEnvironment
 
 logging.basicConfig(level=logging.DEBUG)
 task = "Write a hello world program"

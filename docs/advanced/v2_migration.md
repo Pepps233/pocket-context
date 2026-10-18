@@ -95,7 +95,7 @@ Tool calling is the default. The CLI uses `mini.yaml` and `swebench.yaml` which 
 ```bash
 # Default (tool calling)
 mini
-python -m minisweagent.run.benchmarks.swebench
+python -m pocketcontextagent.run.benchmarks.swebench
 mini-extra swebench
 
 # Text-based parsing
@@ -159,7 +159,7 @@ In other words: the exact message structure depends on the model you use.
 
 **New environment:**
 
-- **`swerex_modal`**: Run environments on Modal (requires `pip install mini-swe-agent[modal]`)
+- **`swerex_modal`**: Run environments on Modal (requires `pip install pocketcontextagent[modal]`)
 
 ## Architecture changes
 
@@ -218,7 +218,7 @@ def save(self, path: Path | None, *extra_dicts) -> dict: ...
 
 ### Exception changes
 
-All flow control exceptions now inherit from `InterruptAgentFlow` and moved to `minisweagent.exceptions`:
+All flow control exceptions now inherit from `InterruptAgentFlow` and moved to `pocketcontextagent.exceptions`:
 
 ```python
 InterruptAgentFlow (base)
@@ -236,10 +236,10 @@ InterruptAgentFlow (base)
 
 ```python
 # Old
-from minisweagent.agents.default import Submitted, FormatError
+from pocketcontextagent.agents.default import Submitted, FormatError
 
 # New
-from minisweagent.exceptions import Submitted, FormatError
+from pocketcontextagent.exceptions import Submitted, FormatError
 ```
 
 ### Agent.run() return value

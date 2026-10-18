@@ -5,11 +5,11 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
-from minisweagent.models import GLOBAL_MODEL_STATS
-from minisweagent.models.openrouter_model import (
+from pocketcontextagent.models import GLOBAL_MODEL_STATS
+from pocketcontextagent.models.openrouter_model import (
     OpenRouterAuthenticationError,
 )
-from minisweagent.models.openrouter_textbased_model import (
+from pocketcontextagent.models.openrouter_textbased_model import (
     OpenRouterTextbasedModel,
 )
 

@@ -2,14 +2,14 @@
 
 !!! note "Local Environment class"
 
-    - [Read on GitHub](https://github.com/swe-agent/mini-swe-agent/blob/main/src/minisweagent/environments/local.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/local.py)
 
     ??? note "Full source code"
 
         ```python
-        --8<-- "src/minisweagent/environments/local.py"
+        --8<-- "src/pocketcontextagent/environments/local.py"
         ```
 
-::: minisweagent.environments.local
+::: pocketcontextagent.environments.local
 
 {% include-markdown "../../_footer.md" %}

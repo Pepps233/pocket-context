@@ -30,8 +30,8 @@ We now ask: **What if our agent was 100x simpler, and still worked nearly as wel
 `mini` is
 
 - **Widely adopted**: Used by Meta, NVIDIA, Essential AI, IBM, Nebius, Anyscale, Princeton University, Stanford University, and many more.
-- **Minimal**: Just [100 lines of python](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/agents/default.py) (+100 total for [env](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/environments/local.py),
-[model](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/models/litellm_model.py), [script](https://github.com/SWE-agent/mini-swe-agent/blob/main/src/minisweagent/run/hello_world.py)) — no fancy dependencies!
+- **Minimal**: Just [100 lines of python](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/agents/default.py) (+100 total for [env](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/environments/local.py),
+[model](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/models/litellm_model.py), [script](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/hello_world.py)) — no fancy dependencies!
 - **Performant:** Scores >74% on the [SWE-bench verified benchmark](https://www.swebench.com/); starts much faster than Claude Code
 - **Deployable:** Supports **local environments**, **docker/podman**, **singularity/apptainer**, **bublewrap**, **contree**, and more
 - **Compatible:** Supports all models via **litellm**, **openrouter**, **portkey**, and more. Support for `/completion` and `/response` endpoints, interleaved thinking etc.

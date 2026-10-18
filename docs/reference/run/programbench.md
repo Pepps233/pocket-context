@@ -2,8 +2,8 @@
 
 !!! note "ProgramBench run script"
 
-    - [Read on GitHub](https://github.com/swe-agent/mini-swe-agent/blob/main/src/minisweagent/run/benchmarks/programbench.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/benchmarks/programbench.py)
 
-::: minisweagent.run.benchmarks.programbench
+::: pocketcontextagent.run.benchmarks.programbench
 
 {% include-markdown "../../_footer.md" %}

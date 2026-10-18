@@ -51,10 +51,10 @@ The inspector is implemented with [textual](https://textual.textualize.io/).
 
 ??? note "Implementation"
 
-    - [Read on GitHub](https://github.com/swe-agent/mini-swe-agent/blob/main/src/minisweagent/run/utilities/inspector.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/src/pocketcontextagent/run/utilities/inspector.py)
 
     ```python linenums="1"
-    --8<-- "src/minisweagent/run/utilities/inspector.py"
+    --8<-- "src/pocketcontextagent/run/utilities/inspector.py"
     ```
 
 {% include-markdown "../_footer.md" %}

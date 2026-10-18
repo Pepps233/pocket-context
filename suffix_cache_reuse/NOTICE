@@ -1,0 +1,12 @@
+Third-party attributions
+
+* mini-swe-agent (https://github.com/SWE-agent/mini-swe-agent), MIT License,
+  Copyright (c) the SWE-agent authors.
+  clm/clm_harness/task_templates/terminal_agent_tasks.yaml adapts the task instructions of
+  mini-swe-agent's default configuration, and the submit command
+  (`echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`) follows its convention.
+
+* Harbor (https://github.com/laude-institute/harbor), MIT License,
+  Copyright (c) the Harbor authors.
+  Used as a dependency (ClmAgent subclasses harbor.agents.base.BaseAgent); no Harbor code is
+  vendored in this repository.

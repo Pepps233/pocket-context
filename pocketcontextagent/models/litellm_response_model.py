@@ -13,6 +13,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
 )
+from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API
 from pocketcontextagent.models.utils.retry import retry
 
 logger = logging.getLogger("litellm_response_model")
@@ -42,7 +43,7 @@ class LitellmResponseModel(LitellmModel):
             return litellm.responses(
                 model=self.config.model_name,
                 input=messages,
-                tools=[BASH_TOOL_RESPONSE_API],
+                tools=[BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API],
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:
@@ -79,7 +80,7 @@ class LitellmResponseModel(LitellmModel):
 
     def _parse_actions(self, response) -> list[dict]:
         return parse_toolcall_actions_response(
-            getattr(response, "output", []),
+            response.get("output", []) if isinstance(response, dict) else response.output,
             format_error_template=self.config.format_error_template,
             template_kwargs={"finish_reason": finish_reason_from_responses_api(response)},
         )

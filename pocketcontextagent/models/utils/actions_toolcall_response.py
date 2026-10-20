@@ -1,11 +1,11 @@
 """Parse actions & format observations for OpenAI Responses API toolcalls"""
 
-import json
 import time
 
 from jinja2 import StrictUndefined, Template
 
 from pocketcontextagent.exceptions import FormatError
+from pocketcontextagent.models.utils.compact_tool import parse_native_calls
 
 # OpenRouter/OpenAI Responses API uses a flat structure (no nested "function" key)
 BASH_TOOL_RESPONSE_API = {
@@ -83,25 +83,25 @@ def parse_toolcall_actions_response(
             **template_kwargs,
         )
         raise FormatError(_format_error_message(error_text))
-    actions = []
-    for tool_call in tool_calls:
-        error_msg = ""
-        args = {}
-        try:
-            args = json.loads(tool_call.get("arguments", "{}"))
-        except Exception as e:
-            error_msg = f"Error parsing tool call arguments: {e}."
-        if tool_call.get("name") != "bash":
-            error_msg += f"Unknown tool '{tool_call.get('name')}'."
-        if not isinstance(args, dict) or "command" not in args:
-            error_msg += "Missing 'command' argument in bash tool call."
-        if error_msg:
-            error_text = Template(format_error_template, undefined=StrictUndefined).render(
-                error=error_msg.strip(), actions=[], has_tool_calls=True, **template_kwargs
+    try:
+        return parse_native_calls(
+            [
+                {
+                    "name": call.get("name"),
+                    "arguments": call.get("arguments", "{}"),
+                    "id": call.get("call_id") or call.get("id"),
+                }
+                for call in tool_calls
+            ]
+        )
+    except ValueError as exc:
+        raise FormatError(
+            _format_error_message(
+                Template(format_error_template, undefined=StrictUndefined).render(
+                    error=str(exc), actions=[], has_tool_calls=True, **template_kwargs
+                )
             )
-            raise FormatError(_format_error_message(error_text))
-        actions.append({"command": args["command"], "tool_call_id": tool_call.get("call_id") or tool_call.get("id")})
-    return actions
+        ) from exc
 
 
 def format_toolcall_observation_messages(

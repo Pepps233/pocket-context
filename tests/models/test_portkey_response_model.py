@@ -6,6 +6,7 @@ import pytest
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.portkey_response_model import PortkeyResponseAPIModel
 from pocketcontextagent.models.utils.actions_toolcall_response import BASH_TOOL_RESPONSE_API
+from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API
 
 
 def test_response_api_model_basic_query():
@@ -39,7 +40,7 @@ def test_response_api_model_basic_query():
 
         assert result["extra"]["actions"] == [{"command": "echo test", "tool_call_id": "call_abc"}]
         mock_client.responses.create.assert_called_once_with(
-            model="gpt-5-mini", input=messages, tools=[BASH_TOOL_RESPONSE_API]
+            model="gpt-5-mini", input=messages, tools=[BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API]
         )
 
 

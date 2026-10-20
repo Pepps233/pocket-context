@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import typer
-from datasets import load_dataset
 
 from pocketcontextagent import global_config_dir
 from pocketcontextagent.agents import get_agent
@@ -36,6 +35,12 @@ Examples:
 
 [bold green]-c swebench.yaml -c agent.mode=yolo[/bold green]
 """
+
+
+def load_dataset(path: str, *, split: str):
+    from datasets import load_dataset
+
+    return load_dataset(path, split=split)
 
 
 # fmt: off

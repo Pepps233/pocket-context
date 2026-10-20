@@ -5,6 +5,7 @@ import pytest
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models.litellm_model import LitellmModel, LitellmModelConfig
 from pocketcontextagent.models.utils.actions_toolcall import BASH_TOOL
+from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL
 
 
 class TestLitellmModelConfig:
@@ -36,7 +37,7 @@ class TestLitellmModel:
         model.query([{"role": "user", "content": "test"}])
 
         mock_completion.assert_called_once()
-        assert mock_completion.call_args.kwargs["tools"] == [BASH_TOOL]
+        assert mock_completion.call_args.kwargs["tools"] == [BASH_TOOL, COMPACT_TOOL]
 
     @patch("pocketcontextagent.models.litellm_model.litellm.completion")
     @patch("pocketcontextagent.models.litellm_model.litellm.cost_calculator.completion_cost")

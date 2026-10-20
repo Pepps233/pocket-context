@@ -1,11 +1,11 @@
 """Parse actions & format observations with toolcalls"""
 
-import json
 import time
 
 from jinja2 import StrictUndefined, Template
 
 from pocketcontextagent.exceptions import FormatError
+from pocketcontextagent.models.utils.compact_tool import parse_native_calls
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
 
 BASH_TOOL = {
@@ -50,30 +50,20 @@ def parse_toolcall_actions(
                 "extra": {"interrupt_type": "FormatError"},
             }
         )
-    actions = []
-    for tool_call in tool_calls:
-        error_msg = ""
-        args = {}
-        try:
-            args = json.loads(tool_call.function.arguments)
-        except Exception as e:
-            error_msg = f"Error parsing tool call arguments: {e}."
-        if tool_call.function.name != "bash":
-            error_msg += f"Unknown tool '{tool_call.function.name}'."
-        if not isinstance(args, dict) or "command" not in args:
-            error_msg += "Missing 'command' argument in bash tool call."
-        if error_msg:
-            raise FormatError(
-                {
-                    "role": "user",
-                    "content": Template(format_error_template, undefined=StrictUndefined).render(
-                        actions=[], error=error_msg.strip(), has_tool_calls=True, **template_kwargs
-                    ),
-                    "extra": {"interrupt_type": "FormatError"},
-                }
-            )
-        actions.append({"command": args["command"], "tool_call_id": tool_call.id})
-    return actions
+    try:
+        return parse_native_calls(
+            [{"name": call.function.name, "arguments": call.function.arguments, "id": call.id} for call in tool_calls]
+        )
+    except ValueError as exc:
+        raise FormatError(
+            {
+                "role": "user",
+                "content": Template(format_error_template, undefined=StrictUndefined).render(
+                    actions=[], error=str(exc), has_tool_calls=True, **template_kwargs
+                ),
+                "extra": {"interrupt_type": "FormatError"},
+            }
+        ) from exc
 
 
 def format_toolcall_observation_messages(

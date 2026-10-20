@@ -4,7 +4,6 @@ or https://minimal-agent.com for a tutorial on the basic building principles.
 
 import json
 import logging
-import sqlite3
 import time
 import traceback
 from pathlib import Path
@@ -198,7 +197,7 @@ class DefaultAgent:
                 min_chars=self.config.compact_min_chars,
                 min_reduction=self.config.compact_min_reduction,
             )
-        except (SelectionError, sqlite3.Error, OSError) as exc:
+        except SelectionError as exc:
             results = format_results(
                 message,
                 [

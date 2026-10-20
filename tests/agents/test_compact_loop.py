@@ -442,3 +442,27 @@ def test_unknown_provider_tools_are_rejected_safely(tmp_path, api):
     start_history(agent)
     assert "Cannot safely group" in get_content_string(agent.step()[0])
     assert not read_blocks(agent)
+
+
+def test_plaintext_reasoning_quotes_exclude_signatures(tmp_path, api):
+    agent = make_agent(tmp_path, api, args=compaction_args(start_quote="Reasoned archive-start"))
+    if api:
+        agent.model.config.outputs[0]["output"].insert(
+            0,
+            {
+                "type": "reasoning",
+                "summary": [{"type": "summary_text", "text": "Reasoned archive-start"}],
+                "encrypted_content": "hidden-signature",
+            },
+        )
+    else:
+        agent.model.config.outputs[0]["content"] = [
+            {"type": "text", "text": "Inspect archive-start"},
+            {"type": "thinking", "thinking": "Reasoned archive-start", "signature": "hidden-signature"},
+        ]
+    start_history(agent)
+    assert "Compacted" in get_content_string(agent.step()[0])
+    assert "hidden-signature" in encode(read_blocks(agent)[0]["messages"])
+    from pocketcontextagent.agents.context import visible_text
+
+    assert "hidden-signature" not in encode(visible_text(agent.messages[2]))

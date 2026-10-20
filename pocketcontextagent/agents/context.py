@@ -43,6 +43,16 @@ def visible_text(message: dict) -> list[str]:
     """Only literal model-visible text and arguments, never IDs, signatures or metadata."""
     texts = []
     for item in provider_items(message):
+        for field in ("reasoning_content", "reasoning"):
+            if isinstance(item.get(field), str):
+                texts.append(item[field])
+        for block in item.get("summary", []) if item.get("type") == "reasoning" else []:
+            if block.get("type") == "summary_text":
+                texts.append(block.get("text", ""))
+        for block in item.get("reasoning_details") or []:
+            for field in ("text", "summary"):
+                if isinstance(block.get(field), str):
+                    texts.append(block[field])
         if item.get("type") == "function_call":
             texts.append(item.get("arguments", ""))
         elif item.get("type") == "function_call_output":
@@ -53,8 +63,10 @@ def visible_text(message: dict) -> list[str]:
             texts.append(content)
         elif isinstance(content, list):
             for block in content:
-                if block.get("type") in ("text", "input_text", "output_text"):
+                if block.get("type") in ("text", "input_text", "output_text", "reasoning_text"):
                     texts.append(block.get("text", ""))
+                elif block.get("type") == "thinking":
+                    texts.append(block.get("thinking", ""))
                 elif block.get("type") == "tool_use":
                     texts.append(encode(block.get("input", {})))
                 elif block.get("type") == "tool_result":
@@ -428,11 +440,14 @@ class ContextManager:
             "request_sequence": self.trigger["sequence"],
             "results": results,
         }
-        with closing(self._connect()) as db, db:
-            db.execute("INSERT INTO blocks VALUES (?, ?, ?, ?)", (self.run_id, call_id, tag, encode(record)))
-            db.execute(
-                "INSERT INTO events VALUES (?, ?, ?, ?)", (self.run_id, self.revision + 1, call_id, encode(event))
-            )
+        try:
+            with closing(self._connect()) as db, db:
+                db.execute("INSERT INTO blocks VALUES (?, ?, ?, ?)", (self.run_id, call_id, tag, encode(record)))
+                db.execute(
+                    "INSERT INTO events VALUES (?, ?, ?, ?)", (self.run_id, self.revision + 1, call_id, encode(event))
+                )
+        except (sqlite3.Error, OSError) as exc:
+            raise SelectionError(f"Archive write failed: {exc}. Retry after fixing local storage.") from exc
         self.records[summary_id] = summary_record
         self.events.append(event)
         self.active = proposed

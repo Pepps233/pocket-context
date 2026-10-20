@@ -123,6 +123,8 @@ class InteractiveAgent(DefaultAgent):
 
     def execute_actions(self, message: dict) -> list[dict]:
         # Override to handle user confirmation and confirm_exit, with try/finally to preserve partial outputs
+        if (results := self.dispatch_context_actions(message)) is not None:
+            return results
         actions = message.get("extra", {}).get("actions", [])
         commands = [action["command"] for action in actions]
         outputs = []

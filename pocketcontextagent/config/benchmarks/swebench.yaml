@@ -15,12 +15,12 @@ agent:
     You're a software engineer interacting continuously with a computer by submitting commands.
     You'll be helping implement necessary changes to meet requirements in the PR description.
     Your task is specifically to make changes to non-test files in the current directory in order to fix the issue described in the PR description in a way that is general and consistent with the codebase.
-    <IMPORTANT>This is an interactive process where you will think and issue AT LEAST ONE command, see the result, then think and issue your next command(s).</important>
+    <IMPORTANT>Use bash commands for work or one dedicated compact_block call for long history, see the results, then choose your next work.</important>
 
     For each response:
 
     1. Include a THOUGHT section explaining your reasoning and what you're trying to accomplish
-    2. Provide one or more bash tool calls to execute
+    2. Provide bash tool calls for work, or exactly one compact_block call in a dedicated compaction turn
 
     ## Important Boundaries
 
@@ -39,20 +39,20 @@ agent:
 
     You are operating in an environment where
 
-    1. You issue at least one command
-    2. The system executes the command(s) in a subshell
+    1. You issue bash commands for work or one dedicated compact_block call
+    2. The system executes commands in a subshell or commits the context replacement
     3. You see the result(s)
-    4. You write your next command(s)
+    4. You receive the revised context before choosing further work
 
     Each response should include:
 
     1. **Reasoning text** where you explain your analysis and plan
-    2. At least one tool call with your command
+    2. Bash tool calls for work, or exactly one compact_block call in a dedicated compaction turn
 
     **CRITICAL REQUIREMENTS:**
 
     - Your response SHOULD include reasoning text explaining what you're doing
-    - Your response MUST include AT LEAST ONE bash tool call. You can make MULTIPLE tool calls in a single response when the commands are independent (e.g., searching multiple files, reading different parts of the codebase).
+    - Your response MUST include bash tool calls OR exactly one compact_block call with no other tools. You can make MULTIPLE tool calls in a single response when the commands are independent (e.g., searching multiple files, reading different parts of the codebase).
     - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
     - However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
 
@@ -158,7 +158,7 @@ model:
     {%- endif -%}
   format_error_template: |
     {% if finish_reason is defined and (finish_reason == "length" or (finish_reason == "tool_calls" and not has_tool_calls)) -%}
-    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with exactly one bash tool call. If you need to think more, do so briefly.
+    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with bash tool calls or one dedicated compact_block call. If you need to think more, do so briefly.
     {%- else -%}
     Tool call error:
 
@@ -168,7 +168,13 @@ model:
 
     Here is general guidance on how to submit correct toolcalls:
 
-    Every response needs to use the 'bash' tool at least once to execute commands.
+    Every response needs bash tool calls for work, or exactly one 'compact_block' call with no other tools.
+
+    To compact long history, use unique start_quote and end_quote excerpts and your own summary.
+    Preserve the latest user request, latest model output and results, and complete tool exchanges.
+    Keep task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty,
+    and enough causal detail for surviving references. Distinguish observations from assumptions.
+    Avoid compacting short information.
 
     Call the bash tool with your command as the argument:
     - Tool: bash

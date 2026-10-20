@@ -55,14 +55,24 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
         required = ["start_quote", "end_quote", "summary"] if name == "compact_block" else ["command"]
         if name not in ("bash", "compact_block"):
             error += f"Unknown tool '{name}'."
-        if not isinstance(args, dict) or any(not isinstance(args.get(key), str) or not args[key] for key in required):
+        if not isinstance(args, dict) or any(
+            not isinstance(args.get(key), str) or (name == "compact_block" and not args[key]) for key in required
+        ):
             error += (
                 "Missing 'command' argument in bash tool call."
                 if name == "bash"
                 else "Missing or invalid start_quote, end_quote, summary argument in compact_block tool call."
             )
         if name == "compact_block":
-            actions.append({"type": name, "tool_call_id": call["id"], **(args if isinstance(args, dict) else {})})
+            if isinstance(args, dict) and set(args) != set(required):
+                error += "Use only start_quote, end_quote and summary arguments."
+            actions.append(
+                {
+                    **({key: args[key] for key in required if key in args} if isinstance(args, dict) else {}),
+                    "type": name,
+                    "tool_call_id": call["id"],
+                }
+            )
             if error:
                 actions[-1]["error"] = error
         elif error:

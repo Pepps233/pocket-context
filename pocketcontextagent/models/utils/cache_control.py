@@ -8,7 +8,7 @@ from typing import Literal
 
 
 def _get_content_text(entry: dict) -> str | None:
-    if entry["content"] is None:
+    if not entry["content"]:
         return None
     if isinstance(entry["content"], str):
         return entry["content"]
@@ -18,15 +18,15 @@ def _get_content_text(entry: dict) -> str | None:
 
 def _clear_cache_control(entry: dict) -> None:
     if isinstance(entry["content"], list):
-        assert len(entry["content"]) == 1, "Expected single message in content"
-        entry["content"][0].pop("cache_control", None)
+        for block in entry["content"]:
+            block.pop("cache_control", None)
     # Note: entry["content"] can be None for assistant messages with only tool_use
     entry.pop("cache_control", None)
 
 
 def _set_cache_control(entry: dict) -> None:
     # Handle None content (e.g., assistant messages with only tool_use)
-    if entry["content"] is None:
+    if not entry["content"]:
         entry["cache_control"] = {"type": "ephemeral"}
         return
 
@@ -39,10 +39,10 @@ def _set_cache_control(entry: dict) -> None:
             }
         ]
     else:
-        entry["content"][0]["cache_control"] = {"type": "ephemeral"}
+        entry["content"][-1]["cache_control"] = {"type": "ephemeral"}
     if entry["role"] == "tool":
         # Workaround for weird bug
-        entry["content"][0].pop("cache_control", None)
+        entry["content"][-1].pop("cache_control", None)
         entry["cache_control"] = {"type": "ephemeral"}
 
 

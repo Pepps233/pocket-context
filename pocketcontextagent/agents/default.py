@@ -4,14 +4,16 @@ or https://minimal-agent.com for a tutorial on the basic building principles.
 
 import json
 import logging
+import sqlite3
 import time
 import traceback
 from pathlib import Path
 
 from jinja2 import StrictUndefined, Template
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pocketcontextagent import Environment, Model, __version__
+from pocketcontextagent.agents.context import ContextManager, SelectionError
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, TimeExceeded
 from pocketcontextagent.utils.serialize import recursive_merge
 
@@ -31,6 +33,10 @@ class AgentConfig(BaseModel):
     """Stop agent after this many seconds of wall-clock time. 0 means no limit."""
     max_consecutive_format_errors: int = 3
     """Exit after this many format errors in a row (0 = no limit)."""
+    context_db_path: Path | None = None
+    """SQLite context archive; defaults to a separate database for each run."""
+    compact_min_chars: int = Field(default=2000, ge=0)
+    compact_min_reduction: int = Field(default=512, ge=0)
     output_path: Path | None = None
     """Save the trajectory to this path."""
 
@@ -40,6 +46,8 @@ class DefaultAgent:
         """See the `AgentConfig` class for permitted keyword arguments."""
         self.config = config_class(**kwargs)
         self.messages: list[dict] = []
+        self.context = ContextManager(self.config.context_db_path)
+        self._context_results: dict[tuple[int, str], list[dict]] = {}
         self.model = model
         self.env = env
         self.extra_template_vars = {}
@@ -68,6 +76,8 @@ class DefaultAgent:
 
     def add_messages(self, *messages: dict) -> list[dict]:
         self.logger.debug(messages)  # set log level to debug to see
+        for message in messages:
+            self.context.ingest(message)
         self.messages.extend(messages)
         return list(messages)
 
@@ -89,6 +99,8 @@ class DefaultAgent:
         """Run step() until agent is finished. Returns dictionary with exit_status, submission keys."""
         self.extra_template_vars |= {"task": task, **kwargs}
         self.messages = []
+        self.context = ContextManager(self.config.context_db_path)
+        self._context_results = {}
         self.add_messages(
             self.model.format_message(role="system", content=self._render_template(self.config.system_template)),
             self.model.format_message(role="user", content=self._render_template(self.config.instance_template)),
@@ -146,15 +158,56 @@ class DefaultAgent:
                 }
             )
         self.n_calls += 1
-        message = self.model.query(self.messages)
+        message = self.model.query(self.context.assemble(self.model))
         self.cost += message.get("extra", {}).get("cost", 0.0)
         self.add_messages(message)
         return message
 
     def execute_actions(self, message: dict) -> list[dict]:
         """Execute actions in message, add observation messages, return them."""
+        if (results := self.dispatch_context_actions(message)) is not None:
+            return results
         outputs = [self.env.execute(action) for action in message.get("extra", {}).get("actions", [])]
         return self.add_messages(*self.model.format_observation_messages(message, outputs, self.get_template_vars()))
+
+    def dispatch_context_actions(self, message: dict) -> list[dict] | None:
+        actions = message.get("extra", {}).get("actions", [])
+        if not any(action.get("type") in ("compact_block", "rejected") for action in actions):
+            return None
+        result_key = (id(message), json.dumps(actions, sort_keys=True))
+        if result_key in self._context_results:
+            return self._context_results[result_key]
+
+        def format_results(response, outputs):
+            results = self.model.format_observation_messages(response, outputs, self.get_template_vars())
+            for result, output in zip(results, outputs, strict=True):
+                if result.get("type") == "function_call_output":
+                    result["output"] = output["output"]
+                else:
+                    result["content"] = output["output"]
+            return results
+
+        try:
+            if len(actions) != 1 or actions[0].get("type") != "compact_block":
+                raise SelectionError("compact_block requires exactly one call and no other tools. No actions executed.")
+            results = self.context.compact(
+                actions[0],
+                message,
+                self.model,
+                format_results,
+                min_chars=self.config.compact_min_chars,
+                min_reduction=self.config.compact_min_reduction,
+            )
+        except (SelectionError, sqlite3.Error, OSError) as exc:
+            results = format_results(
+                message,
+                [
+                    {"output": f"compact_block error: {exc}", "returncode": -1, "exception_info": str(exc)}
+                    for _ in actions
+                ],
+            )
+        self._context_results[result_key] = self.add_messages(*results)
+        return self._context_results[result_key]
 
     def serialize(self, *extra_dicts) -> dict:
         """Serialize agent state to a json-compatible nested dictionary for saving."""
@@ -175,6 +228,7 @@ class DefaultAgent:
                 "submission": last_extra.get("submission", ""),
             },
             "messages": self.messages,
+            "context": self.context.serialize(),
             "trajectory_format": "mini-swe-agent-1.1",
         }
         return recursive_merge(agent_data, self.model.serialize(), self.env.serialize(), *extra_dicts)

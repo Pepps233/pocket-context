@@ -7,6 +7,7 @@ import pytest
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.portkey_model import PortkeyModel, PortkeyModelConfig
 from pocketcontextagent.models.utils.actions_toolcall import BASH_TOOL
+from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL
 
 
 def test_portkey_model_missing_api_key():
@@ -83,7 +84,7 @@ def test_portkey_model_query():
 
                 # Verify the API was called correctly with tools
                 mock_client.chat.completions.create.assert_called_once_with(
-                    model="gpt-4o", messages=messages, tools=[BASH_TOOL]
+                    model="gpt-4o", messages=messages, tools=[BASH_TOOL, COMPACT_TOOL]
                 )
                 # Verify cost calculation was called
                 mock_cost.assert_called_once_with(mock_response.model_copy(), model=None)

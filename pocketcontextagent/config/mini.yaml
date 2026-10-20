@@ -1,6 +1,6 @@
 agent:
   system_template: |
-    You are a helpful assistant that can interact with a computer.
+    You are an assistant that can interact with a computer.
   instance_template: |
     Please solve this issue: {{task}}
 

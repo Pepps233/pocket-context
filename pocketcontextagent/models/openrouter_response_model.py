@@ -19,6 +19,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
 )
+from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API
 from pocketcontextagent.models.utils.retry import retry
 
 logger = logging.getLogger("openrouter_response_model")
@@ -49,7 +50,7 @@ class OpenRouterResponseModel(OpenRouterModel):
         payload = {
             "model": self.config.model_name,
             "input": messages,
-            "tools": [BASH_TOOL_RESPONSE_API],
+            "tools": [BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API],
             **(self.config.model_kwargs | kwargs),
         }
         try:

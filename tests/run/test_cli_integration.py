@@ -1,3 +1,5 @@
+import json
+import os
 import re
 import subprocess
 import sys
@@ -561,89 +563,46 @@ def test_exit_immediately_flag_with_typer_runner():
 
 
 def test_output_file_is_created(tmp_path):
-    """Test that output trajectory file is created when --output is specified."""
-    from typer.testing import CliRunner
+    """Exercise trajectory saving through the real CLI, deterministic model and shell."""
+    import yaml
 
-    output_file = tmp_path / "test_traj.json"
+    from pocketcontextagent.models.test_models import make_output
 
-    # Create a temporary config file
-    config_file = tmp_path / "test_config.yaml"
-    default_config_path = Path("pocketcontextagent/config/default.yaml")
-    config_file.write_text(default_config_path.read_text())
-
-    with (
-        patch("pocketcontextagent.run.mini.configure_if_first_time"),
-        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
-        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
-        patch("pocketcontextagent.agents.utils.prompt_user.prompt_session.prompt", return_value=""),
-        patch("pocketcontextagent.agents.utils.prompt_user._multiline_prompt_session.prompt", return_value=""),
-    ):
-        # Setup mocks
-        mock_model = Mock()
-        mock_model.config = Mock()
-        mock_model.config.model_dump.return_value = {}
-        mock_model.serialize.return_value = {
-            "info": {
-                "config": {"model": {}, "model_type": "MockModel"},
-            }
-        }
-        mock_model.get_template_vars.return_value = {}
-        mock_model.format_message.side_effect = lambda **kwargs: dict(**kwargs)
-        # query now returns dict with extra["actions"]
-        mock_model.query.side_effect = [
-            {
-                "role": "assistant",
-                "content": "```mswea_bash_command\necho COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\necho done\n```",
-                "extra": {"actions": [{"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\necho done"}]},
-            },
-        ]
-        # format_observation_messages returns observation messages
-        mock_model.format_observation_messages.return_value = []
-        mock_get_model.return_value = mock_model
-
-        # Environment execute raises Submitted when COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT is seen
-        from pocketcontextagent.exceptions import Submitted
-
-        def execute_side_effect(action):
-            raise Submitted(
-                {
-                    "role": "exit",
-                    "content": "done",
-                    "extra": {"exit_status": "Submitted", "submission": "done"},
-                }
-            )
-
-        mock_environment = Mock()
-        mock_environment.config = Mock()
-        mock_environment.config.model_dump.return_value = {}
-        mock_environment.execute.side_effect = execute_side_effect
-        mock_environment.get_template_vars.return_value = {
-            "system": "TestOS",
-            "release": "1.0",
-            "version": "1.0.0",
-            "machine": "x86_64",
-        }
-        mock_environment.serialize.return_value = {
-            "info": {"config": {"environment": {}, "environment_type": "MockEnvironment"}}
-        }
-        mock_get_env.return_value = mock_environment
-
-        runner = CliRunner()
-        result = runner.invoke(
-            app,
-            [
-                "--task",
-                "Test task",
-                "--model",
-                "test-model",
-                "--output",
-                str(output_file),
-                "--config",
-                str(config_file),
+    config = yaml.safe_load(Path("pocketcontextagent/config/default.yaml").read_text())
+    config["agent"].update(
+        {"mode": "yolo", "confirm_exit": False, "context_db_path": str(tmp_path / "context.sqlite3")}
+    )
+    config["model"].update(
+        {
+            "model_class": "pocketcontextagent.models.test_models.DeterministicModel",
+            "model_name": "deterministic",
+            "outputs": [
+                make_output("Finish", [{"command": "printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\ndone\\n'"}])
             ],
-        )
-
-        if result.exit_code != 0:
-            print(f"Error output: {result.output}")
-        assert result.exit_code == 0
-        assert output_file.exists(), f"Output file {output_file} was not created"
+        }
+    )
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.safe_dump(config))
+    output_file = tmp_path / "trajectory.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pocketcontextagent.run.mini",
+            "--task",
+            "Test task",
+            "--output",
+            str(output_file),
+            "--config",
+            str(config_file),
+        ],
+        env={**os.environ, "MSWEA_CONFIGURED": "true", "MSWEA_GLOBAL_CONFIG_DIR": str(tmp_path / "global")},
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    saved = json.loads(output_file.read_text())
+    assert saved["info"]["exit_status"] == "Submitted" and saved["info"]["submission"] == "done\n"
+    assert saved["context"]["revision"] == 0 and len(saved["context"]["manifests"]) == 1
+    assert Path(saved["context"]["archive_path"]).is_file()

@@ -29,6 +29,48 @@ agent:
     <system_information>
     {{system}} {{release}} {{version}} {{machine}}
     </system_information>
+
+    ## Shell guidance
+
+    Each bash tool call runs in a new subshell.
+    Working-directory changes and exported environment variables do not persist between calls; files do.
+    Use `cd /path/to/project && command` to work in a directory and `MY_VAR=value command` to set a variable for one command.
+    For output that is too long, narrow your search or inspect selected lines with head, tail, or sed.
+    Redirect large output to a file when you need to inspect it across multiple calls.
+
+    ## Command examples
+
+    Pass commands in the bash tool's `command` argument.
+    These code blocks illustrate command contents, not a replacement for tool calls.
+
+    Create a file with a quoted heredoc to preserve literal content:
+
+    ```bash
+    cat <<'EOF' > example.py
+    print("hello")
+    EOF
+    ```
+
+    Replace text in a file:
+    {% if system == "Darwin" %}
+    On macOS, sed requires an empty backup suffix for in-place editing:
+
+    ```bash
+    sed -i '' 's/hello/world/g' example.py
+    ```
+    {% else %}
+    With GNU sed, use:
+
+    ```bash
+    sed -i 's/hello/world/g' example.py
+    ```
+    {% endif %}
+
+    Inspect a range of lines with line numbers:
+
+    ```bash
+    nl -ba example.py | sed -n '1,20p'
+    ```
   step_limit: 0
   cost_limit: 3.
   mode: confirm

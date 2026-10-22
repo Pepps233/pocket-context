@@ -1,6 +1,16 @@
 """Shared native tool schema and action parsing."""
 
 import json
+import re
+
+CONTEXT_TOOLS = ("compact_block", "expand_block")
+
+
+def canonical_tag(tag) -> bool:
+    return (
+        isinstance(tag, str) and re.fullmatch(r"ctx-(?:[0-9]{4}|[1-9][0-9]{4,})", tag) is not None and tag != "ctx-0000"
+    )
+
 
 COMPACT_FUNCTION = {
     "name": "compact_block",
@@ -30,16 +40,35 @@ COMPACT_FUNCTION = {
 }
 COMPACT_TOOL = {"type": "function", "function": COMPACT_FUNCTION}
 COMPACT_TOOL_RESPONSE_API = {"type": "function", **COMPACT_FUNCTION}
+EXPAND_FUNCTION = {
+    "name": "expand_block",
+    "description": (
+        "Retrieve a tagged archive from this run, keeping its summary in place. "
+        "Use exactly one expand_block call and no other tools in a dedicated response. "
+        "Returns complete local historical messages, never executes archived calls, and never follows references. "
+        "Use exp/part markers as unique quote selectors when recompacting; select complete original exchanges. "
+        "A fresh call may retrieve the same tag again. Expand referenced tags separately when needed."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {"tag": {"type": "string", "description": "Canonical current-run tag, such as ctx-0001"}},
+        "required": ["tag"],
+        "additionalProperties": False,
+    },
+}
+EXPAND_TOOL = {"type": "function", "function": EXPAND_FUNCTION}
+EXPAND_TOOL_RESPONSE_API = {"type": "function", **EXPAND_FUNCTION}
 
 
 def parse_native_calls(calls: list[dict]) -> list[dict]:
     """Normalize both API formats, retaining a result slot for every rejected call."""
-    if any(call["name"] == "compact_block" for call in calls) and len(calls) != 1:
+    context_tool = next((call["name"] for call in calls if call["name"] in CONTEXT_TOOLS), None)
+    if context_tool and len(calls) != 1:
         return [
             {
                 "type": "rejected",
                 "tool_call_id": call["id"],
-                "error": "compact_block requires exactly one call and no other tools. No actions executed.",
+                "error": f"{context_tool} requires exactly one call and no other tools. No actions executed.",
             }
             for call in calls
         ]
@@ -52,20 +81,24 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
             args = {}
             error = f"Error parsing tool call arguments: {exc}."
         name = call["name"]
-        required = ["start_quote", "end_quote", "summary"] if name == "compact_block" else ["command"]
-        if name not in ("bash", "compact_block"):
+        required = {"compact_block": ["start_quote", "end_quote", "summary"], "expand_block": ["tag"]}.get(
+            name, ["command"]
+        )
+        if name not in ("bash", *CONTEXT_TOOLS):
             error += f"Unknown tool '{name}'."
         if not isinstance(args, dict) or any(
-            not isinstance(args.get(key), str) or (name == "compact_block" and not args[key]) for key in required
+            not isinstance(args.get(key), str) or (name in CONTEXT_TOOLS and not args[key]) for key in required
         ):
             error += (
                 "Missing 'command' argument in bash tool call."
                 if name == "bash"
-                else "Missing or invalid start_quote, end_quote, summary argument in compact_block tool call."
+                else f"Missing or invalid {', '.join(required)} argument in {name} tool call."
             )
-        if name == "compact_block":
+        if name in CONTEXT_TOOLS:
             if isinstance(args, dict) and set(args) != set(required):
-                error += "Use only start_quote, end_quote and summary arguments."
+                error += f"Use only {', '.join(required)} arguments."
+            if name == "expand_block" and (not isinstance(args, dict) or not canonical_tag(args.get("tag"))):
+                error += "Use a canonical tag such as ctx-0001 from this run."
             actions.append(
                 {
                     **({key: args[key] for key in required if key in args} if isinstance(args, dict) else {}),

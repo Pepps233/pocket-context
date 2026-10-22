@@ -67,6 +67,7 @@ nav:
       - "Config": usage/config.md
       - "SWE-bench": usage/swebench.md
       - "ProgramBench": usage/programbench.md
+      - "BrowseComp-Plus": usage/browsecomp_plus.md
       - "Inspector": usage/inspector.md
       - "Output files": usage/output_files.md
     - "Language models":

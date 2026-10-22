@@ -24,6 +24,7 @@ subcommands = [
         "Evaluate on SWE-bench (single instance)",
     ),
     ("pocketcontextagent.run.benchmarks.programbench", ["programbench"], "Run on ProgramBench (batch mode)"),
+    ("pocketcontextagent.run.benchmarks.browsecomp_plus", ["browsecomp-plus"], "Prepare and run BrowseComp-Plus"),
 ]
 
 

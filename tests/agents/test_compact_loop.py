@@ -396,10 +396,11 @@ def test_concurrent_runs_share_database_without_sharing_context(tmp_path):
 
 
 def test_native_prompt_consistency_and_text_mode_unchanged():
-    for name in ("mini", "benchmarks/swebench", "benchmarks/programbench"):
+    for name in ("mini", "benchmarks/swebench", "benchmarks/programbench", "benchmarks/browsecomp_plus"):
         config = yaml.safe_load(Path(f"pocketcontextagent/config/{name}.yaml").read_text())
-        assert "exactly one compact_block" in config["agent"]["instance_template"]
-        assert "expand_block" in config["agent"]["instance_template"]
+        prompt = config["agent"]["system_template"] + config["agent"]["instance_template"]
+        assert "exactly one compact_block" in prompt
+        assert "expand_block" in prompt
         assert "compact_block" in config["model"]["format_error_template"]
         assert "expand_block" in config["model"]["format_error_template"]
         assert "AT LEAST ONE bash" not in encode(config)

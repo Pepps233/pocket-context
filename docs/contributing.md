@@ -1,7 +1,7 @@
 # Contributing
 
 Contributions to code, tests, and documentation are welcome.
-Please follow the [Code of Conduct](../.github/CODE_OF_CONDUCT.md).
+Please follow the [Code of Conduct](https://github.com/Pepps233/pocket-context/blob/main/.github/CODE_OF_CONDUCT.md).
 
 ## Issues and suggestions
 
@@ -12,11 +12,11 @@ For suggestions, describe the problem and the proposed improvement.
 ## Pull requests
 
 1. Fork the repository and create a branch for your changes.
-2. Follow the repository's [development guidelines](../AGENTS.md) and existing code style.
+2. Follow the repository's local `AGENTS.md` instructions and existing code style.
 3. Keep changes focused and add tests for new or changed behavior where appropriate.
 4. Run relevant tests and `pre-commit run --all-files` before submitting.
 5. Use the pull request template, explain the changes and validation, and link related issues.
 
-By contributing, you confirm that you have the right to submit your changes under the project's [MIT license](../LICENSE.md).
+By contributing, you confirm that you have the right to submit your changes under the project's [MIT license](https://github.com/Pepps233/pocket-context/blob/main/LICENSE.md).
 
 Adapted from the [CONTRIBUTING.md template](https://contributing.md/example/).

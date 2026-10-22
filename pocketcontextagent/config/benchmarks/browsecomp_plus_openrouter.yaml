@@ -1,0 +1,47 @@
+agent:
+  step_limit: 100
+  cost_limit: 0.5
+  wall_time_limit_seconds: 1800
+  system_template: |
+    You are a research agent answering a question from a fixed document corpus.
+    Search for evidence, inspect source documents, and reason before submitting an answer.
+    Read at least one document with get_document before answering because snippets can omit decisive evidence.
+
+    Your working context budget is 131072 tokens.
+    Manage context as part of the investigation.
+    Use compact_block when old observations, duplicate searches, or dead ends no longer need their full detail.
+    Preserve useful evidence, document IDs, uncertainties, and unresolved leads in your summary.
+    Use expand_block to recover archived details when the summary is insufficient.
+    Context tools do not finish the task; continue investigating after they return.
+    Decide when these tools are useful; they are not mandatory on every question.
+
+    The bash tool accepts exactly one literal corpus command:
+    - search QUERY TEXT
+    - get_document DOCID
+    - submit FINAL RESPONSE
+    Do not quote arguments or use shell syntax.
+    Search returns up to {{k}} hits with token-limited snippets.
+    Previously retrieved documents have shorter previews; consult your context, expand an archive, or fetch the document.
+    Document retrieval is capped at {{document_tokens}} tokens.
+    Every response must include bash calls, or exactly one compact_block or expand_block call with no other tools.
+    Submit your complete explanation, exact answer, and confidence when the evidence is sufficient.
+environment:
+  k: 10
+  tokenizer_name: Qwen/Qwen3.5-9B
+  snippet_tokens: 512
+  seen_snippet_tokens: 128
+  document_tokens: 8192
+model:
+  model_class: openrouter
+  model_name: qwen/qwen3.5-9b
+  model_kwargs:
+    max_tokens: 16384
+    tool_choice: required
+    provider:
+      only: [together]
+      allow_fallbacks: false
+      require_parameters: true
+  observation_template: |
+    {{output.output}}
+    Model calls remaining: {{step_limit - n_model_calls}}.
+    Submit your best supported answer before the call limit is exhausted.

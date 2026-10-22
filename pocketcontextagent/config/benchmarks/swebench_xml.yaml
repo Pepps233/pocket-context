@@ -1,5 +1,7 @@
 agent:
+  context_token_limit: 128000
   system_template: |
+    Your context window is {{context_token_limit}} tokens, including the next response.
     You are a helpful assistant that can interact multiple times with a computer shell to solve programming tasks.
     Your response must contain exactly ONE bash code block with ONE command (or commands connected with && or ||).
 

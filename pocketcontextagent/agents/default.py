@@ -12,7 +12,8 @@ from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel, Field
 
 from pocketcontextagent import Environment, Model, __version__
-from pocketcontextagent.agents.context import ContextManager, SelectionError
+from pocketcontextagent.agents.context import ContextManager, SelectionError, provider_items
+from pocketcontextagent.agents.utils.context_budget import append_text, estimate_tokens, output_token_setting
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, TimeExceeded
 from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
 from pocketcontextagent.utils.serialize import recursive_merge
@@ -37,6 +38,16 @@ class AgentConfig(BaseModel):
     """SQLite context archive; defaults to a separate database for each run."""
     compact_min_chars: int = Field(default=2000, ge=0)
     compact_min_reduction: int = Field(default=512, ge=0)
+    context_token_limit: int = Field(default=0, ge=0)
+    """Working context window, including the next response; 0 disables accounting."""
+    response_token_limit: int = Field(default=16384, gt=0)
+    """Output reservation when model_kwargs does not specify an output-token limit."""
+    context_limit_template: str = (
+        "Your {{context_token_limit}} token context window has reached 95% of its budget. "
+        "Stop searching and conclude the investigation now. Do not call any tools or manage memory. "
+        "Review the available evidence and produce your best final answer in the required answer format. "
+        "This is your final generation; the episode ends immediately after your response."
+    )
     output_path: Path | None = None
     """Save the trajectory to this path."""
 
@@ -56,6 +67,7 @@ class DefaultAgent:
         self.n_calls = 0
         self.n_consecutive_format_errors = 0
         self._start_time = time.time()
+        self._final_generation = False
 
     def get_template_vars(self, **kwargs) -> dict:
         return recursive_merge(
@@ -101,6 +113,7 @@ class DefaultAgent:
         self.messages = []
         self.context = ContextManager(self.config.context_db_path)
         self._context_results = {}
+        self._final_generation = False
         self.add_messages(
             self.model.format_message(role="system", content=self._render_template(self.config.system_template)),
             self.model.format_message(role="user", content=self._render_template(self.config.instance_template)),
@@ -137,7 +150,10 @@ class DefaultAgent:
 
     def step(self) -> list[dict]:
         """Query the LM, execute actions."""
-        return self.execute_actions(self.query())
+        message = self.query()
+        if self._final_generation:
+            return self.finish_context_limited_episode(message)
+        return self.execute_actions(message)
 
     def query(self) -> dict:
         """Query the model and return model messages. Override to add hooks."""
@@ -157,8 +173,29 @@ class DefaultAgent:
                     "extra": {"exit_status": "TimeExceeded", "submission": ""},
                 }
             )
+        options = {}
+        if self.config.context_token_limit:
+            key, allowance = output_token_setting(self.model, self.config.response_token_limit)
+            if self.context_tokens(self.context.projection()) + allowance >= self.config.context_token_limit * 0.95:
+                self._final_generation = True
+                self.add_messages(
+                    self.model.format_message(
+                        role="user", content=self._render_template(self.config.context_limit_template)
+                    )
+                )
+                options["final_answer"] = True
+            remaining = self.config.context_token_limit - self.context_tokens(self.context.projection())
+            if remaining <= 0:
+                raise LimitsExceeded(
+                    {
+                        "role": "exit",
+                        "content": "Context window exhausted",
+                        "extra": {"exit_status": "LimitsExceeded", "submission": "", "context_limit_reached": True},
+                    }
+                )
+            options[key] = min(allowance, remaining)
         self.n_calls += 1
-        message = self.model.query(self.context.assemble(self.model))
+        message = self.model.query(self.context.assemble(self.model), **options)
         self.cost += message.get("extra", {}).get("cost", 0.0)
         self.add_messages(message)
         return message
@@ -168,7 +205,42 @@ class DefaultAgent:
         if (results := self.dispatch_context_actions(message)) is not None:
             return results
         outputs = [self.env.execute(action) for action in message.get("extra", {}).get("actions", [])]
-        return self.add_messages(*self.model.format_observation_messages(message, outputs, self.get_template_vars()))
+        return self.add_observations(self.model.format_observation_messages(message, outputs, self.get_template_vars()))
+
+    def context_tokens(self, messages: list[dict]) -> int:
+        return estimate_tokens(
+            self.context._prepare(self.model, messages),
+            getattr(self.env, "tokenizer", None),
+            text_based=hasattr(self.model.config, "action_regex"),
+        )
+
+    def add_observations(self, messages: list[dict], *, origins: list[dict] | None = None) -> list[dict]:
+        if messages and self.config.context_token_limit:
+            _, allowance = output_token_setting(self.model, self.config.response_token_limit)
+            tokens = self.context_tokens(self.context.projection() + messages) + allowance
+            append_text(messages[-1], f"[CURRENT CONTEXT TOKEN: {tokens}]")
+        return self.add_messages(*messages, origins=origins)
+
+    def finish_context_limited_episode(self, message: dict) -> list[dict]:
+        text = "\n".join(
+            block.get("text", "")
+            for item in provider_items(message)
+            for block in (
+                [{"text": item["content"]}] if isinstance(item.get("content"), str) else item.get("content") or []
+            )
+            if block.get("type", "text") in ("text", "output_text")
+        ).strip()
+        return self.add_messages(
+            self.model.format_message(
+                role="exit",
+                content=text,
+                extra={
+                    "exit_status": "Submitted" if text else "LimitsExceeded",
+                    "submission": text,
+                    "context_limit_reached": True,
+                },
+            )
+        )
 
     def dispatch_context_actions(self, message: dict) -> list[dict] | None:
         actions = message.get("extra", {}).get("actions", [])
@@ -215,7 +287,7 @@ class DefaultAgent:
                     for _ in actions
                 ],
             )
-        self._context_results[result_key] = self.add_messages(*results, origins=origins)
+        self._context_results[result_key] = self.add_observations(results, origins=origins)
         return self._context_results[result_key]
 
     def serialize(self, *extra_dicts) -> dict:

@@ -17,6 +17,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     parse_toolcall_actions_response,
 )
 from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API
+from pocketcontextagent.models.utils.response import has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
 
 logger = logging.getLogger("portkey_response_model")
@@ -96,6 +97,7 @@ class PortkeyResponseAPIModel:
 
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:
         final_answer = kwargs.pop("final_answer", False)
+        allow_text_response = kwargs.pop("allow_text_response", False)
         if final_answer and not hasattr(self.config, "action_regex"):
             kwargs["tool_choice"] = "none"
         for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
@@ -104,7 +106,11 @@ class PortkeyResponseAPIModel:
         cost_output = self._calculate_cost(response)
         GLOBAL_MODEL_STATS.add(cost_output["cost"])
         try:
-            actions = [] if final_answer else self._parse_actions(response)
+            actions = (
+                []
+                if final_answer or (allow_text_response and not has_tool_calls(response))
+                else self._parse_actions(response)
+            )
         except FormatError as e:
             e.messages[0]["extra"].update(cost_output)
             # hasattr guard: Portkey returns a pydantic object, but tests may inject a plain dict.

@@ -13,6 +13,9 @@
 #   1. Run `modal setup` to authenticate with Modal
 #   2. Install the modal extra: `pip install pocketcontextagent[modal]`
 
+agent:
+  context_token_limit: 128000
+
 # Modal environment configuration via SWE-ReX
 # The image will be dynamically set per-instance to match SWE-bench docker images
 environment:
@@ -43,4 +46,5 @@ model:
   model_class: portkey
   provider: "@openai"
   model_kwargs:
+    max_completion_tokens: 16384
     drop_params: true

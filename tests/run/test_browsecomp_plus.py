@@ -8,9 +8,10 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment
+from pocketcontextagent.agents.default import DefaultAgent
+from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
 from pocketcontextagent.exceptions import Submitted
-from pocketcontextagent.models.test_models import make_output, make_toolcall_output
+from pocketcontextagent.models.test_models import DeterministicToolcallModel, make_output, make_toolcall_output
 from pocketcontextagent.run.benchmarks.browsecomp_plus import app
 from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
     BM25Retriever,
@@ -73,6 +74,7 @@ def test_real_bm25_environment(bm25_index: Path, tmp_path: Path):
         "docid": "city",
         "score": env.retriever.search("jazz festival", 1)[0]["score"],
         "snippet": "Montréal hosts a jaz",
+        "context_status": "new",
     }
     assert "Montréal" in json.loads(env.execute({"command": "get_document city"})["output"])["text"]
     assert "not found" in env.execute({"command": "get_document missing"})["output"]
@@ -88,9 +90,17 @@ def test_real_bm25_environment(bm25_index: Path, tmp_path: Path):
 
 
 @pytest.mark.parametrize(
-    ("step_limit", "status", "memory"), [(5, "completed", False), (1, "LimitsExceeded", False), (10, "completed", True)]
+    ("step_limit", "status", "memory", "text_answer"),
+    [
+        (5, "completed", False, False),
+        (1, "LimitsExceeded", False, False),
+        (10, "completed", True, False),
+        (5, "completed", False, True),
+    ],
 )
-def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: int, status: str, memory: bool):
+def test_benchmark_cli_end_to_end(
+    bm25_index: Path, tmp_path: Path, step_limit: int, status: str, memory: bool, text_answer: bool
+):
     queries = tmp_path / "queries.jsonl"
     queries.write_text(
         "\n".join(
@@ -107,8 +117,12 @@ def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: 
                 make_output("Look for the festival.", [{"command": "search jazz festival"}]),
                 make_output("Read the evidence.", [{"command": "get_document city"}]),
                 make_output(
-                    "The document identifies the city.",
-                    [{"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%"}],
+                    "Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%"
+                    if text_answer
+                    else "The document identifies the city.",
+                    []
+                    if text_answer
+                    else [{"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%"}],
                 ),
             ],
         },
@@ -179,6 +193,8 @@ def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: 
     assert {path.name for path in output.glob("*.json")} == {"0.json", "1.json"}
     for query_id in ("0", "1"):
         data = json.loads((output / f"{query_id}.json").read_text())
+        assert data["final_answer"] == ("Montréal" if status == "completed" else "")
+        assert data["confidence"] == 100
         assert data["query_id"] == query_id
         assert data["status"] == status
         assert data["retrieved_docids"] == (["city", "other"] if memory else ["city"])
@@ -337,12 +353,12 @@ def test_metrics_count_context_calls_and_deduplicate_responses():
     }
 
 
-@pytest.mark.parametrize(("final_action",), [([],), ([{"command": "search bananas"}],)])  # noqa: PT006
-def test_context_budget_final_generation(bm25_index: Path, tmp_path: Path, final_action: list[dict]):
+@pytest.mark.parametrize(("final_action", "valid"), [([], True), ([{"command": "search bananas"}], True), ([], False)])
+def test_context_budget_final_generation(bm25_index: Path, tmp_path: Path, final_action: list[dict], valid: bool):
     queries = tmp_path / "queries.jsonl"
     queries.write_text(json.dumps({"query_id": "budget", "query": "Which city hosts the festival?"}))
     config = tmp_path / "replay.yaml"
-    answer = "Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 85%"
+    answer = "Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 85%" if valid else "Insufficient evidence."
     config.write_text(
         yaml.safe_dump(
             {
@@ -376,13 +392,109 @@ def test_context_budget_final_generation(bm25_index: Path, tmp_path: Path, final
             str(config),
         ],
     )
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == (0 if valid else 1), result.output
     data = json.loads((output / "budget.json").read_text())
     trajectory = json.loads((output / "trajectories/budget/trajectory.json").read_text())
-    assert data["status"] == "completed"
+    assert data["status"] == ("completed" if valid else "LimitsExceeded")
     assert data["result"] == [{"type": "output_text", "output": answer}]
     assert data["model_stats"]["api_calls"] == 2
     assert data["tool_call_counts"] == {"search": 1, "get_document": 0}
     assert trajectory["messages"][3]["content"].splitlines()[-1].startswith("[CURRENT CONTEXT TOKEN: ")
     assert "Stop searching" in trajectory["messages"][4]["content"]
     assert trajectory["messages"][-1]["extra"]["context_limit_reached"] is True
+
+
+@pytest.mark.parametrize(("expand",), [(False,), (True,)])  # noqa: PT006
+def test_memory_aware_retrieval(bm25_index: Path, tmp_path: Path, expand: bool):
+    turns = [
+        ("Initial corpus search.", {"command": "search jazz"}),
+        ("Read evidence.", {"command": "get_document city"}),
+        ("Try another lead.", {"command": "search bananas"}),
+        (
+            "Archive evidence.",
+            {
+                "type": "compact_block",
+                "start_quote": "Initial corpus search.",
+                "end_quote": '"text":',
+                "summary": "Montréal hosts the jazz festival [city].",
+            },
+        ),
+    ]
+    turns.append(("Revisit the remaining lead.", {"command": "search bananas"}))
+    if expand:
+        turns.append(("Recover evidence.", {"type": "expand_block", "tag": "ctx-0001"}))
+    turns.extend(
+        [
+            ("Revisit the city.", {"command": "search jazz"}),
+            ("Finish.", {"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 90%"}),
+        ]
+    )
+    env = BrowseCompPlusEnvironment(BM25Retriever(bm25_index), k=1)
+    agent = DefaultAgent(
+        DeterministicToolcallModel(
+            observation_template="{{output.output}}",
+            outputs=[
+                make_toolcall_output(
+                    content,
+                    [
+                        {
+                            "id": str(index),
+                            "type": "function",
+                            "function": {
+                                "name": action.get("type", "bash"),
+                                "arguments": json.dumps({key: value for key, value in action.items() if key != "type"}),
+                            },
+                        }
+                    ],
+                    [action | {"tool_call_id": str(index)}],
+                )
+                for index, (content, action) in enumerate(turns)
+            ],
+        ),
+        env,
+        system_template="Research.",
+        instance_template="{{task}}",
+        cost_limit=0,
+        compact_min_chars=0,
+        compact_min_reduction=0,
+        context_token_limit=128000,
+        context_db_path=tmp_path / "context.sqlite",
+    )
+    assert agent.run("Which city hosts the festival?")["exit_status"] == "Submitted"
+    searches = [
+        json.loads(message["extra"]["raw_output"])
+        for message in agent.messages
+        if message.get("role") == "tool" and message.get("extra", {}).get("docids")
+    ]
+    assert searches[0][0]["context_status"] == "new"
+    assert searches[-1][0]["context_status"] == ("in_context" if expand else "compressed")
+    assert searches[-2][0]["context_status"] == "in_context"
+    assert searches[-1][0]["previously_retrieved"] is True
+    assert ("expand_block" in searches[-1][0]["hint"]) != expand
+    if not expand:
+        assert searches[-1][0]["memory_tags"] == ["ctx-0001"]
+    else:
+        assert (
+            next(
+                message
+                for message in agent.messages
+                if message.get("role") == "tool" and "Expanded [ctx-0001]" in message.get("content", "")
+            )["content"]
+            .splitlines()[-1]
+            .startswith("[CURRENT CONTEXT TOKEN: ")
+        )
+    env.retriever.close()
+
+
+@pytest.mark.parametrize(
+    ("text", "answer", "confidence"),
+    [
+        ("Exact Answer: First\nConfidence: 20%\n**Exact Answer:** Montréal**\nConfidence: 85%", "Montréal", 85),
+        ("Explanation: Evidence [city].\nExact Answer: Montréal", "Montréal", 100),
+        ("I will search again.\nConfidence: 10%", "", 10),
+        ("Exact Answer:\nConfidence: 10%", "", 10),
+    ],
+)
+def test_answer_extraction(text: str, answer: str, confidence: int):
+    assert extract_answer(text) == {"final_answer": answer, "confidence": confidence}
+    assert BrowseCompPlusEnvironment.is_final_answer(text) == bool(answer)

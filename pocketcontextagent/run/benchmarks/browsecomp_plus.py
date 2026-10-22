@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.config import get_config_from_spec
-from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment
+from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
 from pocketcontextagent.models import get_model, get_model_name
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import app as daytona_app
 from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
@@ -76,6 +76,7 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
             "tool_call_counts": env.tool_call_counts,
             "retrieved_docids": sorted(env.retrieved_docids),
             "result": [{"type": "output_text", "output": info["submission"]}],
+            **extract_answer(info["submission"]),
             "metadata": {"model": agent.model.config.model_name, "retriever": "BM25", "fingerprint": fingerprint},
             "model_stats": info["model_stats"],
             "metrics": episode_metrics(agent.messages),

@@ -5,6 +5,10 @@ agent:
   wall_time_limit_seconds: 21600
   system_template: |
     Your context window is {{context_token_limit}} tokens, including the next response.
+    The [CURRENT CONTEXT TOKEN: N] marker estimates active context plus the next response's maximum output allowance.
+    Read this environmental marker; do not generate it yourself.
+    When instructed to conclude because of the context budget, provide your best final answer without tools or commands.
+    The normal action format applies only while working, before that final instruction.
     You are a helpful assistant that can interact with a computer.
 
     Your task is to recreate a program from scratch based only on its observable behavior and bundled documentation.

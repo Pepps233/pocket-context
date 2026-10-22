@@ -13,7 +13,12 @@ from pydantic import BaseModel, Field
 
 from pocketcontextagent import Environment, Model, __version__
 from pocketcontextagent.agents.context import ContextManager, SelectionError, relationships
-from pocketcontextagent.agents.utils.context_budget import append_text, estimate_tokens, output_token_setting
+from pocketcontextagent.agents.utils.context_budget import (
+    append_text,
+    estimate_tokens,
+    fit_observations,
+    output_token_setting,
+)
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, Submitted, TimeExceeded
 from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
 from pocketcontextagent.models.utils.response import response_text
@@ -233,8 +238,14 @@ class DefaultAgent:
 
     def add_observations(self, messages: list[dict], *, origins: list[dict] | None = None) -> list[dict]:
         if messages and self.config.context_token_limit:
+            fit_observations(
+                messages,
+                int(self.config.context_token_limit * 0.95),
+                lambda results: self.context_tokens(self.context.projection() + results),
+            )
             _, allowance = output_token_setting(self.model, self.config.response_token_limit)
-            tokens = self.context_tokens(self.context.projection() + messages) + allowance
+            tokens = self.context_tokens(self.context.projection() + messages)
+            tokens += min(allowance, max(0, self.config.context_token_limit - tokens))
             latest_result = next(
                 (
                     message

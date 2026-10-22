@@ -99,7 +99,9 @@ It sets a 128,000-token context window, 100 model calls, a $0.50 stopping thresh
 The last tool result of each turn receives a `[CURRENT CONTEXT TOKEN: N]` marker estimating the active conversation plus the next response's maximum output allowance.
 Estimates use the configured corpus tokenizer when available, otherwise four UTF-8 bytes per token, and include message framing and tool schemas.
 At 95% of the projected window, the agent receives a stop instruction, makes one text-only final generation, and ends without executing further tools.
-The response allowance is capped to the estimated remaining space; an already oversized prompt ends with `LimitsExceeded`.
+Oversized new tool results are visibly truncated before entering the conversation so there is room for the final generation; complete raw tool output remains in trajectory metadata.
+The response allowance is capped to the estimated remaining space.
+An initial task or model response that already exceeds the window ends with `LimitsExceeded`.
 Search results distinguish new documents, previously seen evidence still in context, and compacted evidence with archive tags for `expand_block`.
 The agent is instructed to read a document before answering, corroborate uncertain candidates, and use Pocket Context's own memory tools.
 The cost threshold is checked between calls and can be exceeded by an in-flight request.

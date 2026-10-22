@@ -1,5 +1,6 @@
 """Offline context estimates and provider-neutral tool-result annotations."""
 
+from collections.abc import Callable, Iterator
 from math import ceil
 
 from pocketcontextagent.agents.context import encode
@@ -38,3 +39,41 @@ def append_text(message: dict, text: str) -> None:
             append_text(content[-1], text)
         else:
             content.append({"type": "input_text" if field == "output" else "text", "text": text})
+
+
+def text_fields(message: dict) -> Iterator[tuple[dict, str]]:
+    field = "output" if message.get("type") == "function_call_output" else "content"
+    content = message.get(field)
+    if isinstance(content, str):
+        yield message, field
+    elif isinstance(content, list):
+        for block in content:
+            if block.get("type") in ("text", "input_text", "output_text"):
+                yield block, "text"
+            elif block.get("type") == "tool_result":
+                yield from text_fields(block)
+
+
+def fit_observations(messages: list[dict], budget: int, count_tokens: Callable[[list[dict]], int]) -> None:
+    """Bound new visible results before ingestion, retaining full raw_output metadata."""
+    suffix = "\n[Output truncated to leave room for a final answer.]"
+    fields = [(message, container, key) for message in messages for container, key in text_fields(message)]
+    for message, container, key in sorted(fields, key=lambda field: len(field[1][field[2]]), reverse=True):
+        if count_tokens(messages) <= budget:
+            return
+        original = container[key]
+        if len(original) <= len(suffix):
+            continue
+        low, high = 0, len(original)
+        container[key] = suffix
+        message.setdefault("extra", {})["context_truncated"] = True
+        if count_tokens(messages) > budget:
+            continue
+        while low < high:
+            middle = (low + high + 1) // 2
+            container[key] = original[:middle] + suffix
+            if count_tokens(messages) <= budget:
+                low = middle
+            else:
+                high = middle - 1
+        container[key] = original[:low] + suffix

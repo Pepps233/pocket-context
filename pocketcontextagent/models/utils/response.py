@@ -8,10 +8,10 @@ def response_items(message: dict) -> list[dict]:
     return message.get("output", []) if message.get("object") == "response" else [message]
 
 
-def has_tool_calls(response: Any) -> bool:
+def has_tool_calls(response: Any, *, action_regex: str = "") -> bool:
     response = response if isinstance(response, dict) else response.model_dump()
     message = response["choices"][0]["message"] if "choices" in response else response
-    return any(
+    return bool(action_regex and re.search(action_regex, response_text(message), re.DOTALL)) or any(
         item.get("tool_calls")
         or item.get("type") == "function_call"
         or any(block.get("type") == "tool_use" for block in item.get("content") or [] if isinstance(block, dict))

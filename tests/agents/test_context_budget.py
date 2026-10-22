@@ -108,3 +108,29 @@ def test_budget_disabled_and_multimodal_result_annotations(tmp_path: Path):
     assert message["content"][0]["content"][-1] == {"type": "text", "text": "[CURRENT CONTEXT TOKEN: 50]"}
     assert message["content"][0]["content"][1]["source"]["url"] == "image"
     assert output_token_setting(model, 16384) == ("max_tokens", 16384)
+
+
+def test_oversized_tool_output_still_allows_one_final_generation(tmp_path: Path):
+    model = RecordingModel(
+        outputs=[
+            make_output("Read evidence", [{"command": "printf '%0600000d' 0"}]),
+            make_output("Best answer", []),
+        ]
+    )
+    agent = DefaultAgent(
+        model,
+        LocalEnvironment(),
+        system_template="Work",
+        instance_template="{{task}}",
+        cost_limit=0,
+        context_token_limit=128000,
+        context_db_path=tmp_path / "context.sqlite",
+    )
+    assert agent.run("Find evidence")["submission"] == "Best answer"
+    assert len(model.requests) == 2
+    assert model.requests[-1][1]["final_answer"] is True
+    assert agent.context_tokens(model.requests[-1][0]) + model.requests[-1][1]["max_tokens"] <= 128000
+    assert agent.messages[3]["extra"]["context_truncated"] is True
+    assert len(agent.messages[3]["extra"]["raw_output"]) == 600000
+    assert "truncated" in agent.messages[3]["content"]
+    assert agent.messages[3]["content"].endswith("[CURRENT CONTEXT TOKEN: 128000]")

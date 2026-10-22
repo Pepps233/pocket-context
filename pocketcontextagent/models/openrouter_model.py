@@ -109,7 +109,11 @@ class OpenRouterModel:
         try:
             actions = (
                 []
-                if final_answer or (allow_text_response and not has_tool_calls(response))
+                if final_answer
+                or (
+                    allow_text_response
+                    and not has_tool_calls(response, action_regex=getattr(self.config, "action_regex", ""))
+                )
                 else self._parse_actions(response)
             )
         except FormatError as e:

@@ -108,7 +108,9 @@ The cost threshold is checked between calls and can be exceeded by an in-flight 
 Ten concurrent tasks can therefore consume roughly ten times the per-task threshold.
 
 This is a paper-guided retrieval configuration for this repository's existing agent.
-Its `compact_block` and `expand_block` tools differ from the paper's external summarizer and memory querier, and the profile does not reproduce the paper's trained policy.
+Its `compact_block` selects bounds for a separate same-model compaction agent, and `expand_block` retrieves the local archive.
+The compaction agent sees only the active history prefix through the selected end.
+These tools differ from the paper's memory pipeline, and the profile does not reproduce the paper's trained policy.
 The model decides whether context tools are useful; a short successful episode can use neither.
 
 ### Ten parallel Daytona workers

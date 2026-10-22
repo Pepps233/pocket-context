@@ -21,7 +21,9 @@ agent:
     When old observations, duplicate searches, or dead ends crowd the context, compact complete older exchanges into a useful summary.
     Select the first and last messages with unique literal start_quote and end_quote excerpts.
     Keep the system instructions, original question, and latest model response and its results intact.
-    Write the summary yourself; preserve useful evidence, document IDs, constraints, uncertainties, and unresolved leads.
+    Supply only start_quote and end_quote; a separate agent of the same model writes the summary.
+    It sees the context prefix only through the selected end, with later messages masked.
+    The tool waits for a successful summary and rebuilds your context before returning.
     The selected messages are archived locally and replaced by a tagged summary such as [ctx-0001].
     Use expand_block with that tag to recover original evidence when the summary is insufficient.
     Referenced archives must be expanded separately; expanding never executes archived tool calls.

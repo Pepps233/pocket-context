@@ -10,7 +10,7 @@ from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL, COMPACT_T
 
 @pytest.mark.parametrize(("response_api",), [(False,), (True,)])  # noqa: PT006
 def test_native_compaction_parsing_and_batch_rejection(response_api):
-    args = {"start_quote": "first", "end_quote": "last", "summary": "Remember results"}
+    args = {"start_quote": "first", "end_quote": "last"}
 
     def parse(calls):
         if response_api:
@@ -36,6 +36,11 @@ def test_native_compaction_parsing_and_batch_rejection(response_api):
         assert len(rejected) == 2
         assert all(action["type"] == "rejected" and "No actions executed" in action["error"] for action in rejected)
     assert "error" in parse([("compact_block", "{}", "bad")])[0]
+    assert (
+        "error"
+        in parse([("compact_block", json.dumps(args | {"summary": "Do not accept a caller summary"}), "old")])[0]
+    )
+    assert set(COMPACT_TOOL["function"]["parameters"]["properties"]) == {"start_quote", "end_quote"}
     assert parse([("bash", '{"command":"echo ok"}', "shell")]) == [{"command": "echo ok", "tool_call_id": "shell"}]
     assert COMPACT_TOOL["function"] == {key: value for key, value in COMPACT_TOOL_RESPONSE_API.items() if key != "type"}
 

@@ -79,7 +79,7 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
             **extract_answer(info["submission"]),
             "metadata": {"model": agent.model.config.model_name, "retriever": "BM25", "fingerprint": fingerprint},
             "model_stats": info["model_stats"],
-            "metrics": episode_metrics(agent.messages),
+            "metrics": episode_metrics(agent.messages + [call["response"] for call in agent.compactions]),
         }
         temporary = output / f"{query_id}.json.tmp"
         temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

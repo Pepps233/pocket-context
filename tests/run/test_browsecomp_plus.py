@@ -147,25 +147,28 @@ def test_benchmark_cli_end_to_end(
             make_output("Recover the original evidence.", [{"type": "expand_block", "tag": "ctx-0001"}]),
         ]
         configuration["model"]["model_class"] = "pocketcontextagent.models.test_models.DeterministicToolcallModel"
-        configuration["model"]["outputs"] = [
-            make_toolcall_output(
-                message["content"],
-                [
-                    {
-                        "id": f"call-{index}",
-                        "type": "function",
-                        "function": {
-                            "name": message["extra"]["actions"][0].get("type", "bash"),
-                            "arguments": json.dumps(
-                                {key: value for key, value in message["extra"]["actions"][0].items() if key != "type"}
-                            ),
-                        },
-                    }
-                ],
-                [message["extra"]["actions"][0] | {"tool_call_id": f"call-{index}"}],
+        configuration["model"]["outputs"] = []
+        for index, message in enumerate(outputs):
+            action = dict(message["extra"]["actions"][0])
+            summary = action.pop("summary", None)
+            configuration["model"]["outputs"].append(
+                make_toolcall_output(
+                    message["content"],
+                    [
+                        {
+                            "id": f"call-{index}",
+                            "type": "function",
+                            "function": {
+                                "name": action.get("type", "bash"),
+                                "arguments": json.dumps({key: value for key, value in action.items() if key != "type"}),
+                            },
+                        }
+                    ],
+                    [action | {"tool_call_id": f"call-{index}"}],
+                )
             )
-            for index, message in enumerate(outputs)
-        ]
+            if summary is not None:
+                configuration["model"]["outputs"].append(make_output(summary, []))
     config.write_text(yaml.safe_dump(configuration))
     output = tmp_path / "runs"
     command = [
@@ -331,13 +334,24 @@ def test_metrics_count_context_calls_and_deduplicate_responses():
             ]
         )
     ]
-    metrics = episode_metrics(messages + [messages[0]])
+    metrics = episode_metrics(
+        messages
+        + [
+            messages[0],
+            {
+                "object": "response",
+                "id": "compaction-agent",
+                "output": [],
+                "usage": {"input_tokens": 95, "output_tokens": 5, "total_tokens": 100},
+            },
+        ]
+    )
     assert metrics == {
         "peak_input_tokens": 100,
         "peak_total_tokens": 105,
-        "total_input_tokens": 320,
-        "total_output_tokens": 20,
-        "calls_with_usage": 4,
+        "total_input_tokens": 415,
+        "total_output_tokens": 25,
+        "calls_with_usage": 5,
         "tool_call_counts": {"search": 1, "compact_block": 1, "expand_block": 1, "submit": 1},
         "total_tool_calls": 4,
     }
@@ -429,28 +443,31 @@ def test_memory_aware_retrieval(bm25_index: Path, tmp_path: Path, expand: bool):
             ("Finish.", {"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 90%"}),
         ]
     )
+    outputs = []
+    for index, (content, arguments) in enumerate(turns):
+        action = dict(arguments)
+        summary = action.pop("summary", None)
+        outputs.append(
+            make_toolcall_output(
+                content,
+                [
+                    {
+                        "id": str(index),
+                        "type": "function",
+                        "function": {
+                            "name": action.get("type", "bash"),
+                            "arguments": json.dumps({key: value for key, value in action.items() if key != "type"}),
+                        },
+                    }
+                ],
+                [action | {"tool_call_id": str(index)}],
+            )
+        )
+        if summary is not None:
+            outputs.append(make_output(summary, []))
     env = BrowseCompPlusEnvironment(BM25Retriever(bm25_index), k=1)
     agent = DefaultAgent(
-        DeterministicToolcallModel(
-            observation_template="{{output.output}}",
-            outputs=[
-                make_toolcall_output(
-                    content,
-                    [
-                        {
-                            "id": str(index),
-                            "type": "function",
-                            "function": {
-                                "name": action.get("type", "bash"),
-                                "arguments": json.dumps({key: value for key, value in action.items() if key != "type"}),
-                            },
-                        }
-                    ],
-                    [action | {"tool_call_id": str(index)}],
-                )
-                for index, (content, action) in enumerate(turns)
-            ],
-        ),
+        DeterministicToolcallModel(observation_template="{{output.output}}", outputs=outputs),
         env,
         system_template="Research.",
         instance_template="{{task}}",

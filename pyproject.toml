@@ -48,6 +48,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+browsecomp-plus = [
+    "pyserini==1.2.0",
+]
+
 full = [
     "pocketcontextagent[dev]",
     "swe-rex>=1.4.0",

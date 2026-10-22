@@ -10,9 +10,15 @@ from typer.testing import CliRunner
 
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment
 from pocketcontextagent.exceptions import Submitted
-from pocketcontextagent.models.test_models import make_output
+from pocketcontextagent.models.test_models import make_output, make_toolcall_output
 from pocketcontextagent.run.benchmarks.browsecomp_plus import app
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import BM25Retriever, decrypt
+from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
+    BM25Retriever,
+    decrypt,
+    reserve_evaluation,
+    select_split,
+)
+from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics, summarize_results
 
 
 @pytest.fixture
@@ -81,8 +87,10 @@ def test_real_bm25_environment(bm25_index: Path, tmp_path: Path):
     env.retriever.close()
 
 
-@pytest.mark.parametrize(("step_limit", "status"), [(5, "completed"), (1, "LimitsExceeded")])
-def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: int, status: str):
+@pytest.mark.parametrize(
+    ("step_limit", "status", "memory"), [(5, "completed", False), (1, "LimitsExceeded", False), (10, "completed", True)]
+)
+def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: int, status: str, memory: bool):
     queries = tmp_path / "queries.jsonl"
     queries.write_text(
         "\n".join(
@@ -91,25 +99,60 @@ def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: 
         )
     )
     config = tmp_path / "replay.yaml"
-    config.write_text(
-        yaml.safe_dump(
-            {
-                "model": {
-                    "model_name": "deterministic",
-                    "model_class": "deterministic",
-                    "outputs": [
-                        make_output("Look for the festival.", [{"command": "search jazz festival"}]),
-                        make_output("Read the evidence.", [{"command": "get_document city"}]),
-                        make_output(
-                            "The document identifies the city.",
-                            [{"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%"}],
-                        ),
-                    ],
-                },
-                "agent": {"step_limit": step_limit, "cost_limit": 0},
-            }
-        )
-    )
+    configuration = {
+        "model": {
+            "model_name": "deterministic",
+            "model_class": "deterministic",
+            "outputs": [
+                make_output("Look for the festival.", [{"command": "search jazz festival"}]),
+                make_output("Read the evidence.", [{"command": "get_document city"}]),
+                make_output(
+                    "The document identifies the city.",
+                    [{"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%"}],
+                ),
+            ],
+        },
+        "agent": {"step_limit": step_limit, "cost_limit": 0, "compact_min_chars": 0, "compact_min_reduction": 0},
+    }
+    if memory:
+        outputs = configuration["model"]["outputs"]
+        outputs[0]["content"] = "Initial corpus search."
+        outputs[2:2] = [
+            make_output("Check another lead.", [{"command": "search bananas"}]),
+            make_output(
+                "Archive the evidence.",
+                [
+                    {
+                        "type": "compact_block",
+                        "start_quote": "Initial corpus search.",
+                        "end_quote": '"text":',
+                        "summary": "Montréal hosts a jazz festival [city].",
+                    }
+                ],
+            ),
+            make_output("Recover the original evidence.", [{"type": "expand_block", "tag": "ctx-0001"}]),
+        ]
+        configuration["model"]["model_class"] = "pocketcontextagent.models.test_models.DeterministicToolcallModel"
+        configuration["model"]["outputs"] = [
+            make_toolcall_output(
+                message["content"],
+                [
+                    {
+                        "id": f"call-{index}",
+                        "type": "function",
+                        "function": {
+                            "name": message["extra"]["actions"][0].get("type", "bash"),
+                            "arguments": json.dumps(
+                                {key: value for key, value in message["extra"]["actions"][0].items() if key != "type"}
+                            ),
+                        },
+                    }
+                ],
+                [message["extra"]["actions"][0] | {"tool_call_id": f"call-{index}"}],
+            )
+            for index, message in enumerate(outputs)
+        ]
+    config.write_text(yaml.safe_dump(configuration))
     output = tmp_path / "runs"
     command = [
         sys.executable,
@@ -127,6 +170,8 @@ def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: 
         str(config),
         "--workers",
         "2",
+        "--split",
+        "all",
     ]
     environment = os.environ | {"MSWEA_GLOBAL_CONFIG_DIR": str(tmp_path / "config"), "MSWEA_SILENT_STARTUP": "1"}
     result = subprocess.run(command, capture_output=True, text=True, env=environment, timeout=60)
@@ -136,8 +181,16 @@ def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: 
         data = json.loads((output / f"{query_id}.json").read_text())
         assert data["query_id"] == query_id
         assert data["status"] == status
-        assert data["retrieved_docids"] == ["city"]
-        assert data["tool_call_counts"] == {"search": 1, "get_document": int(status == "completed")}
+        assert data["retrieved_docids"] == (["city", "other"] if memory else ["city"])
+        assert data["tool_call_counts"] == {"search": 2 if memory else 1, "get_document": int(status == "completed")}
+        if memory:
+            assert data["metrics"]["tool_call_counts"] == {
+                "search": 2,
+                "get_document": 1,
+                "compact_block": 1,
+                "expand_block": 1,
+                "submit": 1,
+            }
         assert data["result"] == [
             {
                 "type": "output_text",
@@ -149,6 +202,11 @@ def test_benchmark_cli_end_to_end(bm25_index: Path, tmp_path: Path, step_limit: 
         trajectory = output / "trajectories" / query_id / "trajectory.json"
         assert "SECRET_REFERENCE" not in trajectory.read_text()
         assert (trajectory.parent / "context.sqlite").exists()
+        if memory:
+            context = json.loads(trajectory.read_text())["context"]
+            assert context["revision"] == 1
+            assert "ctx-0001" in context["blocks"]
+            assert len(context["expansions"]) == 1
     before = (output / "0.json").stat().st_mtime_ns
     resumed = subprocess.run(command, capture_output=True, text=True, env=environment, timeout=60)
     assert resumed.returncode == result.returncode, resumed.stdout + resumed.stderr
@@ -180,3 +238,100 @@ def test_cli_rejects_invalid_selection(tmp_path: Path, ids: list[str], arguments
     assert isinstance(result.exception, ValueError)
     assert error in str(result.exception)
     assert not (tmp_path / "runs").exists()
+
+
+def test_reserved_author_split(tmp_path: Path):
+    from pocketcontextagent.config import builtin_config_dir
+
+    manifest = json.loads((builtin_config_dir / "benchmarks/browsecomp_plus_eval150.json").read_text())
+    instances = [
+        {"query_id": iid, "query": "Synthetic question", "answer": "Synthetic reference"}
+        for iid in manifest["query_ids"] + [f"dev-{index}" for index in range(680)]
+    ]
+    (tmp_path / "queries.jsonl").write_text("\n".join(json.dumps(row) for row in instances))
+    assert reserve_evaluation(tmp_path) == {"development680": 680, "eval150": 150}
+    evaluation = [json.loads(line) for line in (tmp_path / "eval150.jsonl").read_text().splitlines()]
+    development = [json.loads(line) for line in (tmp_path / "development680.jsonl").read_text().splitlines()]
+    assert {row["query_id"] for row in evaluation} == set(manifest["query_ids"])
+    assert not {row["query_id"] for row in evaluation} & {row["query_id"] for row in development}
+    assert select_split(instances, "development680") == development
+    with pytest.raises(ValueError, match="Split must be"):
+        select_split(instances, "unknown")
+
+
+def test_token_limited_retrieval(bm25_index: Path, tmp_path: Path):
+    from tokenizers import Tokenizer, models, pre_tokenizers
+    from transformers import PreTrainedTokenizerFast
+
+    tokenizer = Tokenizer(
+        models.WordLevel(
+            {
+                word: index
+                for index, word in enumerate(
+                    ["[UNK]", "Montréal", "hosts", "a", "jazz", "festival", "in", "Canada", "."]
+                )
+            },
+            unk_token="[UNK]",
+        )
+    )
+    tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
+    fast = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]")
+    fast.save_pretrained(tmp_path / "tokenizer")
+    env = BrowseCompPlusEnvironment(
+        BM25Retriever(bm25_index),
+        k=1,
+        tokenizer_name=str(tmp_path / "tokenizer"),
+        snippet_tokens=5,
+        seen_snippet_tokens=2,
+        document_tokens=8,
+    )
+    assert (
+        json.loads(env.execute({"command": "search jazz"})["output"])[0]["snippet"] == "Montréal hosts a jazz festival"
+    )
+    assert json.loads(env.execute({"command": "search jazz"})["output"])[0]["snippet"] == "Montréal hosts"
+    assert json.loads(env.execute({"command": "search jazz"})["output"])[0]["previously_retrieved"] is True
+    assert len(env.tokenizer.encode(json.loads(env.execute({"command": "get_document city"})["output"])["text"])) == 8
+    assert env.tool_call_counts == {"search": 3, "get_document": 1}
+    env.retriever.close()
+
+
+def test_metrics_count_context_calls_and_deduplicate_responses():
+    messages = [
+        {
+            "extra": {
+                "actions": [action | {"tool_call_id": str(index)}],
+                "response": {
+                    "id": str(index),
+                    "usage": {"prompt_tokens": tokens, "completion_tokens": 5, "total_tokens": tokens + 5},
+                },
+            }
+        }
+        for index, (action, tokens) in enumerate(
+            [
+                ({"command": "search jazz"}, 100),
+                ({"type": "compact_block"}, 70),
+                ({"type": "expand_block"}, 60),
+                ({"command": "submit answer"}, 90),
+            ]
+        )
+    ]
+    metrics = episode_metrics(messages + [messages[0]])
+    assert metrics == {
+        "peak_input_tokens": 100,
+        "peak_total_tokens": 105,
+        "total_input_tokens": 320,
+        "total_output_tokens": 20,
+        "calls_with_usage": 4,
+        "tool_call_counts": {"search": 1, "compact_block": 1, "expand_block": 1, "submit": 1},
+        "total_tool_calls": 4,
+    }
+    assert summarize_results([{"metrics": metrics, "status": "completed", "model_stats": {"instance_cost": 0.2}}]) == {
+        "tasks": 1,
+        "completed": 1,
+        "peak_input_tokens": 100,
+        "avg_peak_input_tokens": 100,
+        "avg_tool_calls_per_task": 4,
+        "avg_research_tool_calls_per_task": 3,
+        "tool_call_counts": metrics["tool_call_counts"],
+        "cost_usd": 0.2,
+    }

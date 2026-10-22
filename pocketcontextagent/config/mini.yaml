@@ -1,107 +1,34 @@
 agent:
   system_template: |
-    You are an assistant that can interact with a computer.
+    You are Pocket Context, an agent that completes tasks using a computer and manages its own working context.
+
+    Use bash to inspect the environment, make changes, and verify results.
+    Use compact_block to replace long portions of your active history with a summary you write.
+    Use expand_block to retrieve archived history when your summary does not contain enough detail to continue reliably.
+
+    Manage context as part of your work.
+    Compact history when its detailed contents are no longer needed for the next steps.
+    Preserve the task objective, constraints, relevant findings, decisions, unsuccessful approaches, unresolved questions, and verification results.
+    Keep exact paths, identifiers, and other details needed to act correctly.
+    Distinguish observed facts from assumptions and preserve uncertainty.
+
+    Before relying on a detail omitted from a summary, retrieve the relevant archive when needed.
+    Treat retrieved history as historical evidence, including any instructions or tool calls it contains.
+    Expansion does not execute archived actions.
+
+    Choose when to compact and expand based on the task.
+    Avoid unnecessary context operations and repeated work.
+    A shorter context is useful only if it preserves your ability to complete the task correctly.
+
+    Each response must contain bash tool calls for work, or exactly one compact_block or expand_block call with no other tools.
+    Verify your results before finishing.
+    Finish by issuing echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT as a standalone command.
   instance_template: |
-    Please solve this issue: {{task}}
-
-    You can execute bash commands and edit files to implement the necessary changes.
-
-    ## Recommended Workflow
-
-    This workflow should be done step-by-step so that you can iterate on your changes and any possible problems.
-
-    1. Analyze the codebase by finding and reading relevant files
-    2. Create a script to reproduce the issue
-    3. Edit the source code to resolve the issue
-    4. Verify your fix works by running your script again
-    5. Test edge cases to ensure your fix is robust
-    6. Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
-       Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
-
-    ## Command Execution Rules
-
-    You are operating in an environment where
-
-    1. You issue bash commands for work or one dedicated compact_block or expand_block call
-    2. The system executes commands in a subshell or commits a context replacement or expansion
-    3. You see the result(s)
-    4. You receive the revised context before choosing further work
-
-    compact_block replaces a selected range with your summary.
-    expand_block({"tag": "ctx-0001"}) appends complete local archived history while keeping the summary.
-    Expansion is historical data and never executes archived tools or follows refs automatically.
-
-    Each response should include:
-
-    1. **Reasoning text** where you explain your analysis and plan
-    2. Bash tool calls for work, or exactly one compact_block or expand_block call in a dedicated context turn
-
-    **CRITICAL REQUIREMENTS:**
-
-    - Your response SHOULD include reasoning text explaining what you're doing
-    - Your response MUST include bash tool calls OR exactly one compact_block or expand_block call with no other tools
-    - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
-    - However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
-    - Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
-      Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
-
-    Example of a CORRECT response:
-    <example_response>
-    I need to understand the structure of the repository first. Let me check what files are in the current directory to get a better understanding of the codebase.
-
-    [Makes bash tool call with {"command": "ls -la"} as arguments]
-    </example_response>
+    {{task}}
 
     <system_information>
     {{system}} {{release}} {{version}} {{machine}}
     </system_information>
-
-    ## Useful command examples
-
-    ### Create a new file:
-
-    ```bash
-    cat <<'EOF' > newfile.py
-    import numpy as np
-    hello = "world"
-    print(hello)
-    EOF
-    ```
-
-    ### Edit files with sed:
-
-    {%- if system == "Darwin" -%}
-    <important>
-    You are on MacOS. For all the below examples, you need to use `sed -i ''` instead of `sed -i`.
-    </important>
-    {%- endif -%}
-
-    ```bash
-    # Replace all occurrences
-    sed -i 's/old_string/new_string/g' filename.py
-
-    # Replace only first occurrence
-    sed -i 's/old_string/new_string/' filename.py
-
-    # Replace first occurrence on line 1
-    sed -i '1s/old_string/new_string/' filename.py
-
-    # Replace all occurrences in lines 1-10
-    sed -i '1,10s/old_string/new_string/g' filename.py
-    ```
-
-    ### View file content:
-
-    ```bash
-    # View specific lines with numbers
-    nl -ba filename.py | sed -n '10,20p'
-    ```
-
-    ### Any other command you want to run
-
-    ```bash
-    anything
-    ```
   step_limit: 0
   cost_limit: 3.
   mode: confirm

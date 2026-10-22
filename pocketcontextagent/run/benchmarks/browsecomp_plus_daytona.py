@@ -366,13 +366,16 @@ def run_pool(
             if not (path := output / f"{instance['query_id']}.json").exists()
             or json.loads(path.read_text())["status"] != "completed"
         ]
-        typer.echo(f"Running {len(pending)} tasks across {min(workers, len(pending))} sandboxes ({split})")
         existing = [
             json.loads((output / f"{instance['query_id']}.json").read_text())
             for instance in instances
             if instance not in pending
         ]
         remaining_successes = max(0, success_limit - len(existing)) if success_limit else 0
+        concurrent = min(workers, len(pending), remaining_successes if success_limit else len(pending))
+        typer.echo(f"Selected {len(pending)} pending tasks; up to {concurrent} parallel sandboxes ({split})")
+        if success_limit:
+            typer.echo(f"Stopping after {remaining_successes} additional submissions")
         if not success_limit or remaining_successes:
             run_pool_tasks(
                 api,

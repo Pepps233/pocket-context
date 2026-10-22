@@ -1,0 +1,608 @@
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
+
+from pocketcontextagent.run.mini import DEFAULT_CONFIG_FILE, app, main
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI escape sequences from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
+
+
+def test_configure_if_first_time_called():
+    """Test that configure_if_first_time is called when running mini main."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time") as mock_configure,
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test task",
+            yolo=False,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify configure_if_first_time was called
+        mock_configure.assert_called_once()
+
+
+def test_mini_command_calls_run_interactive():
+    """Test that mini command creates agent via get_agent."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test", "mode": "confirm"}, "env": {}, "model": {}}
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function with task provided (so prompt is not called)
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test task",
+            yolo=False,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify get_agent was called
+        mock_get_agent.assert_called_once()
+        args, kwargs = mock_get_agent.call_args
+        assert args[0] == mock_model  # model
+        assert args[1] == mock_environment  # env
+        # Verify agent.run was called with the task
+        mock_agent.run.assert_called_once_with("Test task")
+
+
+def test_mini_calls_prompt_when_no_task_provided():
+    """Test that mini calls prompt when no task is provided."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini._multiline_prompt") as mock_prompt,
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_prompt.return_value = "User provided task"
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test", "mode": "confirm"}, "env": {}, "model": {}}
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function without task
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task=None,  # No task provided
+            yolo=False,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify prompt was called
+        mock_prompt.assert_called_once()
+
+        # Verify get_agent was called
+        mock_get_agent.assert_called_once()
+        # Verify agent.run was called with the task from prompt
+        mock_agent.run.assert_called_once_with("User provided task")
+
+
+def test_mini_with_explicit_model():
+    """Test that mini works with explicitly provided model."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {
+            "agent": {"system_template": "test", "mode": "yolo"},
+            "env": {},
+            "model": {"default_config": "test"},
+        }
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function with explicit model
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="gpt-4",
+            task="Test task with explicit model",
+            yolo=True,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify get_model was called (model name is merged into config)
+        mock_get_model.assert_called_once()
+
+        # Verify get_agent was called
+        mock_get_agent.assert_called_once()
+        # Verify agent.run was called
+        mock_agent.run.assert_called_once_with("Test task with explicit model")
+
+
+def test_yolo_mode_sets_correct_agent_config():
+    """Test that yolo mode sets the correct agent configuration."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function with yolo=True
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test yolo task",
+            yolo=True,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify get_agent was called with yolo mode in config
+        mock_get_agent.assert_called_once()
+        args, kwargs = mock_get_agent.call_args
+        # The config (third positional arg) should contain the mode
+        assert args[2].get("mode") == "yolo"
+        # Verify agent.run was called
+        mock_agent.run.assert_called_once_with("Test yolo task")
+
+
+def test_confirm_mode_sets_correct_agent_config():
+    """Test that when yolo=False, no explicit mode is set (defaults to None)."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function with yolo=False (default)
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test confirm task",
+            yolo=False,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify get_agent was called with no explicit mode (defaults to None)
+        mock_get_agent.assert_called_once()
+        args, kwargs = mock_get_agent.call_args
+        # The config (third positional arg) should not contain mode when yolo=False
+        assert args[2].get("mode") is None
+        # Verify agent.run was called
+        mock_agent.run.assert_called_once_with("Test confirm task")
+
+
+def test_cost_limit_zero_is_preserved():
+    """Test that an explicit cost_limit=0 is not dropped during config merge."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        mock_get_model.return_value = Mock()
+        mock_get_env.return_value = Mock()
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+        mock_agent = Mock()
+        mock_get_agent.return_value = mock_agent
+
+        main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test cost limit task",
+            yolo=False,
+            cost_limit=0,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        assert mock_get_agent.call_args.args[2]["cost_limit"] == 0
+
+
+def test_mini_help():
+    """Test that mini --help works correctly."""
+    result = subprocess.run(
+        [sys.executable, "-m", "pocketcontextagent", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    # Strip ANSI color codes for reliable text matching
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "Run pocketcontextagent in your local environment." in clean_output
+    assert "--help" in clean_output
+    assert "--config" in clean_output
+    assert "--model" in clean_output
+    assert "--task" in clean_output
+    assert "--yolo" in clean_output
+    assert "--output" in clean_output
+
+
+def test_mini_help_with_typer_runner():
+    """Test help functionality using typer's test runner."""
+    from typer.testing import CliRunner
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    # Strip ANSI color codes for reliable text matching
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "Run pocketcontextagent in your local environment." in clean_output
+    assert "--help" in clean_output
+    assert "--config" in clean_output
+    assert "--model" in clean_output
+    assert "--task" in clean_output
+    assert "--yolo" in clean_output
+    assert "--output" in clean_output
+
+
+def test_python_m_pocketcontextagent_help():
+    """Test that python -m pocketcontextagent --help works correctly."""
+    result = subprocess.run(
+        [sys.executable, "-m", "pocketcontextagent", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    assert "pocketcontextagent" in result.stdout
+
+
+def test_mini_script_help():
+    """Test that the mini script entry point help works."""
+    result = subprocess.run(
+        ["mini", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    assert "pocketcontextagent" in result.stdout
+
+
+def test_pocketcontextagent_help():
+    """Test that pocketcontextagent --help works correctly."""
+    result = subprocess.run(
+        ["pocketcontextagent", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "pocketcontextagent" in clean_output
+
+
+def test_mini_extra_help():
+    """Test that mini-extra --help works correctly."""
+    result = subprocess.run(
+        ["mini-extra", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "central entry point for all extra commands" in clean_output
+    assert "config" in clean_output
+    assert "inspect" in clean_output
+    assert "swebench" in clean_output
+
+
+def test_mini_e_help():
+    """Test that mini-e --help works correctly."""
+    result = subprocess.run(
+        ["mini-e", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "central entry point for all extra commands" in clean_output
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "aliases"),
+    [
+        ("config", ["config"]),
+        ("inspect", ["inspect", "i", "inspector"]),
+        ("swebench", ["swebench"]),
+        ("swebench-single", ["swebench-single"]),
+    ],
+)
+def test_mini_extra_subcommand_help(subcommand: str, aliases: list[str]):
+    """Test that mini-extra subcommands --help work correctly."""
+    for alias in aliases:
+        result = subprocess.run(
+            ["mini-extra", alias, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        assert result.returncode == 0
+        # Just verify that help output is returned (content varies by subcommand)
+        assert len(result.stdout) > 0
+
+
+def test_mini_extra_config_help():
+    """Test that mini-extra config --help works correctly."""
+    result = subprocess.run(
+        ["mini-extra", "config", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+    assert len(result.stdout) > 0
+    # Config command should have help output
+    clean_output = strip_ansi_codes(result.stdout)
+    assert "--help" in clean_output
+
+
+def test_exit_immediately_flag_sets_confirm_exit_false():
+    """Test that --exit-immediately flag sets confirm_exit to False in agent config."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+
+        # Create mock agent with config
+        mock_agent = Mock()
+        mock_agent.config.confirm_exit = False
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function with --exit-immediately flag
+        agent = main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test task",
+            yolo=False,
+            output=None,
+            exit_immediately=True,  # This should set confirm_exit=False
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify the agent's config has confirm_exit set to False
+        assert agent.config.confirm_exit is False
+
+
+def test_no_exit_immediately_flag_sets_confirm_exit_true():
+    """Test that when --exit-immediately flag is not used, confirm_exit defaults to True."""
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+
+        # Create mock agent with config
+        mock_agent = Mock()
+        mock_agent.config.confirm_exit = True
+        mock_agent.run.return_value = {"exit_status": "Success", "submission": "Result"}
+        mock_get_agent.return_value = mock_agent
+
+        # Call main function without --exit-immediately flag (defaults to False)
+        agent = main(
+            config_spec=[str(DEFAULT_CONFIG_FILE)],
+            model_name="test-model",
+            task="Test task",
+            yolo=False,
+            output=None,
+            model_class=None,
+            agent_class=None,
+            environment_class=None,
+        )
+
+        # Verify the agent's config has confirm_exit set to True
+        assert agent.config.confirm_exit is True
+
+
+def test_exit_immediately_flag_with_typer_runner():
+    """Test --exit-immediately flag using typer's test runner."""
+    from typer.testing import CliRunner
+
+    with (
+        patch("pocketcontextagent.run.mini.configure_if_first_time"),
+        patch("pocketcontextagent.run.mini.get_agent") as mock_get_agent,
+        patch("pocketcontextagent.run.mini.get_model") as mock_get_model,
+        patch("pocketcontextagent.run.mini.get_environment") as mock_get_env,
+        patch("pocketcontextagent.run.mini.get_config_from_spec") as mock_get_config,
+    ):
+        # Setup mocks
+        mock_model = Mock()
+        mock_get_model.return_value = mock_model
+        mock_environment = Mock()
+        mock_get_env.return_value = mock_environment
+        mock_get_config.return_value = {"agent": {"system_template": "test"}, "env": {}, "model": {}}
+
+        # Setup mock agent instance
+        mock_agent = Mock()
+        mock_agent.run.return_value = {"exit_status": "Success", "result": "Result"}
+        mock_agent.messages = []
+        mock_get_agent.return_value = mock_agent
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["--task", "Test task", "--exit-immediately", "--model", "test-model"])
+
+        assert result.exit_code == 0
+        mock_get_agent.assert_called_once()
+        args, kwargs = mock_get_agent.call_args
+        # The config (third positional arg) should contain confirm_exit
+        assert args[2].get("confirm_exit") is False
+
+
+def test_output_file_is_created(tmp_path):
+    """Exercise trajectory saving through the real CLI, deterministic model and shell."""
+    import yaml
+
+    from pocketcontextagent.models.test_models import make_output
+
+    config = yaml.safe_load(Path("pocketcontextagent/config/default.yaml").read_text())
+    config["agent"].update(
+        {"mode": "yolo", "confirm_exit": False, "context_db_path": str(tmp_path / "context.sqlite3")}
+    )
+    config["model"].update(
+        {
+            "model_class": "pocketcontextagent.models.test_models.DeterministicModel",
+            "model_name": "deterministic",
+            "outputs": [
+                make_output("Finish", [{"command": "printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\ndone\\n'"}])
+            ],
+        }
+    )
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.safe_dump(config))
+    output_file = tmp_path / "trajectory.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pocketcontextagent.run.mini",
+            "--task",
+            "Test task",
+            "--output",
+            str(output_file),
+            "--config",
+            str(config_file),
+        ],
+        env={**os.environ, "MSWEA_CONFIGURED": "true", "MSWEA_GLOBAL_CONFIG_DIR": str(tmp_path / "global")},
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    saved = json.loads(output_file.read_text())
+    assert saved["info"]["exit_status"] == "Submitted" and saved["info"]["submission"] == "done\n"
+    assert saved["context"]["revision"] == 0 and len(saved["context"]["manifests"]) == 1
+    assert Path(saved["context"]["archive_path"]).is_file()

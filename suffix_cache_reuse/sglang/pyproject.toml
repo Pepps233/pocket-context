@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "suffix-cache-reuse"
+version = "1.0.0"
+description = "Suffix Cache Reuse: KV reuse for context-editing agents, as a patch to SGLang"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["sglang==0.5.16"]
+
+[project.scripts]
+scr-serve = "suffix_cache_reuse.serve:main"
+
+[tool.setuptools]
+packages = ["suffix_cache_reuse"]
+
+[tool.setuptools.package-data]
+suffix_cache_reuse = ["_site/sitecustomize.py"]

@@ -399,9 +399,12 @@ def test_native_prompt_consistency_and_text_mode_unchanged():
     for name in ("mini", "benchmarks/swebench", "benchmarks/programbench"):
         config = yaml.safe_load(Path(f"pocketcontextagent/config/{name}.yaml").read_text())
         assert "exactly one compact_block" in config["agent"]["instance_template"]
+        assert "expand_block" in config["agent"]["instance_template"]
         assert "compact_block" in config["model"]["format_error_template"]
+        assert "expand_block" in config["model"]["format_error_template"]
         assert "AT LEAST ONE bash" not in encode(config)
     assert "compact_block" not in Path("pocketcontextagent/config/default.yaml").read_text()
+    assert "expand_block" not in Path("pocketcontextagent/config/default.yaml").read_text()
 
 
 def test_repeated_call_id_is_idempotent_and_conflicts_fail(tmp_path, api):

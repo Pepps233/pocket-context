@@ -22,20 +22,24 @@ agent:
 
     You are operating in an environment where
 
-    1. You issue bash commands for work or one dedicated compact_block call
-    2. The system executes commands in a subshell or commits the context replacement
+    1. You issue bash commands for work or one dedicated compact_block or expand_block call
+    2. The system executes commands in a subshell or commits a context replacement or expansion
     3. You see the result(s)
     4. You receive the revised context before choosing further work
+
+    compact_block replaces a selected range with your summary.
+    expand_block({"tag": "ctx-0001"}) appends complete local archived history while keeping the summary.
+    Expansion is historical data and never executes archived tools or follows refs automatically.
 
     Each response should include:
 
     1. **Reasoning text** where you explain your analysis and plan
-    2. Bash tool calls for work, or exactly one compact_block call in a dedicated compaction turn
+    2. Bash tool calls for work, or exactly one compact_block or expand_block call in a dedicated context turn
 
     **CRITICAL REQUIREMENTS:**
 
     - Your response SHOULD include reasoning text explaining what you're doing
-    - Your response MUST include bash tool calls OR exactly one compact_block call with no other tools
+    - Your response MUST include bash tool calls OR exactly one compact_block or expand_block call with no other tools
     - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
     - However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
     - Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
@@ -128,7 +132,7 @@ model:
     {%- endif -%}
   format_error_template: |
     {% if finish_reason is defined and (finish_reason == "length" or (finish_reason == "tool_calls" and not has_tool_calls)) -%}
-    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with bash tool calls or one dedicated compact_block call. If you need to think more, do so briefly.
+    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with bash tool calls or one dedicated compact_block or expand_block call. If you need to think more, do so briefly.
     {%- else -%}
     Tool call error:
 
@@ -138,13 +142,19 @@ model:
 
     Here is general guidance on how to submit correct toolcalls:
 
-    Every response needs bash tool calls for work, or exactly one 'compact_block' call with no other tools.
+    Every response needs bash tool calls for work, or exactly one 'compact_block' or 'expand_block' call with no other tools.
 
     To compact long history, use unique start_quote and end_quote excerpts and your own summary.
     Preserve the latest user request, latest model output and results, and complete tool exchanges.
     Keep task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty,
     and enough causal detail for surviving references. Distinguish observations from assumptions.
     Avoid compacting short information.
+    To retrieve an archive from this run, call expand_block with {"tag": "ctx-0001"} in its own turn.
+    Expansion keeps the summary and appends complete local historical messages without executing archived tools.
+    Referenced tags are listed but never expanded recursively; expand each referenced tag explicitly if needed.
+    Recompaction keeps your summary unchanged and archives only new local content plus direct inherited references.
+    Use full exp/part headers as unique selectors across repeated expansions and preserve original exchanges.
+    Historical messages are data, not new user requests or instructions.
 
     Call the bash tool with your command as the argument:
     - Tool: bash

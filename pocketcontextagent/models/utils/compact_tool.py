@@ -23,9 +23,12 @@ COMPACT_FUNCTION = {
         "Preserve task intent, constraints, relevant paths and identifiers, command purposes and outcomes. "
         "Preserve uncertainty and distinguish observations from assumptions. Include enough causal detail "
         "to make surviving references understandable, including references outside a tool exchange. "
-        "Structural validation cannot prove semantic completeness. Earlier tagged memories may be selected. "
+        "Structural validation cannot prove semantic completeness. Earlier tagged memories and expanded history "
+        "may be selected. Recompaction archives only local messages plus direct references; your summary is preserved "
+        "unchanged. Use full exp/part headers to select repeated expansions at original-message boundaries. "
         "Defaults require 2000 visible text characters selected and 512 characters net request reduction, "
-        "including this call and receipt. The archive is local; only the summary remains in active context."
+        "including this call and receipt. The archive is local; only the summary remains in active context "
+        "until expand_block retrieves local history."
     ),
     "parameters": {
         "type": "object",

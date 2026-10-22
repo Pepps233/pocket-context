@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from pocketcontextagent import Environment, Model, __version__
 from pocketcontextagent.agents.context import ContextManager, SelectionError
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, TimeExceeded
+from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
 from pocketcontextagent.utils.serialize import recursive_merge
 
 
@@ -73,10 +74,10 @@ class DefaultAgent:
     def _render_template(self, template: str) -> str:
         return Template(template, undefined=StrictUndefined).render(**self.get_template_vars())
 
-    def add_messages(self, *messages: dict) -> list[dict]:
+    def add_messages(self, *messages: dict, origins: list[dict] | None = None) -> list[dict]:
         self.logger.debug(messages)  # set log level to debug to see
-        for message in messages:
-            self.context.ingest(message)
+        for message, origin in zip(messages, origins or [{} for _ in messages], strict=True):
+            self.context.ingest(message, **origin)
         self.messages.extend(messages)
         return list(messages)
 
@@ -171,7 +172,7 @@ class DefaultAgent:
 
     def dispatch_context_actions(self, message: dict) -> list[dict] | None:
         actions = message.get("extra", {}).get("actions", [])
-        if not any(action.get("type") in ("compact_block", "rejected") for action in actions):
+        if not any(action.get("type") in (*CONTEXT_TOOLS, "rejected") for action in actions):
             return None
         result_key = (id(message), json.dumps(actions, sort_keys=True))
         if result_key in self._context_results:
@@ -186,26 +187,35 @@ class DefaultAgent:
                     result["content"] = output["output"]
             return results
 
+        origins = None
+        operation = actions[0].get("type")
         try:
-            if len(actions) != 1 or actions[0].get("type") != "compact_block":
-                raise SelectionError("compact_block requires exactly one call and no other tools. No actions executed.")
-            results = self.context.compact(
-                actions[0],
-                message,
-                self.model,
-                format_results,
-                min_chars=self.config.compact_min_chars,
-                min_reduction=self.config.compact_min_reduction,
-            )
+            if len(actions) != 1 or operation not in CONTEXT_TOOLS:
+                raise SelectionError(
+                    actions[0].get(
+                        "error", "Context operations require exactly one call and no other tools. No actions executed."
+                    )
+                )
+            if operation == "expand_block":
+                results, origins = self.context.expand(actions[0], message, self.model, format_results)
+            else:
+                results = self.context.compact(
+                    actions[0],
+                    message,
+                    self.model,
+                    format_results,
+                    min_chars=self.config.compact_min_chars,
+                    min_reduction=self.config.compact_min_reduction,
+                )
         except SelectionError as exc:
             results = format_results(
                 message,
                 [
-                    {"output": f"compact_block error: {exc}", "returncode": -1, "exception_info": str(exc)}
+                    {"output": f"{operation} error: {exc}", "returncode": -1, "exception_info": str(exc)}
                     for _ in actions
                 ],
             )
-        self._context_results[result_key] = self.add_messages(*results)
+        self._context_results[result_key] = self.add_messages(*results, origins=origins)
         return self._context_results[result_key]
 
     def serialize(self, *extra_dicts) -> dict:

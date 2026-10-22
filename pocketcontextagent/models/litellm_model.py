@@ -18,7 +18,7 @@ from pocketcontextagent.models.utils.actions_toolcall import (
 )
 from pocketcontextagent.models.utils.anthropic_utils import _reorder_anthropic_thinking_blocks
 from pocketcontextagent.models.utils.cache_control import set_cache_control
-from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL
+from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL, EXPAND_TOOL
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
 from pocketcontextagent.models.utils.retry import retry
 
@@ -67,7 +67,7 @@ class LitellmModel:
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
-                tools=[BASH_TOOL, COMPACT_TOOL],
+                tools=[BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL],
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:

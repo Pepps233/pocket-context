@@ -40,7 +40,7 @@ class InteractiveAgent(DefaultAgent):
     def _interrupt(self, content: str, *, itype: str = "UserInterruption") -> NoReturn:
         raise UserInterruption({"role": "user", "content": content, "extra": {"interrupt_type": itype}})
 
-    def add_messages(self, *messages: dict) -> list[dict]:
+    def add_messages(self, *messages: dict, origins: list[dict] | None = None) -> list[dict]:
         # Extend supermethod to print messages
         for msg in messages:
             role, content = msg.get("role") or msg.get("type", "unknown"), get_content_string(msg)
@@ -53,7 +53,7 @@ class InteractiveAgent(DefaultAgent):
             else:
                 console.print(f"\n[bold green]{role.capitalize()}[/bold green]:\n", end="", highlight=False)
             console.print(content, highlight=False, markup=False)
-        return super().add_messages(*messages)
+        return super().add_messages(*messages, origins=origins)
 
     def query(self) -> dict:
         # Extend supermethod to handle human mode

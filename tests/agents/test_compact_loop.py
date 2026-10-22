@@ -324,7 +324,9 @@ def test_recompaction_keeps_archives_and_lineage(tmp_path, api):
     blocks = read_blocks(agent)
     assert len(blocks) == 2 and blocks[1]["children"] == ["ctx-0001"]
     assert blocks[0]["messages"] == agent.messages[2:4]
-    assert blocks[1]["messages"][0] == blocks[0]["summary_record"]["message"]
+    assert blocks[1]["version"] == 2 and blocks[1]["messages"] == blocks[1]["records"] == []
+    assert blocks[1]["references"][0]["source_record"] == blocks[0]["summary_record"]["id"]
+    assert "[ctx-0002 refs=ctx-0001]:" in encode(agent.context.projection())
     assert agent.serialize()["context"]["blocks"] == {"ctx-0001": [], "ctx-0002": ["ctx-0001"]}
 
 

@@ -52,6 +52,11 @@ browsecomp-plus = [
     "pyserini==1.2.0",
 ]
 
+daytona = [
+    "daytona==0.226.0",
+    "build",
+]
+
 full = [
     "pocketcontextagent[dev]",
     "swe-rex>=1.4.0",

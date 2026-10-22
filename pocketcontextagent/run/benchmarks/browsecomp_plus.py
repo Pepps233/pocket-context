@@ -2,35 +2,41 @@
 
 import hashlib
 import json
-import re
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import Path
 
 import typer
 import yaml
+from dotenv import load_dotenv
 
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment
 from pocketcontextagent.models import get_model, get_model_name
+from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import app as daytona_app
 from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
     DATASET_REVISION,
     INDEX_REVISION,
     BM25Retriever,
+    load_instances,
     prepare_data,
+    reserve_evaluation,
 )
+from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics, summarize_results
 from pocketcontextagent.utils.serialize import recursive_merge
 
 DEFAULT_DATA_DIR = Path("data/browsecomp-plus")
 DEFAULT_CONFIG = "benchmarks/browsecomp_plus.yaml"
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+app.add_typer(daytona_app, name="daytona")
 
 
 @app.callback()
 def benchmark() -> None:
     """Prepare data and evaluate Pocket Context Agent on BrowseComp-Plus."""
+    load_dotenv(Path(".env"))
 
 
 @app.command()
@@ -41,6 +47,12 @@ def prepare(
     """Download pinned queries, decrypt locally, and fetch the official BM25 index."""
     prepare_data(data_dir, download_index=download_index)
     typer.echo(f"Prepared BrowseComp-Plus in {data_dir}")
+
+
+@app.command()
+def reserve(data_dir: Path = typer.Option(DEFAULT_DATA_DIR)) -> None:
+    """Reserve the authors' exact 150 evaluation tasks and separate 680 development tasks."""
+    typer.echo(yaml.safe_dump(reserve_evaluation(data_dir)))
 
 
 def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retriever, fingerprint: str) -> bool:
@@ -66,6 +78,7 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
             "result": [{"type": "output_text", "output": info["submission"]}],
             "metadata": {"model": agent.model.config.model_name, "retriever": "BM25", "fingerprint": fingerprint},
             "model_stats": info["model_stats"],
+            "metrics": episode_metrics(agent.messages),
         }
         temporary = output / f"{query_id}.json.tmp"
         temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -87,6 +100,7 @@ def run(
     offset: int = typer.Option(0, min=0, help="Skip this many selected queries."),
     limit: int = typer.Option(0, min=0, help="Maximum selected queries; 0 runs all."),
     workers: int = typer.Option(1, "-w", "--workers", min=1),
+    split: str = typer.Option("development680", help="development680 (default), eval150, or all."),
     redo_existing: bool = typer.Option(False, help="Rerun completed queries too."),
 ) -> None:
     """Run corpus-only research and export files accepted by the official evaluator."""
@@ -98,18 +112,10 @@ def run(
     config["model"]["model_name"] = get_model_name(model, config["model"])
     if model_class:
         config["model"]["model_class"] = model_class
-    instances = [json.loads(line) for line in queries.read_text(encoding="utf-8").splitlines() if line.strip()]
-    ids = [str(instance["query_id"]) for instance in instances]
-    if len(set(ids)) != len(ids) or any(not re.fullmatch(r"[A-Za-z0-9_-]+", iid) for iid in ids):
-        raise ValueError("Query IDs must be unique and contain only letters, digits, underscores, or hyphens")
-    if set(query_id) - set(ids):
-        raise ValueError(f"Unknown query IDs: {sorted(set(query_id) - set(ids))}")
-    instances = [instance for instance in instances if not query_id or str(instance["query_id"]) in query_id]
-    instances = instances[offset : offset + limit if limit else None]
-    if not instances:
-        raise ValueError("No queries selected")
+    instances = load_instances(queries, split=split, query_ids=query_id, offset=offset, limit=limit)
     manifest = {
         "config": config,
+        "split": split,
         "version": __version__,
         "dataset_revision": DATASET_REVISION,
         "index_revision": INDEX_REVISION,
@@ -143,6 +149,8 @@ def run(
         completed = list(
             executor.map(lambda instance: run_instance(instance, output, config, retriever, fingerprint), instances)
         )
+    results = [json.loads(path.read_text()) for path in sorted(output.glob("*.json"))]
+    (output / "summary.yaml").write_text(yaml.safe_dump(summarize_results(results)), encoding="utf-8")
     if not all(completed):
         raise typer.Exit(1)
 

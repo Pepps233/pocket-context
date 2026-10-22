@@ -42,6 +42,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       - name: Update apt package list
         run: sudo apt-get update
       - name: Install podman
@@ -63,7 +67,7 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Install dependencies
         run: |
-            uv pip install --python ${Python_ROOT_DIR} -e '.[full]'
+            uv pip install --python ${Python_ROOT_DIR} -e '.[full,browsecomp-plus]'
       - name: Configure mini-swe-agent
         run: |
           mini-extra config set MSWEA_CONFIGURED 'true'

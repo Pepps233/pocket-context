@@ -93,6 +93,7 @@ mini-extra browsecomp-plus run --limit 1 \
   --output runs/browsecomp-plus/openrouter
 ```
 
+The profile requires a tool call on every model turn to match the agent protocol and avoid rejected plain-text responses.
 This profile uses ten BM25 results, Qwen tokenizer previews of 512 tokens for new documents and 128 for previously retrieved documents, and an 8,192-token document cap.
 It sets a 131,072-token context hint, 100 model calls, a $0.50 stopping threshold per task, and a 30-minute task timeout.
 The cost threshold is checked between calls and can be exceeded by an in-flight request.

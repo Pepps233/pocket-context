@@ -36,6 +36,7 @@ model:
   model_name: qwen/qwen3.5-9b
   model_kwargs:
     max_tokens: 16384
+    tool_choice: required
     provider:
       only: [together]
       allow_fallbacks: false

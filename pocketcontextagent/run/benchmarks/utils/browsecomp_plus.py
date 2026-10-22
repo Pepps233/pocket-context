@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 from datasets import load_dataset
 from huggingface_hub import snapshot_download
@@ -17,7 +18,7 @@ CANARY = (
 )
 
 
-def decrypt(value):
+def decrypt(value: Any) -> Any:
     """Decode upstream's recursive XOR obfuscation, leaving query IDs intact."""
     if isinstance(value, str):
         key = hashlib.sha256(CANARY.encode()).digest()
@@ -35,7 +36,13 @@ def prepare_data(data_dir: Path, *, download_index: bool = True) -> None:
     temporary.write_text(
         "".join(
             json.dumps(decrypt(row), ensure_ascii=False) + "\n"
-            for row in load_dataset("Tevatron/browsecomp-plus", split="test", revision=DATASET_REVISION)
+            for row in load_dataset(
+                "Tevatron/browsecomp-plus",
+                split="test",
+                revision=DATASET_REVISION,
+                streaming=True,
+                columns=["query_id", "query", "answer"],
+            )
         ),
         encoding="utf-8",
     )

@@ -372,7 +372,11 @@ def test_context_budget_final_generation(bm25_index: Path, tmp_path: Path, final
     queries = tmp_path / "queries.jsonl"
     queries.write_text(json.dumps({"query_id": "budget", "query": "Which city hosts the festival?"}))
     config = tmp_path / "replay.yaml"
-    answer = "Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 85%" if valid else "Insufficient evidence."
+    answer = (
+        "**Explanation**: Jazz [city].\n**Exact Answer**: Montréal\n**Confidence**: 85%"
+        if valid
+        else "Insufficient evidence."
+    )
     config.write_text(
         yaml.safe_dump(
             {
@@ -507,6 +511,8 @@ def test_memory_aware_retrieval(bm25_index: Path, tmp_path: Path, expand: bool):
     ("text", "answer", "confidence"),
     [
         ("Exact Answer: First\nConfidence: 20%\n**Exact Answer:** Montréal**\nConfidence: 85%", "Montréal", 85),
+        ("Exact Answer: First\nConfidence: 20%\n**Exact Answer**: Montréal\n**Confidence**: 65%", "Montréal", 65),
+        ("**Exact Answer:** **Montréal**\n**Confidence:** **85%**", "Montréal", 85),
         ("Explanation: Evidence [city].\nExact Answer: Montréal", "Montréal", 100),
         ("I will search again.\nConfidence: 10%", "", 10),
         ("Exact Answer:\nConfidence: 10%", "", 10),

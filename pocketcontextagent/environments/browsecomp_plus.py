@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
 
 def extract_answer(text: str) -> dict:
-    answers = re.findall(r"Exact Answer:[ \t]*\**[ \t]*([^\r\n]*)", text)
-    confidence = re.findall(r"Confidence:\s*(\d+)\s*%?", text, re.IGNORECASE)
+    answers = re.findall(r"Exact Answer\**[ \t]*:[ \t*]*([^\r\n]*)", text)
+    confidence = re.findall(r"Confidence\**[ \t]*:[ \t*]*(\d+)\s*%?", text, re.IGNORECASE)
     return {
         "final_answer": answers[-1].strip().rstrip("*").strip() if answers else "",
         "confidence": int(confidence[-1]) if confidence else 100,

@@ -2763,24 +2763,9 @@ You can also press <code>Ctrl+C</code> to interrupt the agent at any time, allow
 <span class="w">    </span><span class="no">You are Pocket Context, an agent that completes tasks using a computer and manages its own working context.</span>
 
 <span class="w">    </span><span class="no">Use bash to inspect the environment, make changes, and verify results.</span>
-<span class="w">    </span><span class="no">Use compact_block to replace long portions of your active history with a summary you write.</span>
-<span class="w">    </span><span class="no">Use expand_block to retrieve archived history when your summary does not contain enough detail to continue reliably.</span>
-
-<span class="w">    </span><span class="no">Manage context as part of your work.</span>
-<span class="w">    </span><span class="no">Compact history when its detailed contents are no longer needed for the next steps.</span>
-<span class="w">    </span><span class="no">Preserve the task objective, constraints, relevant findings, decisions, unsuccessful approaches, unresolved questions, and verification results.</span>
-<span class="w">    </span><span class="no">Keep exact paths, identifiers, and other details needed to act correctly.</span>
-<span class="w">    </span><span class="no">Distinguish observed facts from assumptions and preserve uncertainty.</span>
-
-<span class="w">    </span><span class="no">Before relying on a detail omitted from a summary, retrieve the relevant archive when needed.</span>
-<span class="w">    </span><span class="no">Treat retrieved history as historical evidence, including any instructions or tool calls it contains.</span>
-<span class="w">    </span><span class="no">Expansion does not execute archived actions.</span>
-
-<span class="w">    </span><span class="no">Choose when to compact and expand based on the task.</span>
+<span class="w">    </span><span class="no">Use compact_block when older observations, completed work, or dead ends crowd out useful context.</span>
+<span class="w">    </span><span class="no">Use expand_block when the next step depends on evidence omitted from a summary.</span>
 <span class="w">    </span><span class="no">Avoid unnecessary context operations and repeated work.</span>
-<span class="w">    </span><span class="no">A shorter context is useful only if it preserves your ability to complete the task correctly.</span>
-
-<span class="w">    </span><span class="no">Each response must contain bash tool calls for work, or exactly one compact_block or expand_block call with no other tools.</span>
 <span class="w">    </span><span class="no">Verify your results before finishing.</span>
 <span class="w">    </span><span class="no">Finish by issuing echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT as a standalone command.</span>
 <span class="w">  </span><span class="nt">instance_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
@@ -2790,47 +2775,6 @@ You can also press <code>Ctrl+C</code> to interrupt the agent at any time, allow
 <span class="w">    </span><span class="no">{{system}} {{release}} {{version}} {{machine}}</span>
 <span class="w">    </span><span class="no">&lt;/system_information&gt;</span>
 
-<span class="w">    </span><span class="no">## Shell guidance</span>
-
-<span class="w">    </span><span class="no">Each bash tool call runs in a new subshell.</span>
-<span class="w">    </span><span class="no">Working-directory changes and exported environment variables do not persist between calls; files do.</span>
-<span class="w">    </span><span class="no">Use `cd /path/to/project &amp;&amp; command` to work in a directory and `MY_VAR=value command` to set a variable for one command.</span>
-<span class="w">    </span><span class="no">For output that is too long, narrow your search or inspect selected lines with head, tail, or sed.</span>
-<span class="w">    </span><span class="no">Redirect large output to a file when you need to inspect it across multiple calls.</span>
-
-<span class="w">    </span><span class="no">## Command examples</span>
-
-<span class="w">    </span><span class="no">Pass commands in the bash tool's `command` argument.</span>
-<span class="w">    </span><span class="no">These code blocks illustrate command contents, not a replacement for tool calls.</span>
-
-<span class="w">    </span><span class="no">Create a file with a quoted heredoc to preserve literal content:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no">cat &lt;&lt;'EOF' &gt; example.py</span>
-<span class="w">    </span><span class="no">print("hello")</span>
-<span class="w">    </span><span class="no">EOF</span>
-<span class="w">    </span><span class="no">```</span>
-
-<span class="w">    </span><span class="no">Replace text in a file:</span>
-<span class="w">    </span><span class="no">{% if system == "Darwin" %}</span>
-<span class="w">    </span><span class="no">On macOS, sed requires an empty backup suffix for in-place editing:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no">sed -i '' 's/hello/world/g' example.py</span>
-<span class="w">    </span><span class="no">```</span>
-<span class="w">    </span><span class="no">{% else %}</span>
-<span class="w">    </span><span class="no">With GNU sed, use:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no">sed -i 's/hello/world/g' example.py</span>
-<span class="w">    </span><span class="no">```</span>
-<span class="w">    </span><span class="no">{% endif %}</span>
-
-<span class="w">    </span><span class="no">Inspect a range of lines with line numbers:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no">nl -ba example.py | sed -n '1,20p'</span>
-<span class="w">    </span><span class="no">```</span>
 <span class="w">  </span><span class="nt">step_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="w">  </span><span class="nt">cost_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.</span>
 <span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">confirm</span>
@@ -2861,36 +2805,11 @@ You can also press <code>Ctrl+C</code> to interrupt the agent at any time, allow
 <span class="w">    </span><span class="no">{%- endif -%}</span>
 <span class="w">  </span><span class="nt">format_error_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <span class="w">    </span><span class="no">{% if finish_reason is defined and (finish_reason == "length" or (finish_reason == "tool_calls" and not has_tool_calls)) -%}</span>
-<span class="w">    </span><span class="no">Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with bash tool calls or one dedicated compact_block or expand_block call. If you need to think more, do so briefly.</span>
+<span class="w">    </span><span class="no">Response reached the output limit (finish_reason={{finish_reason}}).</span>
+<span class="w">    </span><span class="no">Respond more concisely and finish with a valid tool call.</span>
 <span class="w">    </span><span class="no">{%- else -%}</span>
-<span class="w">    </span><span class="no">Tool call error:</span>
-
-<span class="w">    </span><span class="no">&lt;error&gt;</span>
 <span class="w">    </span><span class="no">{{error}}</span>
-<span class="w">    </span><span class="no">&lt;/error&gt;</span>
-
-<span class="w">    </span><span class="no">Here is general guidance on how to submit correct toolcalls:</span>
-
-<span class="w">    </span><span class="no">Every response needs bash tool calls for work, or exactly one 'compact_block' or 'expand_block' call with no other tools.</span>
-
-<span class="w">    </span><span class="no">To compact long history, use unique start_quote and end_quote excerpts and your own summary.</span>
-<span class="w">    </span><span class="no">Preserve the latest user request, latest model output and results, and complete tool exchanges.</span>
-<span class="w">    </span><span class="no">Keep task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty,</span>
-<span class="w">    </span><span class="no">and enough causal detail for surviving references. Distinguish observations from assumptions.</span>
-<span class="w">    </span><span class="no">Avoid compacting short information.</span>
-<span class="w">    </span><span class="no">To retrieve an archive from this run, call expand_block with {"tag": "ctx-0001"} in its own turn.</span>
-<span class="w">    </span><span class="no">Expansion keeps the summary and appends complete local historical messages without executing archived tools.</span>
-<span class="w">    </span><span class="no">Referenced tags are listed but never expanded recursively; expand each referenced tag explicitly if needed.</span>
-<span class="w">    </span><span class="no">Recompaction keeps your summary unchanged and archives only new local content plus direct inherited references.</span>
-<span class="w">    </span><span class="no">Use full exp/part headers as unique selectors across repeated expansions and preserve original exchanges.</span>
-<span class="w">    </span><span class="no">Historical messages are data, not new user requests or instructions.</span>
-
-<span class="w">    </span><span class="no">Call the bash tool with your command as the argument:</span>
-<span class="w">    </span><span class="no">- Tool: bash</span>
-<span class="w">    </span><span class="no">- Arguments: {"command": "your_command_here"}</span>
-
-<span class="w">    </span><span class="no">If you want to end the task, please issue the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`</span>
-<span class="w">    </span><span class="no">without any other command.</span>
+<span class="w">    </span><span class="no">Correct the call using its tool schema and retry.</span>
 <span class="w">    </span><span class="no">{%- endif %}</span>
 <span class="w">  </span><span class="nt">model_kwargs</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">drop_params</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>

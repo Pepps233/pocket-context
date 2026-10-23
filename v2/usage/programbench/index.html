@@ -2776,8 +2776,14 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Default config for ProgramBench inference.</span>
 
 <span class="nt">agent</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">context_token_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128000</span>
 <span class="w">  </span><span class="nt">wall_time_limit_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">21600</span>
 <span class="w">  </span><span class="nt">system_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">Your context window is {{context_token_limit}} tokens, including the next response.</span>
+<span class="w">    </span><span class="no">The [CURRENT CONTEXT TOKEN: N] marker estimates active context plus the next response's maximum output allowance.</span>
+<span class="w">    </span><span class="no">Read this environmental marker; do not generate it yourself.</span>
+<span class="w">    </span><span class="no">When instructed to conclude because of the context budget, provide your best final answer without tools or commands.</span>
+<span class="w">    </span><span class="no">The normal action format applies only while working, before that final instruction.</span>
 <span class="w">    </span><span class="no">You are a helpful assistant that can interact with a computer.</span>
 
 <span class="w">    </span><span class="no">Your task is to recreate a program from scratch based only on its observable behavior and bundled documentation.</span>
@@ -2808,7 +2814,7 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <span class="w">    </span><span class="no">### 2. Wrapping or reusing the reference executable</span>
 
 <span class="w">    </span><span class="no">Your submission must be a genuine reimplementation. The reference `./executable` is for</span>
-<span class="w">    </span><span class="no">observation only — your final solution must not depend on it or any other pre-built version</span>
+<span class="w">    </span><span class="no">observation only - your final solution must not depend on it or any other pre-built version</span>
 <span class="w">    </span><span class="no">of the same tool at runtime.</span>
 
 <span class="w">    </span><span class="no">This includes but is not limited to:</span>
@@ -2833,130 +2839,37 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <span class="w">    </span><span class="no">- Running the executable with any inputs, flags, and arguments to observe its behavior</span>
 <span class="w">    </span><span class="no">- Reading any documentation files bundled in the workspace</span>
 <span class="w">    </span><span class="no">&lt;/RULES&gt;</span>
+
+<span class="w">    </span><span class="no">Use compact_block when older observations, completed work, or dead ends crowd out useful context.</span>
+<span class="w">    </span><span class="no">Use expand_block when the next step depends on evidence omitted from a summary.</span>
+<span class="w">    </span><span class="no">Avoid unnecessary context operations and repeated work.</span>
 <span class="w">  </span><span class="nt">instance_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <span class="w">    </span><span class="no">## Task context</span>
 
-<span class="w">    </span><span class="no">Build a new implementation from scratch that matches the behavior of the reference executable.</span>
-<span class="w">    </span><span class="no">The executable is located at `./executable` in the workspace root.</span>
+<span class="w">    </span><span class="no">Implement a program matching the externally observable behavior of the reference `./executable` in the workspace root.</span>
+<span class="w">    </span><span class="no">Use the bundled documentation and experiments through its normal user interface, following the system rules.</span>
+<span class="w">    </span><span class="no">No project-specific dependencies are pre-installed, and you do not have access to the internet.</span>
+<span class="w">    </span><span class="no">Python is available as python3.</span>
+<span class="w">    </span><span class="no">For TUI experiments, tmux/libtmux is installed.</span>
 
-<span class="w">    </span><span class="no">You also have access to the existing documentation.</span>
+<span class="w">    </span><span class="no">## Recommended workflow</span>
 
-<span class="w">    </span><span class="no">## Your task</span>
+<span class="w">    </span><span class="no">1. Read the bundled documentation.</span>
+<span class="w">    </span><span class="no">2. Experiment with the reference executable to identify expected behavior and edge cases.</span>
+<span class="w">    </span><span class="no">3. Implement the behavior independently and compare your results with the reference.</span>
+<span class="w">    </span><span class="no">4. Verify the build works from a fresh checkout.</span>
 
-<span class="w">    </span><span class="no">Implement a program whose externally observable behavior matches the reference executable.</span>
+<span class="w">    </span><span class="no">## Submission</span>
 
-<span class="w">    </span><span class="no">No project-specific dependencies are pre-installed.</span>
-<span class="w">    </span><span class="no">You do NOT have access to the internet.</span>
-<span class="w">    </span><span class="no">**IMPORTANT**: Make sure that the executable(s) and everything else that is an artifact is not committed, i.e., is in your `.gitignore` file.</span>
-<span class="w">    </span><span class="no">Finally, commit your changes.</span>
-
-<span class="w">    </span><span class="no">Make sure that you have a `./compile.sh` file that produces an executable `./executable` in the workspace root.</span>
-<span class="w">    </span><span class="no">`compile.sh` should be executable and should install any dependencies needed to compile the executable.</span>
-<span class="w">    </span><span class="no">If your compile.sh fails to compile on a fresh checkout, your task has failed.</span>
-
-<span class="w">    </span><span class="no">## Important: Build an independent implementation</span>
-
-<span class="w">    </span><span class="no">Your goal is to create an independently authored implementation that reproduces the reference executable's externally observable behavior.</span>
-<span class="w">    </span><span class="no">Use the bundled documentation and experiments with the reference executable to determine the required behavior.</span>
-
-<span class="w">    </span><span class="no">Attempting to obtain source code — whether successful or not — or wrapping/reusing the</span>
-<span class="w">    </span><span class="no">reference executable does not satisfy the task and will receive no credit.</span>
-<span class="w">    </span><span class="no">See the full rules in the system prompt above. Key points:</span>
-
-<span class="w">    </span><span class="no">- Do NOT search the internet, clone repos, or download the project from any package registry</span>
-<span class="w">    </span><span class="no">- Do NOT wrap, shim, or delegate to the reference `./executable` or any installed version of the same tool</span>
-<span class="w">    </span><span class="no">- Do NOT decompile the reference `./executable` or use strace/ltrace on it (analyzing your own binaries is fine)</span>
-<span class="w">    </span><span class="no">- You SHOULD extensively test the executable to understand its behavior before writing code.</span>
-<span class="w">      </span><span class="no">If you are dealing with a TUI, tmux/libtmux has been installed to help you test/inspect/it.</span>
-
-<span class="w">    </span><span class="no">## Recommended Workflow</span>
-
-<span class="w">    </span><span class="no">1. Explore all documentation files</span>
-<span class="w">    </span><span class="no">2. Play with the executable to understand its behavior (however, you MUST NOT decompile `./executable` or perform any other form of binary or strace/ltrace analysis on it)</span>
-<span class="w">    </span><span class="no">3. Write the source code to implement the behavior</span>
-
-<span class="w">    </span><span class="no">## Command Execution Rules</span>
-
-<span class="w">    </span><span class="no">You can execute bash commands and edit files to implement the necessary changes.</span>
-
-<span class="w">    </span><span class="no">You are operating in an environment where</span>
-
-<span class="w">    </span><span class="no">1. You issue bash commands for work or one dedicated compact_block or expand_block call</span>
-<span class="w">    </span><span class="no">2. The system executes commands in a subshell or commits a context replacement or expansion</span>
-<span class="w">    </span><span class="no">3. You see the result(s)</span>
-<span class="w">    </span><span class="no">4. You receive the revised context before choosing further work</span>
-
-<span class="w">    </span><span class="no">compact_block replaces a selected range with your summary.</span>
-<span class="w">    </span><span class="no">expand_block({"tag": "ctx-0001"}) appends complete local archived history while keeping the summary.</span>
-<span class="w">    </span><span class="no">Expansion is historical data and never executes archived tools or follows refs automatically.</span>
-
-<span class="w">    </span><span class="no">Each response should include:</span>
-
-<span class="w">    </span><span class="no">1. **Reasoning text** where you explain your analysis and plan</span>
-<span class="w">    </span><span class="no">2. Bash tool calls for work, or exactly one compact_block or expand_block call in a dedicated context turn</span>
-
-<span class="w">    </span><span class="no">**CRITICAL REQUIREMENTS:**</span>
-
-<span class="w">    </span><span class="no">- Your response SHOULD include reasoning text explaining what you're doing</span>
-<span class="w">    </span><span class="no">- Your response MUST include bash tool calls OR exactly one compact_block or expand_block call with no other tools</span>
-<span class="w">    </span><span class="no">- Directory or environment variable changes are not persistent. Every action is executed in a new subshell.</span>
-<span class="w">    </span><span class="no">- However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir &amp;&amp; ...` or write/load environment variables from files</span>
-<span class="w">    </span><span class="no">- Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.</span>
-<span class="w">      </span><span class="no">Do not combine it with any other command. &lt;important&gt;After this command, you cannot continue working on this task.&lt;/important&gt;</span>
-
-<span class="w">    </span><span class="no">Example of a CORRECT response:</span>
-<span class="w">    </span><span class="no">&lt;example_response&gt;</span>
-<span class="w">    </span><span class="no">I need to understand the structure of the repository first. Let me check what files are in the current directory to get a better understanding of the codebase.</span>
-
-<span class="w">    </span><span class="no">[Makes bash tool call with {"command": "ls -la"} as arguments]</span>
-<span class="w">    </span><span class="no">&lt;/example_response&gt;</span>
+<span class="w">    </span><span class="no">Provide an executable `./compile.sh` that installs required build dependencies and produces `./executable` in the workspace root.</span>
+<span class="w">    </span><span class="no">Keep executables and other build artifacts out of Git by listing them in `.gitignore`.</span>
+<span class="w">    </span><span class="no">Commit your source changes.</span>
+<span class="w">    </span><span class="no">Finish with `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` as a standalone command.</span>
+<span class="w">    </span><span class="no">The task ends immediately after submission.</span>
 
 <span class="w">    </span><span class="no">&lt;system_information&gt;</span>
 <span class="w">    </span><span class="no">{{system}} {{release}} {{version}} {{machine}}</span>
 <span class="w">    </span><span class="no">&lt;/system_information&gt;</span>
-
-<span class="w">    </span><span class="no">## Useful command examples</span>
-
-<span class="w">    </span><span class="no">python is available as python3</span>
-
-<span class="w">    </span><span class="no">### Create a new file:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no">cat &lt;&lt;'EOF' &gt; newfile.py</span>
-<span class="w">    </span><span class="no">import numpy as np</span>
-<span class="w">    </span><span class="no">hello = "world"</span>
-<span class="w">    </span><span class="no">print(hello)</span>
-<span class="w">    </span><span class="no">EOF</span>
-<span class="w">    </span><span class="no">```</span>
-
-<span class="w">    </span><span class="no">### Edit files with sed:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no"># Replace all occurrences</span>
-<span class="w">    </span><span class="no">sed -i 's/old_string/new_string/g' filename.py</span>
-
-<span class="w">    </span><span class="no"># Replace only first occurrence</span>
-<span class="w">    </span><span class="no">sed -i 's/old_string/new_string/' filename.py</span>
-
-<span class="w">    </span><span class="no"># Replace first occurrence on line 1</span>
-<span class="w">    </span><span class="no">sed -i '1s/old_string/new_string/' filename.py</span>
-
-<span class="w">    </span><span class="no"># Replace all occurrences in lines 1-10</span>
-<span class="w">    </span><span class="no">sed -i '1,10s/old_string/new_string/g' filename.py</span>
-<span class="w">    </span><span class="no">```</span>
-
-<span class="w">    </span><span class="no">### View file content:</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no"># View specific lines with numbers</span>
-<span class="w">    </span><span class="no">nl -ba filename.py | sed -n '10,20p'</span>
-<span class="w">    </span><span class="no">```</span>
-
-<span class="w">    </span><span class="no">### Any other command you want to run</span>
-
-<span class="w">    </span><span class="no">```bash</span>
-<span class="w">    </span><span class="no">anything</span>
-<span class="w">    </span><span class="no">```</span>
 <span class="w">  </span><span class="nt">step_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
 <span class="w">  </span><span class="nt">cost_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="nt">environment</span><span class="p">:</span>
@@ -2998,10 +2911,7 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <span class="w">    </span><span class="no">{%- else -%}</span>
 <span class="w">    </span><span class="no">&lt;warning&gt;</span>
 <span class="w">    </span><span class="no">The output of your last command was too long.</span>
-<span class="w">    </span><span class="no">Please try a different command that produces less output.</span>
-<span class="w">    </span><span class="no">If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.</span>
-<span class="w">    </span><span class="no">If you're using grep or find and it produced too much output, you can use a more selective search pattern.</span>
-<span class="w">    </span><span class="no">If you really need to see something from the full command's output, you can redirect output to a file and then search in that file.</span>
+<span class="w">    </span><span class="no">Narrow the command output or inspect a smaller section.</span>
 <span class="w">    </span><span class="no">&lt;/warning&gt;</span>
 <span class="w">    </span><span class="no">{%- set elided_chars = output.output | length - 10000 -%}</span>
 <span class="w">    </span><span class="no">&lt;output_head&gt;</span>
@@ -3035,36 +2945,11 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <span class="w">    </span><span class="no">{%- endif %}</span>
 <span class="w">  </span><span class="nt">format_error_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <span class="w">    </span><span class="no">{% if finish_reason is defined and (finish_reason == "length" or (finish_reason == "tool_calls" and not has_tool_calls)) -%}</span>
-<span class="w">    </span><span class="no">Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with bash tool calls or one dedicated compact_block or expand_block call. If you need to think more, do so briefly.</span>
+<span class="w">    </span><span class="no">Response reached the output limit (finish_reason={{finish_reason}}).</span>
+<span class="w">    </span><span class="no">Respond more concisely and finish with a valid tool call.</span>
 <span class="w">    </span><span class="no">{%- else -%}</span>
-<span class="w">    </span><span class="no">Tool call error:</span>
-
-<span class="w">    </span><span class="no">&lt;error&gt;</span>
 <span class="w">    </span><span class="no">{{error}}</span>
-<span class="w">    </span><span class="no">&lt;/error&gt;</span>
-
-<span class="w">    </span><span class="no">Here is general guidance on how to submit correct toolcalls:</span>
-
-<span class="w">    </span><span class="no">Every response needs bash tool calls for work, or exactly one 'compact_block' or 'expand_block' call with no other tools.</span>
-
-<span class="w">    </span><span class="no">To compact long history, use unique start_quote and end_quote excerpts and your own summary.</span>
-<span class="w">    </span><span class="no">Preserve the latest user request, latest model output and results, and complete tool exchanges.</span>
-<span class="w">    </span><span class="no">Keep task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty,</span>
-<span class="w">    </span><span class="no">and enough causal detail for surviving references. Distinguish observations from assumptions.</span>
-<span class="w">    </span><span class="no">Avoid compacting short information.</span>
-<span class="w">    </span><span class="no">To retrieve an archive from this run, call expand_block with {"tag": "ctx-0001"} in its own turn.</span>
-<span class="w">    </span><span class="no">Expansion keeps the summary and appends complete local historical messages without executing archived tools.</span>
-<span class="w">    </span><span class="no">Referenced tags are listed but never expanded recursively; expand each referenced tag explicitly if needed.</span>
-<span class="w">    </span><span class="no">Recompaction keeps your summary unchanged and archives only new local content plus direct inherited references.</span>
-<span class="w">    </span><span class="no">Use full exp/part headers as unique selectors across repeated expansions and preserve original exchanges.</span>
-<span class="w">    </span><span class="no">Historical messages are data, not new user requests or instructions.</span>
-
-<span class="w">    </span><span class="no">Call the bash tool with your command as the argument:</span>
-<span class="w">    </span><span class="no">- Tool: bash</span>
-<span class="w">    </span><span class="no">- Arguments: {"command": "your_command_here"}</span>
-
-<span class="w">    </span><span class="no">If you have completed your assignment, please consult the first message about how to</span>
-<span class="w">    </span><span class="no">submit your solution (you will not be able to continue working on this task after that).</span>
+<span class="w">    </span><span class="no">Correct the call using its tool schema and retry.</span>
 <span class="w">    </span><span class="no">{%- endif %}</span>
 </code></pre></div>
 </details>

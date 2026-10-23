@@ -2828,6 +2828,7 @@
     <span class="n">parse_toolcall_actions_response</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models.utils.compact_tool</span><span class="w"> </span><span class="kn">import</span> <span class="n">COMPACT_TOOL_RESPONSE_API</span><span class="p">,</span> <span class="n">EXPAND_TOOL_RESPONSE_API</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models.utils.response</span><span class="w"> </span><span class="kn">import</span> <span class="n">has_tool_calls</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models.utils.retry</span><span class="w"> </span><span class="kn">import</span> <span class="n">retry</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"litellm_response_model"</span><span class="p">)</span>
@@ -2865,13 +2866,25 @@
             <span class="k">raise</span> <span class="n">e</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">final_answer</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"final_answer"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">allow_text_response</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"allow_text_response"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">final_answer</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="s2">"action_regex"</span><span class="p">):</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"tool_choice"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"none"</span>
         <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="n">retry</span><span class="p">(</span><span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">,</span> <span class="n">abort_exceptions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">abort_exceptions</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">attempt</span><span class="p">:</span>
                 <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prepare_messages_for_api</span><span class="p">(</span><span class="n">messages</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">cost_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_cost</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
         <span class="n">GLOBAL_MODEL_STATS</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cost_output</span><span class="p">[</span><span class="s2">"cost"</span><span class="p">])</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="n">actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_actions</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+            <span class="n">actions</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">[]</span>
+                <span class="k">if</span> <span class="n">final_answer</span>
+                <span class="ow">or</span> <span class="p">(</span>
+                    <span class="n">allow_text_response</span>
+                    <span class="ow">and</span> <span class="ow">not</span> <span class="n">has_tool_calls</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">action_regex</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="s2">"action_regex"</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+                <span class="p">)</span>
+                <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_actions</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+            <span class="p">)</span>
         <span class="k">except</span> <span class="n">FormatError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="n">e</span><span class="o">.</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"extra"</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">cost_output</span><span class="p">)</span>
             <span class="c1"># hasattr guard: litellm.responses() returns a pydantic object, but tests</span>
@@ -3067,8 +3080,8 @@
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>pocketcontextagent/models/litellm_response_model.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
-<span class="normal">28</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">config_class</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">LitellmResponseModelConfig</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                    <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
+<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">config_class</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">LitellmResponseModelConfig</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">config_class</span><span class="o">=</span><span class="n">config_class</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div></td></tr></tbody></table></div>
                   </details>
@@ -3102,8 +3115,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>pocketcontextagent/models/litellm_response_model.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
-<span class="normal">54</span>
+              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
@@ -3128,14 +3140,39 @@
 <span class="normal">76</span>
 <span class="normal">77</span>
 <span class="normal">78</span>
-<span class="normal">79</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="n">final_answer</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"final_answer"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="n">allow_text_response</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"allow_text_response"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">final_answer</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="s2">"action_regex"</span><span class="p">):</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"tool_choice"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"none"</span>
     <span class="k">for</span> <span class="n">attempt</span> <span class="ow">in</span> <span class="n">retry</span><span class="p">(</span><span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">,</span> <span class="n">abort_exceptions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">abort_exceptions</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">attempt</span><span class="p">:</span>
             <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prepare_messages_for_api</span><span class="p">(</span><span class="n">messages</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="n">cost_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_cost</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
     <span class="n">GLOBAL_MODEL_STATS</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cost_output</span><span class="p">[</span><span class="s2">"cost"</span><span class="p">])</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">actions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_actions</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+        <span class="n">actions</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">final_answer</span>
+            <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">allow_text_response</span>
+                <span class="ow">and</span> <span class="ow">not</span> <span class="n">has_tool_calls</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">action_regex</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="s2">"action_regex"</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+            <span class="p">)</span>
+            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_actions</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+        <span class="p">)</span>
     <span class="k">except</span> <span class="n">FormatError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
         <span class="n">e</span><span class="o">.</span><span class="n">messages</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">"extra"</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">cost_output</span><span class="p">)</span>
         <span class="c1"># hasattr guard: litellm.responses() returns a pydantic object, but tests</span>
@@ -3183,18 +3220,18 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>pocketcontextagent/models/litellm_response_model.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span>
-<span class="normal">98</span>
-<span class="normal">99</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">format_observation_messages</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">format_observation_messages</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">template_vars</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Format execution outputs into tool result messages."""</span>

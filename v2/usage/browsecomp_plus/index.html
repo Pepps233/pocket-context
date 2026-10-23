@@ -2855,13 +2855,23 @@ The provided profile selects <code>qwen/qwen3.5-9b</code> through OpenRouter wit
 <span class="w">  </span>-c<span class="w"> </span>browsecomp_plus_openrouter<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/openrouter
 </code></pre></div>
-<p>The profile requires a tool call on every model turn to match the agent protocol and avoid rejected plain-text responses.
+<p>The profile allows research tool calls or a final text response in the benchmark answer format.
 This profile uses ten BM25 results, Qwen tokenizer previews of 512 tokens for new documents and 128 for previously retrieved documents, and an 8,192-token document cap.
-It sets a 131,072-token context hint, 100 model calls, a $0.50 stopping threshold per task, and a 30-minute task timeout.
+It sets a 128,000-token context window, 100 model calls, a $0.50 stopping threshold per task, and a 30-minute task timeout.
+The last tool result of each turn receives a <code>[CURRENT CONTEXT TOKEN: N]</code> marker estimating the active conversation plus the next response's maximum output allowance.
+Estimates use the configured corpus tokenizer when available, otherwise four UTF-8 bytes per token, and include message framing and tool schemas.
+At 95% of the projected window, the agent receives a stop instruction, makes one text-only final generation, and ends without executing further tools.
+Oversized new tool results are visibly truncated before entering the conversation so there is room for the final generation; complete raw tool output remains in trajectory metadata.
+The response allowance is capped to the estimated remaining space.
+An initial task or model response that already exceeds the window ends with <code>LimitsExceeded</code>.
+Search results distinguish new documents, previously seen evidence still in context, and compacted evidence with archive tags for <code>expand_block</code>.
+The agent is instructed to read a document before answering, corroborate uncertain candidates, and use Pocket Context's own memory tools.
 The cost threshold is checked between calls and can be exceeded by an in-flight request.
 Ten concurrent tasks can therefore consume roughly ten times the per-task threshold.</p>
 <p>This is a paper-guided retrieval configuration for this repository's existing agent.
-Its <code>compact_block</code> and <code>expand_block</code> tools differ from the paper's external summarizer and memory querier, and the profile does not reproduce the paper's trained policy.
+Its <code>compact_block</code> selects bounds for a separate same-model compaction agent, and <code>expand_block</code> retrieves the local archive.
+The compaction agent sees only the active history prefix through the selected end.
+These tools differ from the paper's memory pipeline, and the profile does not reproduce the paper's trained policy.
 The model decides whether context tools are useful; a short successful episode can use neither.</p>
 <h3 id="ten-parallel-daytona-workers">Ten parallel Daytona workers</h3>
 <p>Daytona is optional for local corpus retrieval.
@@ -2909,7 +2919,9 @@ The summary reports the maximum input context across all calls, the mean per-tas
 Tool counts include <code>submit</code>; <code>avg_research_tool_calls_per_task</code> excludes it.
 When a success target is provided, a second summary reports the same metrics for completed submissions only.
 Retrieval IDs include every document returned by search or successfully fetched directly, even if the agent later compacts the observation.
-Only submitted answers receive <code>status: completed</code>; budget exhaustion remains a failed run for the official evaluator.
+Explicit submissions and final text responses with an extractable <code>Exact Answer:</code> receive <code>status: completed</code>.
+Results retain the complete response for the official evaluator and also record the last <code>Exact Answer:</code> and <code>Confidence:</code> values, with confidence defaulting to 100 when absent.
+Budget exhaustion without a final answer remains a failed run for the official evaluator.
 Trajectories and context archives are kept in subdirectories so the evaluator sees only query results at the run directory's top level.</p>
 <h2 id="evaluate">Evaluate</h2>
 <p>Use the official evaluator rather than a custom answer matcher.
@@ -2944,7 +2956,7 @@ Upstream requests Qwen3-32B judging for leaderboard submissions.</p>
 pytest<span class="w"> </span>-q<span class="w"> </span>tests/run/test_browsecomp_plus.py
 </code></pre></div>
 <p>These tests create a real Lucene index and run the CLI with the repository's deterministic replay model.
-They verify retrieval, token caps, document lookup, submission, context compaction and expansion, usage accounting, held-out partitioning, budget exhaustion, concurrent query isolation, reference-answer isolation, resume behavior, and configuration mismatch rejection without paid API calls.</p>
+They verify retrieval, token caps and markers, document lookup, answer extraction, memory-aware retrieval after compaction and expansion, final-generation steering, usage accounting, held-out partitioning, budget exhaustion, concurrent query isolation, reference-answer isolation, resume behavior, and configuration mismatch rejection without paid API calls.</p>
 
 
 

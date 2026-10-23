@@ -650,7 +650,7 @@ class ContextManager:
                 f"Invalid archive for {tag}: {exc}. Repair the local archive before retrying."
             ) from exc
         self.expansions.append(operation)
-        return results, origins
+        return copy.deepcopy(results), copy.deepcopy(origins)
 
     def compact(
         self,
@@ -662,6 +662,7 @@ class ContextManager:
         min_chars: int,
         min_reduction: int,
         summarize: Callable[[list[dict], int], str],
+        prepare_results: Callable[[list[dict], list[dict]], list[dict]] | None = None,
     ) -> list[dict]:
         self.projection()
         fingerprint = encode(
@@ -736,7 +737,8 @@ class ContextManager:
                     }
                 ],
             )
-            measured = self.trigger["characters"] - len(encode(self._prepare(model, messages + results + catalog)))
+            observations = prepare_results(results, messages + catalog) if prepare_results else results
+            measured = self.trigger["characters"] - len(encode(self._prepare(model, messages + observations + catalog)))
             if measured == reduction:
                 break
             reduction = measured
@@ -753,7 +755,7 @@ class ContextManager:
             "selected_ids": selected,
             "summary_id": summary_id,
             "active_before": list(self.active),
-            "active_after": proposed,
+            "active_after": list(proposed),
             "tool_call_id": call_id,
         }
         if proposed != self._expected_active(self.events + [event]):
@@ -797,7 +799,7 @@ class ContextManager:
         self.revision += 1
         self._applied[call_id] = record
         self.projection()
-        return results
+        return copy.deepcopy(results)
 
     def serialize(self) -> dict:
         return {
@@ -816,5 +818,5 @@ class ContextManager:
                 for key, record in self.records.items()
             },
             "manifests": copy.deepcopy(self.manifests),
-            "blocks": {record["tag"]: record["children"] for record in self._applied.values()},
+            "blocks": {record["tag"]: list(record["children"]) for record in self._applied.values()},
         }

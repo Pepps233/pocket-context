@@ -10,18 +10,25 @@ Text-based bash models keep their existing syntax.
 {
   "name": "compact_block",
   "arguments": {
-    "start_quote": "Unique excerpt from the first selected message",
-    "end_quote": "Unique excerpt from the last selected message"
+    "start_id": "b001",
+    "end_id": "b004"
   }
 }
 ```
 
-Quotes match literal visible text or tool arguments in the request that produced the call.
-They never match hidden provider metadata or the new compaction response.
-Each quote must identify one message uniquely, and the inclusive range must contain complete model exchanges, including reasoning, every tool call, and every result.
+When eligible history exists, the request ends with a block catalog in history order.
+Each stable ID identifies a complete model exchange, including reasoning, every tool call, and every result, or one standalone memory or older request.
+The framework resolves the inclusive range and rejects unknown, stale, or protected IDs.
+IDs remain stable while their messages remain active; compacted IDs disappear and expanded exchanges receive fresh IDs.
+Errors list eligible IDs or identify the required complete exchange.
 Instructions, the latest genuine user request, and the latest model response and its results are protected.
 A rejected selection returns a tool error and leaves active context intact.
 A mixed tool batch rejects every call before executing any command.
+
+During migration, callers may still supply exactly `start_quote` and `end_quote` instead of IDs.
+Quotes match literal visible text, serialized tool arguments, or decoded argument strings, excluding earlier memory-control arguments and hidden metadata.
+Matching is deterministic: each quote must identify exactly one message and both boundaries must include complete exchanges.
+Mixing ID and quote selectors is rejected.
 
 After selection validation, the compaction agent receives the entire active history prefix from the first message through the inclusive selected end.
 Messages before the selected start provide interpretation and task context; only the selected range is summarized and replaced.
@@ -37,7 +44,9 @@ Summaries and expanded historical messages may be compacted again; earlier archi
 
 The tool instructions require task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty, and causal detail needed by surviving references.
 The compaction agent receives preservation instructions and returns only its replacement summary.
-Empty, tool-calling, or truncated responses return a tool error without changing the active context.
+Empty, tool-calling, truncated, or failed child responses return a diagnostic without changing active history, allowing the main agent to continue.
+Internal formatting failures do not request new selection boundaries.
+Adapters serialize child requests and expanded input content for their own API.
 Structural validation cannot guarantee semantic completeness.
 The main agent receives a receipt only after a successful summary passes the reduction check and the archive transaction commits.
 
@@ -50,7 +59,8 @@ Call `expand_block` with one canonical tag from the current run:
 ```
 
 Expansion keeps the existing summary in place and appends a tool receipt followed by the block's local archived messages in their original order.
-It returns complete archived text and tool results, preferring saved raw output over truncated observation text, without silently truncating the expansion.
+It returns complete archived text and tool results, preferring saved raw output over truncated observation text.
+If the expansion would exhaust the context budget, it returns an error before journaling or appending history instead of silently truncating it.
 Each original message becomes one historical input message with labeled roles, tool names, arguments, and results.
 Archived calls are inert historical data and never execute.
 Supported images remain input content, while opaque signatures and provider metadata stay in the original archive.
@@ -71,10 +81,9 @@ Every expanded original message has a unique selection marker:
 <local archived content>
 ```
 
-Use these full headers as quote selectors to distinguish original messages and repeated expansions.
-Expanded content is selectable at original-message boundaries, and a selected original tool exchange must include its response and every result.
+Expanded exchanges appear in the eligible block catalog with distinct IDs for each occurrence.
 Selecting one complete exchange from a larger expansion leaves its other messages intact.
-Quotes still must be unique across the active request, including earlier tool arguments that may repeat an excerpt.
+Legacy quote callers can use full occurrence headers to distinguish repeated expansions, while still selecting complete exchanges.
 
 A fresh tool-call ID can expand the same tag again with a new occurrence marker.
 Redispatching a committed expansion never appends another historical copy.
@@ -114,7 +123,7 @@ agent:
 `context_db_path` defaults to `global_config_dir/contexts/<run_id>.sqlite3`.
 A shared path keeps separate records for each run.
 The minimum range counts visible text characters, excluding images and hidden metadata.
-The minimum reduction compares serialized request characters before and after compaction, including the retained compaction response, replacement, receipt, and rebuilt cache markers.
+The minimum reduction compares serialized request characters before and after compaction, including the retained compaction response, replacement, receipt, updated block catalog, and rebuilt cache markers.
 These limits are characters, not token estimates.
 
 ## Archives and trajectories
@@ -126,15 +135,17 @@ Existing archives are never rewritten.
 The archive and replacement event commit in one transaction before the active projection changes.
 Successful expansions commit their receipt, historical projection, and provenance to the operation journal before appending messages.
 Expansion does not advance compaction revisions or `ctx-NNNN` numbering.
-Storage failures return tool errors; unexpected context assembly errors stop the run.
+Storage and optional-operation formatting failures return tool diagnostics without replacing history.
+A corrupted active projection still stops the run.
 Reprocessing a committed tool-call ID is idempotent, while conflicting arguments or reuse across context operations fail.
 
 Trajectory JSON retains the full chronological `messages` field for existing inspectors.
 Its additional `context` field records the archive path, run ID, revision, active IDs, message and expansion provenance, structured item IDs, replacement events, expansion operations, and block relationships.
-Hidden IDs live in sidecar records and are never sent to providers.
+Internal message and item IDs live in sidecar records and are never sent to providers.
+Public block IDs and their membership are recorded in request manifests; the catalog is generated request metadata, not user history.
 Reasoning signatures and multimodal payloads remain unchanged, and cache markers are rebuilt on prepared copies.
 
-Compaction-agent requests and responses are saved separately in trajectory `compactions`; they never become main-agent conversation messages.
+Compaction-agent requests, responses, and failure diagnostics are saved separately in trajectory `compactions`; they never become main-agent conversation messages.
 Their costs count toward the episode cost, and `model_stats.api_calls` includes both agents while `compaction_api_calls` identifies offloaded calls.
 The main agent's step limit counts only its own decisions.
 Each archive records `summary_input_ids` to audit the masked prefix used for generation.

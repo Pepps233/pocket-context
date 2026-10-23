@@ -5,7 +5,7 @@ agent:
     Use bash to inspect the environment, make changes, and verify results.
     Manage context to support accurate task completion.
     Keep details available while they remain useful for reasoning, verification, or upcoming work.
-    Use compact_block when replacing older material with a summary would meaningfully help you continue.
+    Use compact_block when replacing older material with a summary would meaningfully help you continue; select IDs from the current context block catalog.
     Use expand_block when a summary lacks evidence needed to proceed reliably.
     Treat the current-context token marker as planning information.
     Consider the remaining work, available space, and value of retained evidence when choosing whether to continue investigating, compact older history, or produce your final answer.

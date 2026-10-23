@@ -40,7 +40,7 @@ def test_native_compaction_parsing_and_batch_rejection(response_api):
         "error"
         in parse([("compact_block", json.dumps(args | {"summary": "Do not accept a caller summary"}), "old")])[0]
     )
-    assert set(COMPACT_TOOL["function"]["parameters"]["properties"]) == {"start_quote", "end_quote"}
+    assert set(COMPACT_TOOL["function"]["parameters"]["properties"]) == {"start_id", "end_id"}
     assert parse([("bash", '{"command":"echo ok"}', "shell")]) == [{"command": "echo ok", "tool_call_id": "shell"}]
     assert COMPACT_TOOL["function"] == {key: value for key, value in COMPACT_TOOL_RESPONSE_API.items() if key != "type"}
 
@@ -105,3 +105,20 @@ def test_invalid_expansion_arguments_remain_tool_errors(args):
     action = parse_native_calls([{"name": "expand_block", "id": "real", "arguments": json.dumps(args)}])[0]
     assert action["type"] == "expand_block" and action["tool_call_id"] == "real"
     assert "error" in action and "command" not in action
+
+
+@pytest.mark.parametrize(
+    ("args",),  # noqa: PT006
+    [
+        ({"start_id": "b001", "end_id": "b002"},),
+        ({"start_id": "b001", "end_quote": "last"},),
+        ({"start_id": "b001", "end_id": "b002", "start_quote": "first", "end_quote": "last"},),
+        ({"start_id": [], "end_id": "b002"},),
+    ],
+)  # noqa: PT006
+def test_id_selection_arguments_are_exclusive(args):
+    from pocketcontextagent.models.utils.compact_tool import parse_native_calls
+
+    action = parse_native_calls([{"name": "compact_block", "id": "select", "arguments": json.dumps(args)}])[0]
+    assert action["type"] == "compact_block" and action["tool_call_id"] == "select"
+    assert ("error" not in action) == (args == {"start_id": "b001", "end_id": "b002"})

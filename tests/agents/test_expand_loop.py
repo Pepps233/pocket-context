@@ -77,9 +77,9 @@ def test_expand_full_raw_content_and_next_request(tmp_path, api):
         for record in expanded_records(agent)
     )
     next_turn(agent, "bash", {"command": "echo after-expansion"}, "after", api)
-    assert results == agent.model.requests[-1][-3:]
+    assert results == agent.model.requests[-1][-4:-1]
     assert agent.context.manifests[-1]["revision"] == agent.context.revision == 1
-    assert agent.context.projection() == agent.context.assemble(agent.model)
+    assert agent.context.request_projection(agent.model) == agent.context.assemble(agent.model)
     with sqlite3.connect(agent.context.db_path) as db:
         operation = json.loads(db.execute("SELECT record FROM operations").fetchone()[0])
         assert operation["results"] == results and operation["origins"][2]["source_record"] == "m000004"
@@ -561,7 +561,7 @@ def test_structured_historical_tool_images_and_results(tmp_path, api):
     assert "archive-output" + "0" * 3000 in get_content_string(results[2])
     assert "Historical returncode: 0" in get_content_string(results[2])
     next_turn(agent, "bash", {"command": "echo after-tool-image"}, "after-image", api)
-    assert image in agent.model.requests[-1][-1]["content"]
+    assert image in agent.model.requests[-1][-2]["content"]
 
 
 def test_complete_agent_run_sees_expansion_before_finishing(tmp_path, api):
@@ -573,7 +573,29 @@ def test_complete_agent_run_sees_expansion_before_finishing(tmp_path, api):
     request = agent.model.requests[-1]
     assert len(agent.model.requests) == 6 and agent.context.revision == 1
     assert "[ctx-0001]: Inspection printed" in get_content_string(request[2])
-    assert "archive-output" + "0" * 3000 in get_content_string(request[-1])
-    assert "exp=1 part=1/2" in get_content_string(request[-2])
+    assert "archive-output" + "0" * 3000 in get_content_string(request[-2])
+    assert "exp=1 part=1/2" in get_content_string(request[-3])
     assert len(agent.context.events) == len(agent.context.expansions) == 1
     assert len(read_blocks(agent)) == 1 and agent.context.projection()
+
+
+def test_expansion_that_exceeds_budget_preserves_complete_history(tmp_path, api):
+    agent = compacted_agent(tmp_path, api)
+    agent.config.response_token_limit = 100
+    agent.config.context_token_limit = agent.context_tokens(agent.context.request_projection(agent.model)) + 600
+    before = list(agent.context.active)
+    result = next_turn(agent, "expand_block", {"tag": "ctx-0001"}, "oversized", api)
+    assert "Expansion exceeds" in get_content_string(result[0])
+    assert agent.context.active[: len(before)] == before
+    assert not expanded_records(agent) and not agent.context.expansions
+    assert "context_truncated" not in encode(result)
+    agent.config.context_token_limit = 0
+    assert "after-rejection" in get_content_string(
+        next_turn(
+            agent,
+            "bash",
+            {"command": "echo after-rejection"},
+            "continue-after-rejection",
+            api,
+        )[0]
+    )

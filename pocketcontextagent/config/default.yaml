@@ -123,10 +123,7 @@ model:
     {%- else -%}
     <warning>
     The output of your last command was too long.
-    Please try a different command that produces less output.
-    If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.
-    If you're using grep or find and it produced too much output, you can use a more selective search pattern.
-    If you really need to see something from the full command's output, you can redirect output to a file and then search in that file.
+    Narrow the command output or inspect a smaller section.
     </warning>
     {%- set elided_chars = output.output | length - 10000 -%}
     <output_head>
@@ -143,29 +140,9 @@ model:
     drop_params: true
   format_error_template: |
     {% if finish_reason is defined and finish_reason in ["length", "tool_calls"] -%}
-    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a complete action, so it was cut off. Respond more concisely and provide exactly one action in the required format. If you need to think more, do so briefly.
+    Response reached the output limit (finish_reason={{finish_reason}}).
+    Respond more concisely and finish with one complete command block.
     {%- else -%}
-    Format error:
-
-    <error>
     {{error}}
-    </error>
-
-    Here is general guidance on how to format your response:
-
-    Please always provide EXACTLY ONE action in triple backticks, found {{actions|length}} actions.
-    If you want to end the task, please issue the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`
-    without any other command.
-    Else, please format your response exactly as follows:
-
-    <response_example>
-    Here are some thoughts about why you want to perform the action.
-
-    ```mswea_bash_command
-    <action>
-    ```
-    </response_example>
-
-    Note: In rare cases, if you need to reference a similar format in your command, you might have
-    to proceed in two steps, first writing TRIPLEBACKTICKSBASH, then replacing them with ```mswea_bash_command.
+    Return exactly one command in a fenced mswea_bash_command block.
     {%- endif %}

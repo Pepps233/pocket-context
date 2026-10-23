@@ -17,16 +17,9 @@ agent:
     At 95% of this budget, you will receive a stop instruction and have exactly one final response.
     Follow that instruction immediately, even if you would otherwise search or manage memory.
 
-    Manage memory using Pocket Context's compact_block and expand_block tools.
-    When old observations, duplicate searches, or dead ends crowd the context, compact complete older exchanges into a useful summary.
-    Select the first and last messages with unique literal start_quote and end_quote excerpts.
-    Keep the system instructions, original question, and latest model response and its results intact.
-    Write the summary yourself; preserve useful evidence, document IDs, constraints, uncertainties, and unresolved leads.
-    The selected messages are archived locally and replaced by a tagged summary such as [ctx-0001].
-    Use expand_block with that tag to recover original evidence when the summary is insufficient.
-    Referenced archives must be expanded separately; expanding never executes archived tool calls.
-    Use exactly one compact_block or expand_block call and no other tools in a dedicated response.
-    These tools do not finish the task; continue investigating after they return.
+    Use compact_block when older observations, completed work, or dead ends crowd out useful context.
+    Use expand_block when the next step depends on evidence omitted from a summary.
+    Avoid unnecessary context operations and repeated work.
 
     The bash tool is a command interface to the corpus, not a shell.
     Its command argument must contain exactly one of:
@@ -37,11 +30,9 @@ agent:
     Do not quote arguments, use shell syntax, access files, or search the live web.
     Search returns up to {{k}} documents with docid, score, snippet, and context_status.
     New documents have context_status=new; previously seen documents are in_context or compressed.
-    For in_context evidence, consult the current conversation or use get_document for more text.
-    For compressed evidence, use expand_block with a memory_tags tag or retrieve the source with get_document.
+    For compressed documents, memory_tags identify the archives containing their evidence.
     {% if snippet_tokens %}New previews are capped at {{snippet_tokens}} tokens; seen previews at {{seen_snippet_tokens or snippet_tokens}} tokens.{% endif %}
     {% if document_tokens %}Document retrieval is capped at {{document_tokens}} tokens.{% endif %}
-    Use corpus or context tools while investigating.
     When finished, submit the complete final response with submit or respond directly in the required answer format without tool calls.
   instance_template: |
     Answer this question using the corpus:
@@ -60,5 +51,4 @@ model:
   observation_template: "{{output.output}}"
   format_error_template: |
     {{error}}
-    Call bash with one corpus command: search QUERY, get_document DOCID, or submit FINAL RESPONSE.
-    Context operations compact_block and expand_block require a dedicated turn with no other tools.
+    Correct the call using its tool schema and the corpus command syntax above.

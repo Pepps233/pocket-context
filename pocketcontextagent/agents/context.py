@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -556,10 +557,18 @@ class ContextManager:
         return results, origins
 
     def compact(
-        self, action: dict, response: dict, model, format_results, *, min_chars: int, min_reduction: int
+        self,
+        action: dict,
+        response: dict,
+        model,
+        format_results,
+        *,
+        min_chars: int,
+        min_reduction: int,
+        summarize: Callable[[list[dict], int], str],
     ) -> list[dict]:
         self.projection()
-        fingerprint = encode({key: action.get(key) for key in ("start_quote", "end_quote", "summary")})
+        fingerprint = encode({key: action.get(key) for key in ("start_quote", "end_quote")})
         call_id = action["tool_call_id"]
         if call_id in self._applied:
             if self._applied[call_id]["fingerprint"] != fingerprint:
@@ -580,8 +589,11 @@ class ContextManager:
         )
         if selected_chars < min_chars:
             raise SelectionError(f"Selected range has {selected_chars} visible characters; select at least {min_chars}")
-        if not isinstance(action.get("summary"), str) or not action["summary"].strip():
-            raise SelectionError("Provide a nonempty agent-written summary")
+        start = self.trigger["ids"].index(selected[0])
+        end = self.trigger["ids"].index(selected[-1]) + 1
+        summary_text = summarize(copy.deepcopy(self.trigger["messages"][:end]), start)
+        if not isinstance(summary_text, str) or not summary_text.strip():
+            raise SelectionError("Compaction agent returned an empty summary")
         tag = f"ctx-{self.revision + 1:04d}"
         local = [key for key in selected if not (self.records[key].block or self.records[key].source_block)]
         references = [
@@ -599,7 +611,7 @@ class ContextManager:
         refs = list(dict.fromkeys(reference["tag"] for reference in references))
         summary_id = f"m{len(self.records) + 1:06d}"
         summary = model.format_message(
-            role="user", content=f"{block_header(tag, refs)} {action['summary']}\n(Assistant-generated memory.)"
+            role="user", content=f"{block_header(tag, refs)} {summary_text}\n(Assistant-generated memory.)"
         )
         start = self.active.index(selected[0])
         proposed = self.active[:start] + [summary_id] + self.active[start + len(selected) :]
@@ -629,7 +641,7 @@ class ContextManager:
             raise ContextAssemblyError("Compaction receipt size failed to converge")
         if reduction < min_reduction:
             raise SelectionError(
-                f"Net request reduction is {reduction} characters; need at least {min_reduction}. Shorten the summary or select more history"
+                f"Net request reduction is {reduction} characters; need at least {min_reduction}. Retry compaction or select more history"
             )
         event = {
             "version": 1,
@@ -649,7 +661,8 @@ class ContextManager:
             "version": 2,
             "run_id": self.run_id,
             "tag": tag,
-            "summary": action["summary"],
+            "summary": summary_text,
+            "summary_input_ids": list(self.trigger["ids"][:end]),
             "summary_record": asdict(summary_record),
             "messages": [self.records[key].message for key in local],
             "records": [asdict(self.records[key]) for key in local],

@@ -17,13 +17,14 @@ from tests.agents.test_compact_loop import (
     native_turn,
     read_blocks,
     start_history,
+    with_summaries,
 )
 
 
 def next_turn(agent, name, args, call_id, api, *, content=None):
-    agent.model.config.outputs[agent.model.current_index + 1 :] = [
-        native_turn(name, args, call_id, content or f"Execute {call_id}", api)
-    ]
+    agent.model.config.outputs[agent.model.current_index + 1 :] = list(
+        with_summaries([native_turn(name, args, call_id, content or f"Execute {call_id}", api)], api)
+    )
     return agent.step()
 
 
@@ -566,11 +567,11 @@ def test_structured_historical_tool_images_and_results(tmp_path, api):
 def test_complete_agent_run_sees_expansion_before_finishing(tmp_path, api):
     agent = make_agent(tmp_path, api)
     agent.model.config.outputs.insert(
-        3, native_turn("expand_block", {"tag": "ctx-0001"}, "expand", "Retrieve history", api)
+        4, native_turn("expand_block", {"tag": "ctx-0001"}, "expand", "Retrieve history", api)
     )
     assert agent.run("Keep working")["exit_status"] == "Submitted"
     request = agent.model.requests[-1]
-    assert len(agent.model.requests) == 5 and agent.context.revision == 1
+    assert len(agent.model.requests) == 6 and agent.context.revision == 1
     assert "[ctx-0001]: Inspection printed" in get_content_string(request[2])
     assert "archive-output" + "0" * 3000 in get_content_string(request[-1])
     assert "exp=1 part=1/2" in get_content_string(request[-2])

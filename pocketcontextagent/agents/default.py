@@ -12,6 +12,7 @@ from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel, Field
 
 from pocketcontextagent import Environment, Model, __version__
+from pocketcontextagent.agents.compaction import CompactionAgent
 from pocketcontextagent.agents.context import ContextManager, SelectionError, relationships
 from pocketcontextagent.agents.utils.context_budget import (
     append_text,
@@ -74,6 +75,7 @@ class DefaultAgent:
         self.n_consecutive_format_errors = 0
         self._start_time = time.time()
         self._final_generation = False
+        self.compactions: list[dict] = []
 
     def get_template_vars(self, **kwargs) -> dict:
         return recursive_merge(
@@ -120,6 +122,7 @@ class DefaultAgent:
         self.context = ContextManager(self.config.context_db_path)
         self._context_results = {}
         self._final_generation = False
+        self.compactions = []
         self.add_messages(
             self.model.format_message(role="system", content=self._render_template(self.config.system_template)),
             self.model.format_message(role="user", content=self._render_template(self.config.instance_template)),
@@ -175,9 +178,10 @@ class DefaultAgent:
             )
         return self.execute_actions(message)
 
-    def query(self) -> dict:
-        """Query the model and return model messages. Override to add hooks."""
-        if 0 < self.config.step_limit <= self.n_calls or 0 < self.config.cost_limit <= self.cost:
+    def check_limits(self, *, include_step_limit: bool = True) -> None:
+        if (
+            include_step_limit and 0 < self.config.step_limit <= self.n_calls
+        ) or 0 < self.config.cost_limit <= self.cost:
             raise LimitsExceeded(
                 {
                     "role": "exit",
@@ -193,6 +197,10 @@ class DefaultAgent:
                     "extra": {"exit_status": "TimeExceeded", "submission": ""},
                 }
             )
+
+    def query(self) -> dict:
+        """Query the model and return model messages. Override to add hooks."""
+        self.check_limits()
         options = {"allow_text_response": True} if getattr(self.env, "is_final_answer", None) else {}
         if self.config.context_token_limit:
             key, allowance = output_token_setting(self.model, self.config.response_token_limit)
@@ -272,6 +280,20 @@ class DefaultAgent:
             )
         )
 
+    def summarize_context(self, history: list[dict], start: int) -> str:
+        self.check_limits(include_step_limit=False)
+        agent = CompactionAgent(
+            self.model,
+            self.config.context_token_limit,
+            self.config.response_token_limit,
+            getattr(self.env, "tokenizer", None),
+        )
+        try:
+            return agent.run(history, start)
+        finally:
+            self.compactions.append(agent.serialize())
+            self.cost += agent.response.get("extra", {}).get("cost", 0.0)
+
     def dispatch_context_actions(self, message: dict) -> list[dict] | None:
         actions = message.get("extra", {}).get("actions", [])
         if not any(action.get("type") in (*CONTEXT_TOOLS, "rejected") for action in actions):
@@ -308,6 +330,7 @@ class DefaultAgent:
                     format_results,
                     min_chars=self.config.compact_min_chars,
                     min_reduction=self.config.compact_min_reduction,
+                    summarize=self.summarize_context,
                 )
         except SelectionError as exc:
             results = format_results(
@@ -328,7 +351,8 @@ class DefaultAgent:
             "info": {
                 "model_stats": {
                     "instance_cost": self.cost,
-                    "api_calls": self.n_calls,
+                    "api_calls": self.n_calls + sum(bool(call["response"]) for call in self.compactions),
+                    "compaction_api_calls": sum(bool(call["response"]) for call in self.compactions),
                 },
                 "config": {
                     "agent": self.config.model_dump(mode="json"),
@@ -340,6 +364,7 @@ class DefaultAgent:
             },
             "messages": self.messages,
             "context": self.context.serialize(),
+            "compactions": self.compactions,
             "trajectory_format": "mini-swe-agent-1.1",
         }
         return recursive_merge(agent_data, self.model.serialize(), self.env.serialize(), *extra_dicts)

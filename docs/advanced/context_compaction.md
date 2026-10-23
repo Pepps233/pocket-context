@@ -1,7 +1,8 @@
 # Agent-controlled context compaction and expansion
 
 Native tool models can call `compact_block` to replace a long, contiguous context range with an agent-written memory.
-The calling agent decides when to compact and writes the summary itself.
+The calling agent selects the bounds, then waits for a separate compaction agent using the same model and model settings to generate the summary.
+The compaction agent has an independent conversation and cannot execute tools.
 Compaction and expansion each take a dedicated turn with exactly one call and no other tools.
 Text-based bash models keep their existing syntax.
 
@@ -10,8 +11,7 @@ Text-based bash models keep their existing syntax.
   "name": "compact_block",
   "arguments": {
     "start_quote": "Unique excerpt from the first selected message",
-    "end_quote": "Unique excerpt from the last selected message",
-    "summary": "Information needed to continue working"
+    "end_quote": "Unique excerpt from the last selected message"
   }
 }
 ```
@@ -23,13 +23,23 @@ Instructions, the latest genuine user request, and the latest model response and
 A rejected selection returns a tool error and leaves active context intact.
 A mixed tool batch rejects every call before executing any command.
 
+After selection validation, the compaction agent receives the entire active history prefix from the first message through the inclusive selected end.
+Messages before the selected start provide interpretation and task context; only the selected range is summarized and replaced.
+For history A, B, C, D and selection B through C, it receives A, B, C and never D or the triggering compaction call.
+History is rendered as inert evidence, preserving visible reasoning, tool arguments, results, and supported images while excluding hidden metadata.
+Existing tagged summaries remain summaries; offloading does not recursively expand their archives.
+No task, hints, or instructions are derived from later messages.
+
 A successful replacement appears at the original position as `[ctx-0001]: <summary>`, explicitly labeled as assistant-generated memory.
 The next model request contains this replacement before the agent chooses further work.
 The receipt reports the tag and measured character reduction.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.
 
 The tool instructions require task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty, and causal detail needed by surviving references.
-Structural validation cannot guarantee semantic completeness, so summary quality remains the calling agent's responsibility.
+The compaction agent receives preservation instructions and returns only its replacement summary.
+Empty, tool-calling, or truncated responses return a tool error without changing the active context.
+Structural validation cannot guarantee semantic completeness.
+The main agent receives a receipt only after a successful summary passes the reduction check and the archive transaction commits.
 
 ## Expansion
 
@@ -74,7 +84,7 @@ There is no cross-run lookup or resume feature.
 ## Provenance-aware recompaction
 
 Compaction validates the selected range and reduction thresholds before storing a new block.
-The agent-written summary stays unchanged, including conclusions drawn from inherited material.
+The generated summary stays unchanged, including conclusions drawn from inherited material.
 The new block stores only locally owned messages in its payload and records previous summaries and expanded messages as direct references.
 Reference metadata retains source record IDs, expansion occurrences, original exchange groups, and selection order, including partial-block selections.
 Ownership comes from sidecar provenance, never tag-shaped text or semantic similarity.
@@ -123,3 +133,9 @@ Trajectory JSON retains the full chronological `messages` field for existing ins
 Its additional `context` field records the archive path, run ID, revision, active IDs, message and expansion provenance, structured item IDs, replacement events, expansion operations, and block relationships.
 Hidden IDs live in sidecar records and are never sent to providers.
 Reasoning signatures and multimodal payloads remain unchanged, and cache markers are rebuilt on prepared copies.
+
+Compaction-agent requests and responses are saved separately in trajectory `compactions`; they never become main-agent conversation messages.
+Their costs count toward the episode cost, and `model_stats.api_calls` includes both agents while `compaction_api_calls` identifies offloaded calls.
+The main agent's step limit counts only its own decisions.
+Each archive records `summary_input_ids` to audit the masked prefix used for generation.
+Committed calls are replayed without regenerating a summary; a new call ID creates a fresh compaction attempt.

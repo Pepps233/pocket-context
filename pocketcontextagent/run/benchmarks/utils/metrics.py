@@ -8,7 +8,7 @@ def episode_metrics(messages: list[dict]) -> dict:
     responses, calls = {}, {}
     for message in messages:
         extra = message.get("extra", {})
-        response = extra.get("response")
+        response = message if message.get("object") == "response" else extra.get("response")
         if isinstance(response, dict):
             responses.setdefault(response.get("id") or json.dumps(response, sort_keys=True), response)
         for index, action in enumerate(extra.get("actions", [])):

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from jinja2 import StrictUndefined, Template
 
 from pocketcontextagent.agents.context import ContextAssemblyError, ContextManager, encode
 from pocketcontextagent.agents.default import DefaultAgent
@@ -14,7 +15,12 @@ from pocketcontextagent.agents.interactive import InteractiveAgent
 from pocketcontextagent.environments.local import LocalEnvironment
 from pocketcontextagent.models.litellm_model import LitellmModel
 from pocketcontextagent.models.litellm_response_model import LitellmResponseModel
-from pocketcontextagent.models.test_models import DeterministicResponseAPIToolcallModel, DeterministicToolcallModel
+from pocketcontextagent.models.test_models import (
+    DeterministicResponseAPIToolcallModel,
+    DeterministicToolcallModel,
+    make_output,
+    make_response_api_output,
+)
 from pocketcontextagent.models.utils.actions_toolcall import parse_toolcall_actions
 from pocketcontextagent.models.utils.actions_toolcall_response import parse_toolcall_actions_response
 from pocketcontextagent.models.utils.content_string import get_content_string
@@ -22,7 +28,12 @@ from pocketcontextagent.run.utilities.inspector import _messages_to_steps
 
 
 def native_turn(name, arguments, call_id, content, response_api=False):
-    return native_batch([(name, arguments, call_id)], content, response_api)
+    arguments = dict(arguments)
+    summary = arguments.pop("summary", None) if name == "compact_block" else None
+    message = native_batch([(name, arguments, call_id)], content, response_api)
+    if summary is not None:
+        message["extra"]["test_summary"] = summary
+    return message
 
 
 def native_batch(calls, content, response_api=False):
@@ -92,17 +103,38 @@ def compaction_args(**kwargs):
     }
 
 
+def with_summaries(outputs, api):
+    for message in outputs:
+        yield message
+        if any(action.get("type") == "compact_block" for action in message["extra"]["actions"]):
+            summary = message["extra"].get(
+                "test_summary", "Inspection printed archive-output followed by zeros; command succeeded."
+            )
+            yield make_response_api_output(summary, []) if api else make_output(summary, [], cost=0)
+
+
 def make_agent(tmp_path, api, *, args=None, agent_class=DefaultAgent, outputs=None, **kwargs):
     model = (RecordingResponseModel if api else RecordingModel)(
-        outputs=outputs
-        or [
-            native_turn(
-                "bash", {"command": "printf 'archive-output'; printf '%03000d' 0"}, "a", "Inspect archive-start", api
-            ),
-            native_turn("bash", {"command": "echo retained-output"}, "c", "Retained latest output", api),
-            native_turn("compact_block", args or compaction_args(), "compact", "Store inspection history", api),
-            native_turn("bash", {"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"}, "done", "Finish", api),
-        ]
+        outputs=list(
+            with_summaries(
+                outputs
+                or [
+                    native_turn(
+                        "bash",
+                        {"command": "printf 'archive-output'; printf '%03000d' 0"},
+                        "a",
+                        "Inspect archive-start",
+                        api,
+                    ),
+                    native_turn("bash", {"command": "echo retained-output"}, "c", "Retained latest output", api),
+                    native_turn("compact_block", args or compaction_args(), "compact", "Store inspection history", api),
+                    native_turn(
+                        "bash", {"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"}, "done", "Finish", api
+                    ),
+                ],
+                api,
+            )
+        )
     )
     return agent_class(
         model,
@@ -135,12 +167,12 @@ def read_blocks(agent):
 def test_compaction_finishes_before_next_work_decision(tmp_path, api):
     agent = make_agent(tmp_path, api)
     assert agent.run("Keep working")["exit_status"] == "Submitted"
-    assert len(agent.model.requests) == 4 and len(agent.messages) == 10
-    assert "[ctx-0001]:" in get_content_string(agent.model.requests[3][2])
-    assert "Assistant-generated memory" in get_content_string(agent.model.requests[3][2])
-    assert "Retained latest output" in get_content_string(agent.model.requests[3][3])
-    assert "0" * 1000 not in encode(agent.model.requests[3])
-    assert "Inspection printed" not in get_content_string(agent.model.requests[3][-1])
+    assert len(agent.model.requests) == 5 and len(agent.messages) == 10
+    assert "[ctx-0001]:" in get_content_string(agent.model.requests[4][2])
+    assert "Assistant-generated memory" in get_content_string(agent.model.requests[4][2])
+    assert "Retained latest output" in get_content_string(agent.model.requests[4][3])
+    assert "0" * 1000 not in encode(agent.model.requests[4])
+    assert "Inspection printed" not in get_content_string(agent.model.requests[4][-1])
     assert read_blocks(agent)[0]["messages"] == agent.messages[2:4]
     assert read_blocks(agent)[0]["relationships"] == {"m000003": [["a"], []], "m000004": [[], ["a"]]}
     serialized = agent.save(tmp_path / "trajectory.json")
@@ -154,7 +186,7 @@ def test_compaction_finishes_before_next_work_decision(tmp_path, api):
     ]
     assert event["summary_id"] in after["ids"]
     assert before["characters"] - after["characters"] == read_blocks(agent)[0]["reduction"]
-    payload = agent.model._prepare_messages_for_api(agent.model.requests[3])
+    payload = agent.model._prepare_messages_for_api(agent.model.requests[4])
     for record in agent.context.records.values():
         assert record.id not in encode(payload)
         assert all(item_id not in encode(payload) for item_id in record.item_ids.values())
@@ -259,11 +291,13 @@ def test_stale_response_and_repeated_dispatch(tmp_path, api):
     first = agent.execute_actions(response)
     assert agent.execute_actions(response) == first
     assert len(read_blocks(agent)) == 1 and agent.context.revision == 1
-    action = {**response["extra"]["actions"][0], "summary": "conflicting summary"}
+    action = {**response["extra"]["actions"][0], "start_quote": "conflicting bounds"}
     from pocketcontextagent.agents.context import SelectionError
 
     with pytest.raises(SelectionError, match="Conflicting reuse"):
-        agent.context.compact(action, response, agent.model, None, min_chars=0, min_reduction=0)
+        agent.context.compact(
+            action, response, agent.model, None, min_chars=0, min_reduction=0, summarize=agent.summarize_context
+        )
     agent = make_agent(tmp_path / "stale", api)
     start_history(agent)
     old = agent.query()
@@ -395,14 +429,18 @@ def test_concurrent_runs_share_database_without_sharing_context(tmp_path):
     assert ContextManager().db_path.parent.name == "contexts"
 
 
-def test_native_prompt_consistency_and_text_mode_unchanged():
+def test_native_prompt_responsibilities_and_legacy_tool_separation():
     for name in ("mini", "benchmarks/swebench", "benchmarks/programbench", "benchmarks/browsecomp_plus"):
         config = yaml.safe_load(Path(f"pocketcontextagent/config/{name}.yaml").read_text())
         prompt = config["agent"]["system_template"] + config["agent"]["instance_template"]
-        assert "exactly one compact_block" in prompt
-        assert "expand_block" in prompt
-        assert "compact_block" in config["model"]["format_error_template"]
-        assert "expand_block" in config["model"]["format_error_template"]
+        assert prompt.count("Use compact_block when") == 1
+        assert prompt.count("Use expand_block when") == 1
+        assert all(term not in prompt for term in ("start_quote", "end_quote", "ctx-0001", "compaction agent"))
+        template = Template(config["model"]["format_error_template"], undefined=StrictUndefined)
+        correction = template.render(error="Invalid tool call: missing arguments.")
+        assert "Invalid tool call: missing arguments." in correction and "tool schema" in correction
+        assert len(correction.splitlines()) == 2
+        assert "compact_block" not in correction and "expand_block" not in correction
         assert "AT LEAST ONE bash" not in encode(config)
     assert "compact_block" not in Path("pocketcontextagent/config/default.yaml").read_text()
     assert "expand_block" not in Path("pocketcontextagent/config/default.yaml").read_text()
@@ -416,11 +454,11 @@ def test_repeated_call_id_is_idempotent_and_conflicts_fail(tmp_path, api):
         [
             native_turn("compact_block", compaction_args(), "compact", "Repeat committed call", api),
             native_turn(
-                "compact_block", compaction_args(summary="Different summary"), "compact", "Conflicting call", api
+                "compact_block", compaction_args(start_quote="Different bounds"), "compact", "Conflicting call", api
             ),
         ]
     )
-    agent.model.current_index = 3
+    agent.model.current_index = 4
     assert "Compacted [ctx-0001]" in get_content_string(agent.step()[0])
     assert "Conflicting reuse" in get_content_string(agent.step()[0])
     assert len(read_blocks(agent)) == 1 and agent.context.revision == 1

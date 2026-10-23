@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 from pocketcontextagent import Model
-from pocketcontextagent.agents.context import SelectionError, archived_content
+from pocketcontextagent.agents.context import ContextOperationError, archived_content
 from pocketcontextagent.agents.utils.context_budget import estimate_tokens, output_token_setting
 from pocketcontextagent.models.utils.response import has_tool_calls, response_text
 
@@ -29,12 +29,12 @@ class CompactionAgent:
     tokenizer: object = None
     messages: list[dict] = field(default_factory=list)
     response: dict = field(default_factory=dict)
+    error: str = ""
 
     def run(self, history: list[dict], start: int) -> str:
-        request = self.model.format_message(role="user", content="")
         content = [
             {
-                "type": "input_text" if request.get("type") == "message" else "text",
+                "type": "text",
                 "text": (
                     f"Summarize inclusive history messages {start + 1} through {len(history)}. "
                     "The history ends at the selected right bound.\n"
@@ -44,20 +44,20 @@ class CompactionAgent:
         for index, message in enumerate(history):
             blocks = archived_content(
                 {key: value for key, value in message.items() if key != "extra"},
-                responses=request.get("type") == "message",
+                responses=False,
             )
             blocks[0]["text"] = (
                 f"History message {index + 1} ({'selected' if index >= start else 'earlier context'}):\n"
                 + blocks[0]["text"]
             )
             content.extend(blocks)
-        request["content"] = content
+        request = self.model.format_message(role="user", content=content)
         self.messages = [self.model.format_message(role="system", content=SYSTEM_PROMPT), request]
         key, allowance = output_token_setting(self.model, self.response_token_limit)
         if self.context_token_limit:
             allowance = min(allowance, self.context_token_limit - estimate_tokens(self.messages, self.tokenizer))
             if allowance <= 0:
-                raise SelectionError("Compaction prefix exceeds the context window; select an earlier end bound")
+                raise ContextOperationError("Compaction prefix exceeds the context window; select an earlier end bound")
         self.response = self.model.query(self.messages, final_answer=True, **{key: allowance})
         response = self.response.get("extra", {}).get("response", self.response)
         truncated = response.get("status") == "incomplete" or any(
@@ -68,8 +68,10 @@ class CompactionAgent:
             or has_tool_calls(self.response, action_regex=getattr(self.model.config, "action_regex", ""))
             or truncated
         ):
-            raise SelectionError("Compaction agent must return a complete, nonempty text summary; retry the selection")
+            raise ContextOperationError(
+                "Compaction agent returned an incomplete, empty or tool-bearing summary; history preserved. Continue the task."
+            )
         return summary
 
     def serialize(self) -> dict:
-        return {"messages": self.messages, "response": self.response}
+        return {"messages": self.messages, "response": self.response, "error": self.error}

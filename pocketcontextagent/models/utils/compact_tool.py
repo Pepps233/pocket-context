@@ -16,6 +16,8 @@ COMPACT_FUNCTION = {
     "name": "compact_block",
     "description": (
         "Replace a long context range with a summary produced by a separate agent of the same model. "
+        "If the task is unlikely to finish before the context stop threshold, proactively select eligible earlier "
+        "history for compaction before reaching that threshold so work can continue. "
         "Supply only start_quote and end_quote; the compaction agent receives history from its beginning "
         "through the selected end, with no later messages. The tool waits for summarization and a committed "
         "replacement before returning. Use exactly one compact_block call and no other tools. "

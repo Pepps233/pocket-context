@@ -93,9 +93,15 @@ mini-extra browsecomp-plus run --limit 1 \
   --output runs/browsecomp-plus/openrouter
 ```
 
-The profile requires a tool call on every model turn to match the agent protocol and avoid rejected plain-text responses.
+The profile allows research tool calls or a final text response in the benchmark answer format.
 This profile uses ten BM25 results, Qwen tokenizer previews of 512 tokens for new documents and 128 for previously retrieved documents, and an 8,192-token document cap.
-It sets a 131,072-token context hint, 100 model calls, a $0.50 stopping threshold per task, and a 30-minute task timeout.
+It sets a 128,000-token context window, 100 model calls, a $0.50 stopping threshold per task, and a 30-minute task timeout.
+The last tool result of each turn receives a `[CURRENT CONTEXT TOKEN: N]` marker estimating the active conversation plus the next response's maximum output allowance.
+Estimates use the configured corpus tokenizer when available, otherwise four UTF-8 bytes per token, and include message framing and tool schemas.
+At 95% of the projected window, the agent receives a stop instruction, makes one text-only final generation, and ends without executing further tools.
+The response allowance is capped to the estimated remaining space; an already oversized prompt ends with `LimitsExceeded`.
+Search results distinguish new documents, previously seen evidence still in context, and compacted evidence with archive tags for `expand_block`.
+The agent is instructed to read a document before answering, corroborate uncertain candidates, and use Pocket Context's own memory tools.
 The cost threshold is checked between calls and can be exceeded by an in-flight request.
 Ten concurrent tasks can therefore consume roughly ten times the per-task threshold.
 
@@ -163,7 +169,9 @@ The summary reports the maximum input context across all calls, the mean per-tas
 Tool counts include `submit`; `avg_research_tool_calls_per_task` excludes it.
 When a success target is provided, a second summary reports the same metrics for completed submissions only.
 Retrieval IDs include every document returned by search or successfully fetched directly, even if the agent later compacts the observation.
-Only submitted answers receive `status: completed`; budget exhaustion remains a failed run for the official evaluator.
+Explicit submissions and final text responses with an extractable `Exact Answer:` receive `status: completed`.
+Results retain the complete response for the official evaluator and also record the last `Exact Answer:` and `Confidence:` values, with confidence defaulting to 100 when absent.
+Budget exhaustion without a final answer remains a failed run for the official evaluator.
 Trajectories and context archives are kept in subdirectories so the evaluator sees only query results at the run directory's top level.
 
 ## Evaluate
@@ -214,4 +222,4 @@ pytest -q tests/run/test_browsecomp_plus.py
 ```
 
 These tests create a real Lucene index and run the CLI with the repository's deterministic replay model.
-They verify retrieval, token caps, document lookup, submission, context compaction and expansion, usage accounting, held-out partitioning, budget exhaustion, concurrent query isolation, reference-answer isolation, resume behavior, and configuration mismatch rejection without paid API calls.
+They verify retrieval, token caps and markers, document lookup, answer extraction, memory-aware retrieval after compaction and expansion, final-generation steering, usage accounting, held-out partitioning, budget exhaustion, concurrent query isolation, reference-answer isolation, resume behavior, and configuration mismatch rejection without paid API calls.

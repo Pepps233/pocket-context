@@ -12,10 +12,11 @@ from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel, Field
 
 from pocketcontextagent import Environment, Model, __version__
-from pocketcontextagent.agents.context import ContextManager, SelectionError, provider_items
+from pocketcontextagent.agents.context import ContextManager, SelectionError, relationships
 from pocketcontextagent.agents.utils.context_budget import append_text, estimate_tokens, output_token_setting
-from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, TimeExceeded
+from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, Submitted, TimeExceeded
 from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
+from pocketcontextagent.models.utils.response import response_text
 from pocketcontextagent.utils.serialize import recursive_merge
 
 
@@ -153,6 +154,20 @@ class DefaultAgent:
         message = self.query()
         if self._final_generation:
             return self.finish_context_limited_episode(message)
+        if getattr(self.env, "is_final_answer", None) and not message.get("extra", {}).get("actions"):
+            text = response_text(message)
+            if self.env.is_final_answer(text):
+                raise Submitted(
+                    self.model.format_message(
+                        role="exit", content=text, extra={"exit_status": "Submitted", "submission": text}
+                    )
+                )
+            raise FormatError(
+                self.model.format_message(
+                    role="user",
+                    content="Use the available tools or provide a final answer in the required answer format.",
+                )
+            )
         return self.execute_actions(message)
 
     def query(self) -> dict:
@@ -173,7 +188,7 @@ class DefaultAgent:
                     "extra": {"exit_status": "TimeExceeded", "submission": ""},
                 }
             )
-        options = {}
+        options = {"allow_text_response": True} if getattr(self.env, "is_final_answer", None) else {}
         if self.config.context_token_limit:
             key, allowance = output_token_setting(self.model, self.config.response_token_limit)
             if self.context_tokens(self.context.projection()) + allowance >= self.config.context_token_limit * 0.95:
@@ -204,6 +219,8 @@ class DefaultAgent:
         """Execute actions in message, add observation messages, return them."""
         if (results := self.dispatch_context_actions(message)) is not None:
             return results
+        if update_context := getattr(self.env, "update_context", None):
+            update_context(self.context)
         outputs = [self.env.execute(action) for action in message.get("extra", {}).get("actions", [])]
         return self.add_observations(self.model.format_observation_messages(message, outputs, self.get_template_vars()))
 
@@ -218,24 +235,26 @@ class DefaultAgent:
         if messages and self.config.context_token_limit:
             _, allowance = output_token_setting(self.model, self.config.response_token_limit)
             tokens = self.context_tokens(self.context.projection() + messages) + allowance
-            append_text(messages[-1], f"[CURRENT CONTEXT TOKEN: {tokens}]")
+            latest_result = next(
+                (
+                    message
+                    for message in reversed(messages)
+                    if relationships(message)[1] or "raw_output" in message.get("extra", {})
+                ),
+                messages[-1],
+            )
+            append_text(latest_result, f"[CURRENT CONTEXT TOKEN: {tokens}]")
         return self.add_messages(*messages, origins=origins)
 
     def finish_context_limited_episode(self, message: dict) -> list[dict]:
-        text = "\n".join(
-            block.get("text", "")
-            for item in provider_items(message)
-            for block in (
-                [{"text": item["content"]}] if isinstance(item.get("content"), str) else item.get("content") or []
-            )
-            if block.get("type", "text") in ("text", "output_text")
-        ).strip()
+        text = response_text(message)
+        validate = getattr(self.env, "is_final_answer", bool)
         return self.add_messages(
             self.model.format_message(
                 role="exit",
                 content=text,
                 extra={
-                    "exit_status": "Submitted" if text else "LimitsExceeded",
+                    "exit_status": "Submitted" if validate(text) else "LimitsExceeded",
                     "submission": text,
                     "context_limit_reached": True,
                 },

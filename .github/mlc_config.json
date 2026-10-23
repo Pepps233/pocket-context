@@ -13,6 +13,9 @@
       "pattern": "^https://join\\.slack\\.com/t/swe-bench/shared_invite/"
     },
     {
+      "pattern": "^https://docs\\.vllm\\.ai/"
+    },
+    {
       "pattern": ".*localhost.*"
     },
     {

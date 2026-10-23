@@ -2,7 +2,10 @@ import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack, closing
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 import yaml
@@ -87,6 +90,29 @@ def test_real_bm25_environment(bm25_index: Path, tmp_path: Path):
         env.execute({"command": "submit Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%"})
     assert submitted.value.messages[0]["extra"]["submission"].endswith("Exact Answer: Montréal\nConfidence: 100%")
     env.retriever.close()
+
+
+@pytest.mark.parametrize(("retriever_count",), [(1,), (2,)])  # noqa: PT006
+def test_concurrent_bm25_retrieval(bm25_index: Path, retriever_count: int):
+    barrier = Barrier(8)
+    with ExitStack() as stack, ThreadPoolExecutor(max_workers=8) as executor:
+        retrievers = [stack.enter_context(closing(BM25Retriever(bm25_index))) for _ in range(retriever_count)]
+
+        def retrieve(index: int) -> None:
+            retriever = retrievers[index % retriever_count]
+            query, docid, text = (
+                ("jazz festival", "city", "Montréal hosts a jazz festival in Canada. " * 10)
+                if index % 2
+                else ("bananas", "other", "Bananas grow in tropical climates.")
+            )
+            barrier.wait(timeout=30)
+            for _ in range(100):
+                hits = retriever.search(query, 1)
+                assert len(hits) == 1 and hits[0]["docid"] == docid and hits[0]["text"] == text
+                assert retriever.get_document(docid) == {"docid": docid, "text": text}
+                assert retriever.get_document("missing") is None
+
+        list(executor.map(retrieve, range(8)))
 
 
 @pytest.mark.parametrize(

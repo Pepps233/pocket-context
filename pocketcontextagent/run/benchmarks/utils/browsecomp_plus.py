@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from datasets import load_dataset
@@ -113,24 +114,31 @@ def prepare_data(data_dir: Path, *, download_index: bool = True) -> None:
 
 
 class BM25Retriever:
+    # Pyjnius method descriptors share mutable bindings across Java objects.
+    _lock = Lock()
+
     def __init__(self, index: Path):
         if not index.is_dir() or not list(index.glob("segments_*")):
             raise ValueError(f"No Lucene index at {index}. Run `mini-extra browsecomp-plus prepare` first.")
         # Pyserini's search package eagerly initializes unrelated OpenAI encoders.
         from pyserini.pyclass import autoclass
 
-        self.searcher = autoclass("io.anserini.search.SimpleSearcher")(str(index))
+        with self._lock:
+            self.searcher = autoclass("io.anserini.search.SimpleSearcher")(str(index))
 
     def search(self, query: str, k: int) -> list[dict]:
-        return [
-            {"docid": hit.docid, "score": hit.score, "text": json.loads(hit.lucene_document.get("raw"))["contents"]}
-            for hit in self.searcher.search(query, k)
-        ]
+        with self._lock:
+            return [
+                {"docid": hit.docid, "score": hit.score, "text": json.loads(hit.lucene_document.get("raw"))["contents"]}
+                for hit in self.searcher.search(query, k)
+            ]
 
     def get_document(self, docid: str) -> dict | None:
-        if (document := self.searcher.doc(docid)) is None:
-            return None
-        return {"docid": docid, "text": json.loads(document.get("raw"))["contents"]}
+        with self._lock:
+            if (document := self.searcher.doc(docid)) is None:
+                return None
+            return {"docid": docid, "text": json.loads(document.get("raw"))["contents"]}
 
     def close(self) -> None:
-        self.searcher.close()
+        with self._lock:
+            self.searcher.close()

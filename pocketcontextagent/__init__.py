@@ -11,6 +11,7 @@ This file provides:
 __version__ = "2.4.6"
 
 import os
+from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -45,16 +46,21 @@ class Model(Protocol):
 
     config: Any
 
+    @abstractmethod
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict: ...
 
+    @abstractmethod
     def format_message(self, **kwargs) -> dict: ...
 
+    @abstractmethod
     def format_observation_messages(
         self, message: dict, outputs: list[dict], template_vars: dict | None = None
     ) -> list[dict]: ...
 
+    @abstractmethod
     def get_template_vars(self, **kwargs) -> dict[str, Any]: ...
 
+    @abstractmethod
     def serialize(self) -> dict: ...
 
 

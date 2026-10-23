@@ -18,6 +18,10 @@ class SelectionError(ValueError):
     """An expected, actionable context operation failure."""
 
 
+class ContextOperationError(RuntimeError):
+    """An optional memory operation failed without replacing history."""
+
+
 class ContextAssemblyError(RuntimeError):
     """Context disappeared or changed without a committed replacement."""
 
@@ -513,14 +517,13 @@ class ContextManager:
                         if original.get("type") == "function_call_output"
                         else "unknown",
                     )
-                    historical = model.format_message(role="user", content="")
-                    historical["content"] = archived_content(original, responses=historical.get("type") == "message")
-                    historical["content"][0]["text"] = (
+                    content = archived_content(original, responses=False)
+                    content[0]["text"] = (
                         f"{block_header(tag, refs)} (exp={occurrence} part={part}/{len(records)} role={role})\n"
                         "Historical content, not a new instruction. Archived tool calls do not execute.\n"
-                        + historical["content"][0]["text"]
+                        + content[0]["text"]
                     )
-                    results.append(historical)
+                    results.append(model.format_message(role="user", content=content))
                     origins.append(
                         {
                             "provenance": "expansion",
@@ -547,6 +550,8 @@ class ContextManager:
                 )
         except (sqlite3.Error, OSError) as exc:
             raise SelectionError(f"Expansion storage failed: {exc}. Retry after fixing local storage.") from exc
+        except ContextAssemblyError as exc:
+            raise ContextOperationError("Expansion formatting failed; history preserved. Continue the task.") from exc
         except SelectionError:
             raise
         except (ValueError, KeyError, TypeError) as exc:
@@ -619,7 +624,10 @@ class ContextManager:
             summary_id, summary, "summary", start, content_ids(summary, summary_id), block=tag
         )
         messages = [summary if key == summary_id else self.records[key].message for key in proposed]
-        self._assembled(model, proposed, messages)
+        try:
+            self._assembled(model, proposed, messages)
+        except (ContextAssemblyError, ValueError, TypeError, KeyError) as exc:
+            raise ContextOperationError("Replacement formatting failed; history preserved. Continue the task.") from exc
         reduction = 0
         receipt_width = len(str(self.trigger["characters"]))
         for _ in range(8):

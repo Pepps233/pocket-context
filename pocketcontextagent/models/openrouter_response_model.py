@@ -20,7 +20,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     parse_toolcall_actions_response,
 )
 from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API
-from pocketcontextagent.models.utils.response import has_tool_calls
+from pocketcontextagent.models.utils.response import format_input_message, has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
 
 logger = logging.getLogger("openrouter_response_model")
@@ -124,14 +124,7 @@ class OpenRouterResponseModel(OpenRouterModel):
         )
 
     def format_message(self, **kwargs) -> dict:
-        role = kwargs.get("role", "user")
-        content = kwargs.get("content", "")
-        extra = kwargs.get("extra")
-        content_items = [{"type": "input_text", "text": content}] if isinstance(content, str) else content
-        msg = {"type": "message", "role": role, "content": content_items}
-        if extra:
-            msg["extra"] = extra
-        return msg
+        return format_input_message(**kwargs)
 
     def format_observation_messages(
         self, message: dict, outputs: list[dict], template_vars: dict | None = None

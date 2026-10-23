@@ -71,7 +71,12 @@ def append_text(message: dict, text: str) -> None:
         if content and content[-1].get("type") == "tool_result":
             append_text(content[-1], text)
         else:
-            content.append({"type": "input_text" if field == "output" else "text", "text": text})
+            content.append(
+                {
+                    "type": "input_text" if field == "output" or message.get("type") == "message" else "text",
+                    "text": text,
+                }
+            )
 
 
 def text_fields(message: dict) -> Iterator[tuple[dict, str]]:

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from jinja2 import StrictUndefined, Template
 
 from pocketcontextagent.agents.context import ContextAssemblyError, ContextManager, encode
 from pocketcontextagent.agents.default import DefaultAgent
@@ -428,14 +429,18 @@ def test_concurrent_runs_share_database_without_sharing_context(tmp_path):
     assert ContextManager().db_path.parent.name == "contexts"
 
 
-def test_native_prompt_consistency_and_text_mode_unchanged():
+def test_native_prompt_responsibilities_and_legacy_tool_separation():
     for name in ("mini", "benchmarks/swebench", "benchmarks/programbench", "benchmarks/browsecomp_plus"):
         config = yaml.safe_load(Path(f"pocketcontextagent/config/{name}.yaml").read_text())
         prompt = config["agent"]["system_template"] + config["agent"]["instance_template"]
-        assert "exactly one compact_block" in prompt
-        assert "expand_block" in prompt
-        assert "compact_block" in config["model"]["format_error_template"]
-        assert "expand_block" in config["model"]["format_error_template"]
+        assert prompt.count("Use compact_block when") == 1
+        assert prompt.count("Use expand_block when") == 1
+        assert all(term not in prompt for term in ("start_quote", "end_quote", "ctx-0001", "compaction agent"))
+        template = Template(config["model"]["format_error_template"], undefined=StrictUndefined)
+        correction = template.render(error="Invalid tool call: missing arguments.")
+        assert "Invalid tool call: missing arguments." in correction and "tool schema" in correction
+        assert len(correction.splitlines()) == 2
+        assert "compact_block" not in correction and "expand_block" not in correction
         assert "AT LEAST ONE bash" not in encode(config)
     assert "compact_block" not in Path("pocketcontextagent/config/default.yaml").read_text()
     assert "expand_block" not in Path("pocketcontextagent/config/default.yaml").read_text()

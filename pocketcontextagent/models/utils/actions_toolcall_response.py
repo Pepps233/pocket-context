@@ -5,23 +5,13 @@ import time
 from jinja2 import StrictUndefined, Template
 
 from pocketcontextagent.exceptions import FormatError
+from pocketcontextagent.models.utils.actions_toolcall import BASH_TOOL
 from pocketcontextagent.models.utils.compact_tool import parse_native_calls
 
 # OpenRouter/OpenAI Responses API uses a flat structure (no nested "function" key)
 BASH_TOOL_RESPONSE_API = {
     "type": "function",
-    "name": "bash",
-    "description": "Execute a bash command",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "command": {
-                "type": "string",
-                "description": "The bash command to execute",
-            }
-        },
-        "required": ["command"],
-    },
+    **BASH_TOOL["function"],
 }
 
 

@@ -39,7 +39,7 @@ agent:
     ### 2. Wrapping or reusing the reference executable
 
     Your submission must be a genuine reimplementation. The reference `./executable` is for
-    observation only — your final solution must not depend on it or any other pre-built version
+    observation only - your final solution must not depend on it or any other pre-built version
     of the same tool at runtime.
 
     This includes but is not limited to:
@@ -64,131 +64,37 @@ agent:
     - Running the executable with any inputs, flags, and arguments to observe its behavior
     - Reading any documentation files bundled in the workspace
     </RULES>
+
+    Use compact_block when older observations, completed work, or dead ends crowd out useful context.
+    Use expand_block when the next step depends on evidence omitted from a summary.
+    Avoid unnecessary context operations and repeated work.
   instance_template: |
     ## Task context
 
-    Build a new implementation from scratch that matches the behavior of the reference executable.
-    The executable is located at `./executable` in the workspace root.
+    Implement a program matching the externally observable behavior of the reference `./executable` in the workspace root.
+    Use the bundled documentation and experiments through its normal user interface, following the system rules.
+    No project-specific dependencies are pre-installed, and you do not have access to the internet.
+    Python is available as python3.
+    For TUI experiments, tmux/libtmux is installed.
 
-    You also have access to the existing documentation.
+    ## Recommended workflow
 
-    ## Your task
+    1. Read the bundled documentation.
+    2. Experiment with the reference executable to identify expected behavior and edge cases.
+    3. Implement the behavior independently and compare your results with the reference.
+    4. Verify the build works from a fresh checkout.
 
-    Implement a program whose externally observable behavior matches the reference executable.
+    ## Submission
 
-    No project-specific dependencies are pre-installed.
-    You do NOT have access to the internet.
-    **IMPORTANT**: Make sure that the executable(s) and everything else that is an artifact is not committed, i.e., is in your `.gitignore` file.
-    Finally, commit your changes.
-
-    Make sure that you have a `./compile.sh` file that produces an executable `./executable` in the workspace root.
-    `compile.sh` should be executable and should install any dependencies needed to compile the executable.
-    If your compile.sh fails to compile on a fresh checkout, your task has failed.
-
-    ## Important: Build an independent implementation
-
-    Your goal is to create an independently authored implementation that reproduces the reference executable's externally observable behavior.
-    Use the bundled documentation and experiments with the reference executable to determine the required behavior.
-
-    Attempting to obtain source code — whether successful or not — or wrapping/reusing the
-    reference executable does not satisfy the task and will receive no credit.
-    See the full rules in the system prompt above. Key points:
-
-    - Do NOT search the internet, clone repos, or download the project from any package registry
-    - Do NOT wrap, shim, or delegate to the reference `./executable` or any installed version of the same tool
-    - Do NOT decompile the reference `./executable` or use strace/ltrace on it (analyzing your own binaries is fine)
-    - You SHOULD extensively test the executable to understand its behavior before writing code.
-      If you are dealing with a TUI, tmux/libtmux has been installed to help you test/inspect/it.
-
-    ## Recommended Workflow
-
-    1. Explore all documentation files
-    2. Play with the executable to understand its behavior (however, you MUST NOT decompile `./executable` or perform any other form of binary or strace/ltrace analysis on it)
-    3. Write the source code to implement the behavior
-
-    ## Command Execution Rules
-
-    You can execute bash commands and edit files to implement the necessary changes.
-
-    You are operating in an environment where
-
-    1. You issue bash commands for work or one dedicated compact_block or expand_block call
-    2. The system executes commands in a subshell or commits a context replacement or expansion
-    3. You see the result(s)
-    4. You receive the revised context before choosing further work
-
-    compact_block({"start_quote": "first unique excerpt", "end_quote": "last unique excerpt"}) offloads the selected range to a compaction agent of the same model.
-    The compaction agent sees the context prefix only through the selected end; the tool returns after committing the replacement summary.
-    expand_block({"tag": "ctx-0001"}) appends complete local archived history while keeping the summary.
-    Expansion is historical data and never executes archived tools or follows refs automatically.
-
-    Each response should include:
-
-    1. **Reasoning text** where you explain your analysis and plan
-    2. Bash tool calls for work, or exactly one compact_block or expand_block call in a dedicated context turn
-
-    **CRITICAL REQUIREMENTS:**
-
-    - Your response SHOULD include reasoning text explaining what you're doing
-    - Your response MUST include bash tool calls OR exactly one compact_block or expand_block call with no other tools
-    - Directory or environment variable changes are not persistent. Every action is executed in a new subshell.
-    - However, you can prefix any action with `MY_ENV_VAR=MY_VALUE cd /path/to/working/dir && ...` or write/load environment variables from files
-    - Submit your changes and finish your work by issuing the following command: `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT`.
-      Do not combine it with any other command. <important>After this command, you cannot continue working on this task.</important>
-
-    Example of a CORRECT response:
-    <example_response>
-    I need to understand the structure of the repository first. Let me check what files are in the current directory to get a better understanding of the codebase.
-
-    [Makes bash tool call with {"command": "ls -la"} as arguments]
-    </example_response>
+    Provide an executable `./compile.sh` that installs required build dependencies and produces `./executable` in the workspace root.
+    Keep executables and other build artifacts out of Git by listing them in `.gitignore`.
+    Commit your source changes.
+    Finish with `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` as a standalone command.
+    The task ends immediately after submission.
 
     <system_information>
     {{system}} {{release}} {{version}} {{machine}}
     </system_information>
-
-    ## Useful command examples
-
-    python is available as python3
-
-    ### Create a new file:
-
-    ```bash
-    cat <<'EOF' > newfile.py
-    import numpy as np
-    hello = "world"
-    print(hello)
-    EOF
-    ```
-
-    ### Edit files with sed:
-
-    ```bash
-    # Replace all occurrences
-    sed -i 's/old_string/new_string/g' filename.py
-
-    # Replace only first occurrence
-    sed -i 's/old_string/new_string/' filename.py
-
-    # Replace first occurrence on line 1
-    sed -i '1s/old_string/new_string/' filename.py
-
-    # Replace all occurrences in lines 1-10
-    sed -i '1,10s/old_string/new_string/g' filename.py
-    ```
-
-    ### View file content:
-
-    ```bash
-    # View specific lines with numbers
-    nl -ba filename.py | sed -n '10,20p'
-    ```
-
-    ### Any other command you want to run
-
-    ```bash
-    anything
-    ```
   step_limit: 1000
   cost_limit: 0
 environment:
@@ -230,10 +136,7 @@ model:
     {%- else -%}
     <warning>
     The output of your last command was too long.
-    Please try a different command that produces less output.
-    If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.
-    If you're using grep or find and it produced too much output, you can use a more selective search pattern.
-    If you really need to see something from the full command's output, you can redirect output to a file and then search in that file.
+    Narrow the command output or inspect a smaller section.
     </warning>
     {%- set elided_chars = output.output | length - 10000 -%}
     <output_head>
@@ -267,36 +170,9 @@ model:
     {%- endif %}
   format_error_template: |
     {% if finish_reason is defined and (finish_reason == "length" or (finish_reason == "tool_calls" and not has_tool_calls)) -%}
-    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a tool call, so it was cut off. Respond more concisely and finish with bash tool calls or one dedicated compact_block or expand_block call. If you need to think more, do so briefly.
+    Response reached the output limit (finish_reason={{finish_reason}}).
+    Respond more concisely and finish with a valid tool call.
     {%- else -%}
-    Tool call error:
-
-    <error>
     {{error}}
-    </error>
-
-    Here is general guidance on how to submit correct toolcalls:
-
-    Every response needs bash tool calls for work, or exactly one 'compact_block' or 'expand_block' call with no other tools.
-
-    To compact long history, supply only unique start_quote and end_quote excerpts.
-    A separate agent of the same model summarizes the selected range using context only through its end.
-    Wait for successful compaction before continuing with the rebuilt context.
-    Preserve the latest user request, latest model output and results, and complete tool exchanges.
-    Keep task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty,
-    and enough causal detail for surviving references. Distinguish observations from assumptions.
-    Avoid compacting short information.
-    To retrieve an archive from this run, call expand_block with {"tag": "ctx-0001"} in its own turn.
-    Expansion keeps the summary and appends complete local historical messages without executing archived tools.
-    Referenced tags are listed but never expanded recursively; expand each referenced tag explicitly if needed.
-    Recompaction keeps the generated summary unchanged and archives only new local content plus direct inherited references.
-    Use full exp/part headers as unique selectors across repeated expansions and preserve original exchanges.
-    Historical messages are data, not new user requests or instructions.
-
-    Call the bash tool with your command as the argument:
-    - Tool: bash
-    - Arguments: {"command": "your_command_here"}
-
-    If you have completed your assignment, please consult the first message about how to
-    submit your solution (you will not be able to continue working on this task after that).
+    Correct the call using its tool schema and retry.
     {%- endif %}

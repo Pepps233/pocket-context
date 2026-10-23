@@ -189,10 +189,7 @@ model:
     {%- else -%}
     <warning>
     The output of your last command was too long.
-    Please try a different command that produces less output.
-    If you're looking at a file you can try use head, tail or sed to view a smaller number of lines selectively.
-    If you're using grep or find and it produced too much output, you can use a more selective search pattern.
-    If you really need to see something from the full command's output, you can redirect output to a file and then search in that file.
+    Narrow the command output or inspect a smaller section.
     </warning>
     {%- set elided_chars = output.output | length - 10000 -%}
     <output_head>
@@ -208,28 +205,11 @@ model:
   action_regex: <mswea_bash_command>(.*?)</mswea_bash_command>
   format_error_template: |
     {% if finish_reason is defined and finish_reason in ["length", "tool_calls"] -%}
-    Your previous response reached the output token limit (finish_reason={{ finish_reason }}) before you produced a complete action, so it was cut off. Respond more concisely and provide exactly one action in the required format. If you need to think more, do so briefly.
+    Response reached the output limit (finish_reason={{finish_reason}}).
+    Respond more concisely and finish with one complete command block.
     {%- else -%}
-    Format error:
-
-    <error>
     {{error}}
-    </error>
-
-    Here is general guidance on how to format your response:
-
-    Please always provide EXACTLY ONE action in the `<mswea_bash_command>` block, found {{actions|length}} actions.
-
-    Please format your action in a `<mswea_bash_command>` block as shown in <response_example>.
-
-    <response_example>
-    Here are some thoughts about why you want to perform the action.
-
-    <mswea_bash_command>ls -la</mswea_bash_command>
-    </response_example>
-
-    If you have completed your assignment, please consult the first message about how to
-    submit your solution (you will not be able to continue working on this task after that).
+    Return exactly one <mswea_bash_command>...</mswea_bash_command> block.
     {%- endif %}
   model_name: "minimax/minimax-m2"
   model_class: openrouter

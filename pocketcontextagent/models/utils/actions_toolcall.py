@@ -12,7 +12,13 @@ BASH_TOOL = {
     "type": "function",
     "function": {
         "name": "bash",
-        "description": "Execute a bash command",
+        "description": (
+            "Execute a command in the configured environment. In shell environments, each call runs in a new "
+            "subshell; working-directory changes and exported variables do not persist, but files do. "
+            "Set a working directory with cd /path && command and variables with VAR=value command. "
+            "Use non-interactive commands and narrow large output with selective queries or file redirection. "
+            "Independent bash calls may share a response."
+        ),
         "parameters": {
             "type": "object",
             "properties": {

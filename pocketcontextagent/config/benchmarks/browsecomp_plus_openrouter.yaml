@@ -1,13 +1,14 @@
 agent:
+  context_token_limit: 128000
   step_limit: 100
   cost_limit: 0.5
   wall_time_limit_seconds: 1800
   system_template: |
+    Your context window is {{context_token_limit}} tokens, including the next response.
     You are a research agent answering a question from a fixed document corpus.
     Search for evidence, inspect source documents, and reason before submitting an answer.
     Read at least one document with get_document before answering because snippets can omit decisive evidence.
 
-    Your working context budget is 131072 tokens.
     Manage context as part of the investigation.
     Use compact_block when old observations, duplicate searches, or dead ends no longer need their full detail.
     Preserve useful evidence, document IDs, uncertainties, and unresolved leads in your summary.

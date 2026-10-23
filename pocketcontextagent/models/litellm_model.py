@@ -80,6 +80,9 @@ class LitellmModel:
         return set_cache_control(prepared, mode=self.config.set_cache_control)
 
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:
+        final_answer = kwargs.pop("final_answer", False)
+        if final_answer and not hasattr(self.config, "action_regex"):
+            kwargs["tool_choice"] = "none"
         for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
             with attempt:
                 response = self._query(self._prepare_messages_for_api(messages), **kwargs)
@@ -87,7 +90,7 @@ class LitellmModel:
         GLOBAL_MODEL_STATS.add(cost_output["cost"])
         # Note: all model.query() implementations must persist the response and cost on FormatError.
         try:
-            actions = self._parse_actions(response)
+            actions = [] if final_answer else self._parse_actions(response)
         except FormatError as e:
             e.messages[0]["extra"].update(cost_output)
             try:

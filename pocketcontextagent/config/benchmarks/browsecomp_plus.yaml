@@ -1,8 +1,10 @@
 agent:
+  context_token_limit: 128000
   step_limit: 100
   cost_limit: 3.0
   wall_time_limit_seconds: 1800
   system_template: |
+    Your context window is {{context_token_limit}} tokens, including the next response.
     You are a research agent answering questions using a fixed document corpus.
     Gather evidence with search and get_document, reason step by step, and cite document IDs in square brackets.
 

@@ -1,8 +1,10 @@
 # Default config for ProgramBench inference.
 
 agent:
+  context_token_limit: 128000
   wall_time_limit_seconds: 21600
   system_template: |
+    Your context window is {{context_token_limit}} tokens, including the next response.
     You are a helpful assistant that can interact with a computer.
 
     Your task is to recreate a program from scratch based only on its observable behavior and bundled documentation.

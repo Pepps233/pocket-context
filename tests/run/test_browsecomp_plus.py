@@ -335,3 +335,54 @@ def test_metrics_count_context_calls_and_deduplicate_responses():
         "tool_call_counts": metrics["tool_call_counts"],
         "cost_usd": 0.2,
     }
+
+
+@pytest.mark.parametrize(("final_action",), [([],), ([{"command": "search bananas"}],)])  # noqa: PT006
+def test_context_budget_final_generation(bm25_index: Path, tmp_path: Path, final_action: list[dict]):
+    queries = tmp_path / "queries.jsonl"
+    queries.write_text(json.dumps({"query_id": "budget", "query": "Which city hosts the festival?"}))
+    config = tmp_path / "replay.yaml"
+    answer = "Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 85%"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "agent": {"context_token_limit": 128000, "cost_limit": 0},
+                "model": {
+                    "model_class": "deterministic",
+                    "model_name": "deterministic",
+                    "outputs": [
+                        make_output("Investigate. " * 35000, [{"command": "search jazz festival"}]),
+                        make_output(answer, final_action),
+                        make_output("Should never run", [{"command": "submit WRONG"}]),
+                    ],
+                },
+            }
+        )
+    )
+    output = tmp_path / "runs"
+    result = CliRunner().invoke(
+        app,
+        [
+            "run",
+            "--queries",
+            str(queries),
+            "--index",
+            str(bm25_index),
+            "--output",
+            str(output),
+            "--split",
+            "all",
+            "-c",
+            str(config),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads((output / "budget.json").read_text())
+    trajectory = json.loads((output / "trajectories/budget/trajectory.json").read_text())
+    assert data["status"] == "completed"
+    assert data["result"] == [{"type": "output_text", "output": answer}]
+    assert data["model_stats"]["api_calls"] == 2
+    assert data["tool_call_counts"] == {"search": 1, "get_document": 0}
+    assert trajectory["messages"][3]["content"].splitlines()[-1].startswith("[CURRENT CONTEXT TOKEN: ")
+    assert "Stop searching" in trajectory["messages"][4]["content"]
+    assert trajectory["messages"][-1]["extra"]["context_limit_reached"] is True

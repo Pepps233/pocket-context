@@ -19,6 +19,7 @@ from pocketcontextagent.agents.utils.context_budget import (
     estimate_tokens,
     fit_observations,
     output_token_setting,
+    retained_reasoning_tokens,
 )
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, Submitted, TimeExceeded
 from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
@@ -242,6 +243,7 @@ class DefaultAgent:
             self.context._prepare(self.model, messages),
             getattr(self.env, "tokenizer", None),
             text_based=hasattr(self.model.config, "action_regex"),
+            reasoning_tokens=retained_reasoning_tokens(messages),
         )
 
     def add_observations(self, messages: list[dict], *, origins: list[dict] | None = None) -> list[dict]:

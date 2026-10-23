@@ -17,14 +17,47 @@ def output_token_setting(model, default: int) -> tuple[str, int]:
     return "max_output_tokens" if responses else "max_tokens", default
 
 
-def estimate_tokens(messages: list[dict], tokenizer=None, *, text_based: bool = False) -> int:
+def retained_reasoning_tokens(messages: list[dict]) -> int:
+    tokens = 0
+    for message in messages:
+        if message.get("object") != "response" or not any(
+            item.get("type") == "reasoning" and item.get("encrypted_content") for item in message.get("output", [])
+        ):
+            continue
+        usage = message.get("usage") or {}
+        reasoning = (usage.get("output_tokens_details") or {}).get("reasoning_tokens")
+        tokens += (usage.get("output_tokens", 0) if reasoning is None else reasoning) or 0
+    return tokens
+
+
+def _without_encrypted_reasoning(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _without_encrypted_reasoning(child)
+            for key, child in value.items()
+            if key != "encrypted_content" or value.get("type") != "reasoning"
+        }
+    if isinstance(value, list):
+        return [_without_encrypted_reasoning(child) for child in value]
+    return value
+
+
+def estimate_tokens(
+    messages: list[dict], tokenizer=None, *, text_based: bool = False, reasoning_tokens: int = 0
+) -> int:
     """Count serialized request tokens, falling back to four UTF-8 bytes per token.
 
     The corpus tokenizer is used when configured; schemas and message framing are included.
+    Encrypted reasoning is excluded from text counts; retained reasoning uses reported usage instead.
     This is an estimate rather than the provider's exact chat-template token count.
     """
-    text = encode({"messages": messages, "tools": [] if text_based else [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL]})
-    return (
+    text = encode(
+        {
+            "messages": _without_encrypted_reasoning(messages),
+            "tools": [] if text_based else [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL],
+        }
+    )
+    return reasoning_tokens + (
         len(tokenizer.encode(text, add_special_tokens=False)) if tokenizer is not None else ceil(len(text.encode()) / 4)
     )
 

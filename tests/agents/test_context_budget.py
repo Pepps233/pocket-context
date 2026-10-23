@@ -134,3 +134,51 @@ def test_oversized_tool_output_still_allows_one_final_generation(tmp_path: Path)
     assert len(agent.messages[3]["extra"]["raw_output"]) == 600000
     assert "truncated" in agent.messages[3]["content"]
     assert agent.messages[3]["content"].endswith("[CURRENT CONTEXT TOKEN: 128000]")
+
+
+@pytest.mark.parametrize(
+    ("reasoning_tokens", "calls", "details"),
+    [
+        (128, 3, {"reasoning_tokens": 128}),
+        (124000, 2, {"reasoning_tokens": 124000}),
+        (124000, 2, None),
+        (124000, 2, {"reasoning_tokens": None}),
+    ],
+)
+def test_encrypted_reasoning_uses_reported_tokens_without_changing_requests(
+    tmp_path: Path, reasoning_tokens: int, calls: int, details: dict | None
+):
+    marker = tmp_path / "continued"
+    first = make_response_api_output("Inspect evidence", [{"command": "printf evidence", "tool_call_id": "one"}])
+    reasoning = {
+        "type": "reasoning",
+        "id": "reasoning-one",
+        "summary": [{"type": "summary_text", "text": "Check the evidence before continuing."}],
+        "encrypted_content": "opaque-signed-reasoning" * 25000,
+    }
+    other_reasoning = {**reasoning, "id": "reasoning-two"}
+    first["output"][:0] = [reasoning, other_reasoning]
+    first["usage"] = {"output_tokens": reasoning_tokens + 20, "output_tokens_details": details}
+    model = DeterministicResponseAPIToolcallModel(
+        outputs=[
+            first,
+            make_response_api_output("Review evidence", [{"command": f"touch {marker}", "tool_call_id": "two"}]),
+            make_response_api_output(
+                "Finish", [{"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT", "tool_call_id": "done"}]
+            ),
+        ]
+    )
+    agent = DefaultAgent(
+        model,
+        LocalEnvironment(),
+        system_template="Work",
+        instance_template="{{task}}",
+        cost_limit=0,
+        context_token_limit=128000,
+        context_db_path=tmp_path / "context.sqlite",
+    )
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.n_calls == calls
+    assert marker.exists() == (calls == 3)
+    assert all(item in agent.context._prepare(model, agent.messages) for item in (reasoning, other_reasoning))
+    assert agent.messages[-1]["extra"].get("context_limit_reached", False) == (calls == 2)

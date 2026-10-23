@@ -98,6 +98,7 @@ This profile uses ten BM25 results, Qwen tokenizer previews of 512 tokens for ne
 It sets a 128,000-token context window, 100 model calls, a $0.50 stopping threshold per task, and a 30-minute task timeout.
 The last tool result of each turn receives a `[CURRENT CONTEXT TOKEN: N]` marker estimating the active conversation plus the next response's maximum output allowance.
 Estimates use the configured corpus tokenizer when available, otherwise four UTF-8 bytes per token, and include message framing and tool schemas.
+Encrypted reasoning payloads are excluded from text tokenization; retained reasoning is counted using provider-reported reasoning usage, falling back conservatively to reported output usage when the reasoning breakdown is unavailable.
 At 95% of the projected window, the agent receives a stop instruction, makes one text-only final generation, and ends without executing further tools.
 Oversized new tool results are visibly truncated before entering the conversation so there is room for the final generation; complete raw tool output remains in trajectory metadata.
 The response allowance is capped to the estimated remaining space.

@@ -42,10 +42,7 @@ class CompactionAgent:
             }
         ]
         for index, message in enumerate(history):
-            blocks = archived_content(
-                {key: value for key, value in message.items() if key != "extra"},
-                responses=False,
-            )
+            blocks = archived_content({key: value for key, value in message.items() if key != "extra"})
             blocks[0]["text"] = (
                 f"History message {index + 1} ({'selected' if index >= start else 'earlier context'}):\n"
                 + blocks[0]["text"]

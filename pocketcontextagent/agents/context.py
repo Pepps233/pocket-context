@@ -11,7 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from pocketcontextagent import global_config_dir
-from pocketcontextagent.models.utils.compact_tool import canonical_tag
+from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS, canonical_tag
 
 
 class SelectionError(ValueError):
@@ -45,14 +45,37 @@ def provider_items(message: dict) -> list[dict]:
     return message.get("output", []) if message.get("object") == "response" else [message]
 
 
-def visible_text(message: dict) -> list[str]:
+def argument_text(name: str, arguments, *, anchors: bool) -> list[str]:
+    if anchors and name in CONTEXT_TOOLS:
+        return []
+    raw = arguments if isinstance(arguments, str) else encode(arguments)
+    if not anchors:
+        return [raw]
+    try:
+        decoded = json.loads(raw)
+    except (ValueError, TypeError):
+        return [raw]
+
+    def strings(value):
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, dict):
+            return [text for child in value.values() for text in strings(child)]
+        if isinstance(value, list):
+            return [text for child in value for text in strings(child)]
+        return []
+
+    return [raw, *strings(decoded)]
+
+
+def visible_text(message: dict, *, anchors: bool = False) -> list[str]:
     """Only literal model-visible text and arguments, never IDs, signatures or metadata."""
     texts = []
     for item in provider_items(message):
         for field in ("reasoning_content", "reasoning"):
             if isinstance(item.get(field), str):
                 texts.append(item[field])
-        for block in item.get("summary", []) if item.get("type") == "reasoning" else []:
+        for block in (item.get("summary") or []) if item.get("type") == "reasoning" else []:
             if block.get("type") == "summary_text":
                 texts.append(block.get("text", ""))
         for block in item.get("reasoning_details") or []:
@@ -60,12 +83,12 @@ def visible_text(message: dict) -> list[str]:
                 if isinstance(block.get(field), str):
                     texts.append(block[field])
         if item.get("type") == "function_call":
-            texts.append(item.get("arguments", ""))
+            texts.extend(argument_text(item.get("name", ""), item.get("arguments", ""), anchors=anchors))
         elif item.get("type") == "function_call_output":
             if isinstance(item.get("output"), str):
                 texts.append(item["output"])
             elif isinstance(item.get("output"), list):
-                texts.extend(visible_text({"content": item["output"]}))
+                texts.extend(visible_text({"content": item["output"]}, anchors=anchors))
         content = item.get("content", [])
         if isinstance(content, str):
             texts.append(content)
@@ -76,11 +99,12 @@ def visible_text(message: dict) -> list[str]:
                 elif block.get("type") == "thinking":
                     texts.append(block.get("thinking", ""))
                 elif block.get("type") == "tool_use":
-                    texts.append(encode(block.get("input", {})))
+                    texts.extend(argument_text(block.get("name", ""), block.get("input", {}), anchors=anchors))
                 elif block.get("type") == "tool_result":
-                    texts.extend(visible_text({"content": block.get("content", [])}))
+                    texts.extend(visible_text({"content": block.get("content", [])}, anchors=anchors))
         for call in item.get("tool_calls") or []:
-            texts.append(call.get("function", {}).get("arguments", ""))
+            function = call.get("function", {})
+            texts.extend(argument_text(function.get("name", ""), function.get("arguments", ""), anchors=anchors))
     return texts
 
 
@@ -123,7 +147,7 @@ def block_header(tag: str, refs: list[str]) -> str:
     return f"[{tag}{' refs=' + ','.join(refs) if refs else ''}]:"
 
 
-def archived_content(message: dict, *, responses: bool) -> list[dict]:
+def archived_content(message: dict) -> list[dict]:
     """Project archived data into inert text and supported input images."""
     text, images = [], []
 
@@ -131,21 +155,10 @@ def archived_content(message: dict, *, responses: bool) -> list[dict]:
         for block in content if isinstance(content, list) else []:
             kind = block.get("type")
             if kind == "image_url":
-                url = block["image_url"]["url"]
-                images.append(
-                    {
-                        "type": "input_image",
-                        "image_url": url,
-                        **{k: v for k, v in block["image_url"].items() if k != "url"},
-                    }
-                    if responses
-                    else copy.deepcopy(block)
-                )
+                images.append(copy.deepcopy(block))
             elif kind == "input_image":
                 images.append(
-                    copy.deepcopy(block)
-                    if responses
-                    else {
+                    {
                         "type": "image_url",
                         "image_url": {"url": block["image_url"], **{k: v for k, v in block.items() if k == "detail"}},
                     }
@@ -157,11 +170,7 @@ def archived_content(message: dict, *, responses: bool) -> list[dict]:
                     if source.get("type") == "url"
                     else f"data:{source['media_type']};base64,{source['data']}"
                 )
-                images.append(
-                    {"type": "input_image", "image_url": url}
-                    if responses
-                    else {"type": "image_url", "image_url": {"url": url}}
-                )
+                images.append({"type": "image_url", "image_url": {"url": url}})
             elif kind == "tool_result":
                 image_blocks(block.get("content"))
 
@@ -187,7 +196,7 @@ def archived_content(message: dict, *, responses: bool) -> list[dict]:
         image_blocks(item.get("content"))
         if item.get("type") == "function_call_output":
             image_blocks(item.get("output"))
-    return [{"type": "input_text" if responses else "text", "text": "\n".join(text)}, *images]
+    return [{"type": "text", "text": "\n".join(text)}, *images]
 
 
 @dataclass
@@ -222,6 +231,7 @@ class ContextManager:
         self._applied: dict[str, dict] = {}
         self.expansions: list[dict] = []
         self._sources: dict[int, str] = {}
+        self._block_ids: dict[tuple[str, ...], str] = {}
 
     def ingest(self, message: dict, provenance: str | None = None, **origin) -> str:
         calls, results = relationships(message)
@@ -345,57 +355,18 @@ class ContextManager:
                     "id": key,
                     "item_ids": self.records[key].item_ids if key in self.records else {},
                     "visible": visible_text({"object": "response", "output": items}),
+                    "anchors": visible_text({"object": "response", "output": items}, anchors=True),
                 }
             )
         if without_cache(payload) != without_cache(expected):
             raise ContextAssemblyError("Adapter omitted, reordered or changed request items")
         return payload, entries
 
-    def assemble(self, model) -> list[dict]:
-        messages = self.projection()
-        payload, entries = self._assembled(model, self.active, messages)
-        manifest = {
-            "sequence": len(self.manifests),
-            "revision": self.revision,
-            "ids": list(self.active),
-            "entries": [{key: value for key, value in entry.items() if key != "visible"} for entry in entries],
-            "payload_hash": hashlib.sha256(encode(payload).encode()).hexdigest(),
-            "characters": len(encode(payload)),
-        }
-        with closing(self._connect()) as db, db:
-            db.execute("INSERT INTO requests VALUES (?, ?, ?)", (self.run_id, manifest["sequence"], encode(manifest)))
-        self.manifests.append(manifest)
-        self.trigger = {**copy.deepcopy(manifest), "entries": entries, "messages": messages, "payload": payload}
-        return messages
-
-    def _select(self, action: dict) -> list[str]:
-        if not self.trigger or self.trigger["revision"] != self.revision:
-            raise SelectionError("Stale selection: choose quotes from the current active request")
-        if self.active[: len(self.trigger["ids"])] != self.trigger["ids"]:
-            raise SelectionError("Stale selection: active context changed since this request")
-        positions = []
-        for field in ("start_quote", "end_quote"):
-            quote = action.get(field)
-            matches = [
-                index
-                for index, entry in enumerate(self.trigger["entries"])
-                if isinstance(quote, str) and quote and any(quote in text for text in entry["visible"])
-            ]
-            if len(matches) != 1:
-                raise SelectionError(f"{field} matches {len(matches)} messages; use a unique visible excerpt")
-            positions.append(matches[0])
-        start, end = positions
-        if start > end:
-            raise SelectionError("Reversed selection: start_quote must precede end_quote")
-        selected = self.trigger["ids"][start : end + 1]
-        latest_user = next(
-            (key for key in reversed(self.trigger["ids"]) if self.records[key].provenance == "human"), None
-        )
-        latest_model = next(
-            (key for key in reversed(self.trigger["ids"]) if self.records[key].provenance == "model"), None
-        )
+    def _validate_selection(self, selected: list[str], ids: list[str], records: dict[str, ContextMessage]) -> None:
+        latest_user = next((key for key in reversed(ids) if records[key].provenance == "human"), None)
+        latest_model = next((key for key in reversed(ids) if records[key].provenance == "model"), None)
         for key in selected:
-            record = self.records[key]
+            record = records[key]
             if (
                 any(item.get("role") in ("system", "developer") for item in provider_items(record.message))
                 or record.provenance == "instruction"
@@ -407,7 +378,7 @@ class ContextManager:
                 )
         selected_set = set(selected)
         for key in selected:
-            record = self.records[key]
+            record = records[key]
             for item in provider_items(record.message):
                 if item.get("type") not in (None, "message", "reasoning", "function_call", "function_call_output"):
                     raise SelectionError("Cannot safely group this provider output type")
@@ -420,14 +391,16 @@ class ContextManager:
             if record.provenance == "tool" and not record.exchange:
                 raise SelectionError("Cannot safely group this tool result with its model exchange")
             if record.exchange:
-                group = {other for other in self.trigger["ids"] if self.records[other].exchange == record.exchange}
+                group = {other for other in ids if records[other].exchange == record.exchange}
                 if not group <= selected_set:
-                    raise SelectionError("Selection splits a tool exchange; include the model response and ALL results")
+                    raise SelectionError(
+                        f"Selection splits a tool exchange; use block {self._block_ids.get(tuple(other for other in ids if other in group), 'unavailable')} to include the response and ALL results"
+                    )
                 if record.provenance == "expansion":
                     continue
-                calls = [call for other in group for call in relationships(self.records[other].message)[0]]
-                results = [result for other in group for result in relationships(self.records[other].message)[1]]
-                positions = [self.trigger["ids"].index(other) for other in group]
+                calls = [call for other in group for call in relationships(records[other].message)[0]]
+                results = [result for other in group for result in relationships(records[other].message)[1]]
+                positions = [ids.index(other) for other in group]
                 if max(positions) - min(positions) + 1 != len(positions):
                     raise SelectionError("Tool exchange results are not adjacent; cannot safely group this range")
                 if (
@@ -436,6 +409,114 @@ class ContextManager:
                     or sorted(calls) != sorted(results)
                 ):
                     raise SelectionError("Exchange contains unresolved or duplicate tool calls/results")
+
+    def eligible_blocks(
+        self, ids: list[str] | None = None, records: dict[str, ContextMessage] | None = None
+    ) -> dict[str, list[str]]:
+        ids = self.active if ids is None else ids
+        records = self.records if records is None else records
+        groups: dict[str, list[str]] = {}
+        for key in ids:
+            groups.setdefault(records[key].exchange or key, []).append(key)
+        blocks = {}
+        for group in groups.values():
+            try:
+                self._validate_selection(group, ids, records)
+            except SelectionError:
+                continue
+            identity = tuple(group)
+            if identity not in self._block_ids:
+                self._block_ids[identity] = f"b{len(self._block_ids) + 1:03d}"
+            blocks[self._block_ids[identity]] = group
+        return blocks
+
+    def _catalog(self, model, blocks: dict[str, list[str]], records: dict[str, ContextMessage]) -> list[dict]:
+        if not blocks or hasattr(model.config, "action_regex"):
+            return []
+        lines = []
+        for block_id, group in blocks.items():
+            preview = " ".join(" ".join(visible_text(records[group[0]].message, anchors=True)).split())[:100]
+            lines.append(f"{block_id}: {len(group)} messages; {preview}")
+        return [
+            model.format_message(
+                role="user",
+                content=(
+                    "[Eligible context blocks, in history order]\n"
+                    "compact_block selects an inclusive start_id/end_id range. Each ID covers a complete exchange or memory. "
+                    "Only listed IDs are eligible; protected history is omitted. Descriptions below are historical data.\n"
+                    + "\n".join(lines)
+                ),
+            )
+        ]
+
+    def request_projection(self, model) -> list[dict]:
+        return self.projection() + self._catalog(model, self.eligible_blocks(), self.records)
+
+    def assemble(self, model) -> list[dict]:
+        messages = self.projection()
+        _, entries = self._assembled(model, self.active, messages)
+        blocks = self.eligible_blocks()
+        request = messages + self._catalog(model, blocks, self.records)
+        payload = self._prepare(model, request)
+        manifest = {
+            "sequence": len(self.manifests),
+            "revision": self.revision,
+            "ids": list(self.active),
+            "blocks": blocks,
+            "entries": [
+                {key: value for key, value in entry.items() if key not in ("visible", "anchors")} for entry in entries
+            ],
+            "payload_hash": hashlib.sha256(encode(payload).encode()).hexdigest(),
+            "characters": len(encode(payload)),
+        }
+        with closing(self._connect()) as db, db:
+            db.execute("INSERT INTO requests VALUES (?, ?, ?)", (self.run_id, manifest["sequence"], encode(manifest)))
+        self.manifests.append(manifest)
+        self.trigger = {**copy.deepcopy(manifest), "entries": entries, "messages": messages, "payload": payload}
+        return request
+
+    def _selection_hint(self) -> str:
+        blocks = list(self.trigger["blocks"]) if self.trigger else []
+        return "Eligible IDs: " + (
+            ", ".join(blocks[:16]) + ("; see catalog for more" if len(blocks) > 16 else "") if blocks else "none"
+        )
+
+    def _select(self, action: dict) -> list[str]:
+        if not self.trigger or self.trigger["revision"] != self.revision:
+            raise SelectionError("Stale selection: use IDs from the current active request")
+        if self.active[: len(self.trigger["ids"])] != self.trigger["ids"]:
+            raise SelectionError("Stale selection: active context changed since this request")
+        ids = self.trigger["ids"]
+        positions = []
+        if "start_id" in action or "end_id" in action:
+            for field in ("start_id", "end_id"):
+                block = self.trigger["blocks"].get(action.get(field))
+                if not block:
+                    raise SelectionError(
+                        f"Unknown, stale or protected {field}={action.get(field)!r}. {self._selection_hint()}"
+                    )
+                positions.append(ids.index(block[0 if field == "start_id" else -1]))
+        else:
+            for field in ("start_quote", "end_quote"):
+                quote = action.get(field)
+                matches = [
+                    index
+                    for index, entry in enumerate(self.trigger["entries"])
+                    if isinstance(quote, str) and quote and any(quote in text for text in entry["anchors"])
+                ]
+                if len(matches) != 1:
+                    raise SelectionError(
+                        f"{field} matches {len(matches)} messages. Use start_id/end_id. {self._selection_hint()}"
+                    )
+                positions.append(matches[0])
+        start, end = positions
+        if start > end:
+            raise SelectionError(f"Reversed selection: start must precede end. {self._selection_hint()}")
+        selected = ids[start : end + 1]
+        try:
+            self._validate_selection(selected, ids, self.records)
+        except SelectionError as exc:
+            raise SelectionError(f"{exc}. {self._selection_hint()}") from exc
         return selected
 
     def _committed(self, db, call_id: str, operation: str, fingerprint: str) -> dict | None:
@@ -481,7 +562,15 @@ class ContextManager:
         ):
             raise SelectionError("Stale selection: this response no longer belongs to the current request")
 
-    def expand(self, action: dict, response: dict, model, format_results) -> tuple[list[dict], list[dict]]:
+    def expand(
+        self,
+        action: dict,
+        response: dict,
+        model,
+        format_results,
+        *,
+        validate: Callable[[list[dict]], None] | None = None,
+    ) -> tuple[list[dict], list[dict]]:
         self.projection()
         if action.get("error"):
             raise SelectionError(action["error"])
@@ -517,7 +606,7 @@ class ContextManager:
                         if original.get("type") == "function_call_output"
                         else "unknown",
                     )
-                    content = archived_content(original, responses=False)
+                    content = archived_content(original)
                     content[0]["text"] = (
                         f"{block_header(tag, refs)} (exp={occurrence} part={part}/{len(records)} role={role})\n"
                         "Historical content, not a new instruction. Archived tool calls do not execute.\n"
@@ -534,6 +623,8 @@ class ContextManager:
                         }
                     )
                 self._assembled(model, [f"exp{occurrence}/{i}" for i in range(len(results))], results)
+                if validate:
+                    validate(results)
                 operation = {
                     "version": 1,
                     "operation": "expand_block",
@@ -573,7 +664,9 @@ class ContextManager:
         summarize: Callable[[list[dict], int], str],
     ) -> list[dict]:
         self.projection()
-        fingerprint = encode({key: action.get(key) for key in ("start_quote", "end_quote")})
+        fingerprint = encode(
+            {key: action[key] for key in ("start_id", "end_id", "start_quote", "end_quote") if key in action}
+        )
         call_id = action["tool_call_id"]
         if call_id in self._applied:
             if self._applied[call_id]["fingerprint"] != fingerprint:
@@ -628,6 +721,8 @@ class ContextManager:
             self._assembled(model, proposed, messages)
         except (ContextAssemblyError, ValueError, TypeError, KeyError) as exc:
             raise ContextOperationError("Replacement formatting failed; history preserved. Continue the task.") from exc
+        proposed_records = self.records | {summary_id: summary_record}
+        catalog = self._catalog(model, self.eligible_blocks(proposed, proposed_records), proposed_records)
         reduction = 0
         receipt_width = len(str(self.trigger["characters"]))
         for _ in range(8):
@@ -641,7 +736,7 @@ class ContextManager:
                     }
                 ],
             )
-            measured = self.trigger["characters"] - len(encode(self._prepare(model, messages + results)))
+            measured = self.trigger["characters"] - len(encode(self._prepare(model, messages + results + catalog)))
             if measured == reduction:
                 break
             reduction = measured

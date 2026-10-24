@@ -124,3 +124,20 @@ def test_compaction_call_respects_cost_budget_without_consuming_main_steps(tmp_p
     assert agent.run("Keep working")["exit_status"] == "LimitsExceeded"
     assert agent.n_calls == 3 and len(agent.model.requests) == 3
     assert not agent.compactions and agent.context.revision == 0
+
+
+def test_internal_child_formatting_failure_does_not_request_boundary_repair(tmp_path, api):
+    agent = make_agent(tmp_path, api)
+    first = agent.model.config.outputs[0]["output"][0] if api else agent.model.config.outputs[0]
+    first["content"] = [
+        {"type": "output_text" if api else "text", "text": "Inspect archive-start"},
+        {"type": "image", "source": {}},
+    ]
+    del agent.model.config.outputs[3]
+    assert agent.run("Keep working")["exit_status"] == "Submitted"
+    assert agent.context.revision == 0 and not read_blocks(agent)
+    assert "KeyError" in agent.compactions[0]["error"] and not agent.compactions[0]["response"]
+    assert "history preserved. Continue the task" in encode(agent.model.requests[-1])
+    assert "repair" not in encode(agent.model.requests[-1])
+    assert "archive-output" + "0" * 3000 in encode(agent.model.requests[-1])
+    assert len(agent.model.requests) == 4

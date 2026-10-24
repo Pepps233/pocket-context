@@ -2,6 +2,7 @@
 or https://minimal-agent.com for a tutorial on the basic building principles.
 """
 
+import copy
 import json
 import logging
 import time
@@ -253,16 +254,17 @@ class DefaultAgent:
             reasoning_tokens=retained_reasoning_tokens(messages),
         )
 
-    def add_observations(self, messages: list[dict], *, origins: list[dict] | None = None) -> list[dict]:
+    def prepare_observations(self, messages: list[dict], history: list[dict], *, truncate: bool = True) -> list[dict]:
+        messages = copy.deepcopy(messages)
         if messages and self.config.context_token_limit:
-            if not origins or not any(origin.get("provenance") == "expansion" for origin in origins):
+            if truncate:
                 fit_observations(
                     messages,
                     int(self.config.context_token_limit * 0.95),
-                    lambda results: self.context_tokens(self.context.request_projection(self.model) + results),
+                    lambda results: self.context_tokens(history + results),
                 )
             _, allowance = output_token_setting(self.model, self.config.response_token_limit)
-            tokens = self.context_tokens(self.context.request_projection(self.model) + messages)
+            tokens = self.context_tokens(history + messages)
             tokens += min(allowance, max(0, self.config.context_token_limit - tokens))
             latest_result = next(
                 (
@@ -273,7 +275,17 @@ class DefaultAgent:
                 messages[-1],
             )
             append_text(latest_result, f"[CURRENT CONTEXT TOKEN: {tokens}]")
-        return self.add_messages(*messages, origins=origins)
+        return messages
+
+    def add_observations(self, messages: list[dict], *, origins: list[dict] | None = None) -> list[dict]:
+        return self.add_messages(
+            *self.prepare_observations(
+                messages,
+                self.context.request_projection(self.model) if self.config.context_token_limit else [],
+                truncate=not any(origin.get("provenance") == "expansion" for origin in origins or []),
+            ),
+            origins=origins,
+        )
 
     def finish_context_limited_episode(self, message: dict) -> list[dict]:
         text = response_text(message)
@@ -361,6 +373,7 @@ class DefaultAgent:
                     min_chars=self.config.compact_min_chars,
                     min_reduction=self.config.compact_min_reduction,
                     summarize=self.summarize_context,
+                    prepare_results=self.prepare_observations,
                 )
         except InterruptAgentFlow:
             raise
@@ -404,7 +417,7 @@ class DefaultAgent:
             "compactions": self.compactions,
             "trajectory_format": "mini-swe-agent-1.1",
         }
-        return recursive_merge(agent_data, self.model.serialize(), self.env.serialize(), *extra_dicts)
+        return copy.deepcopy(recursive_merge(agent_data, self.model.serialize(), self.env.serialize(), *extra_dicts))
 
     def save(self, path: Path | None, *extra_dicts) -> dict:
         """Save the trajectory of the agent to a file if path is given. Returns full serialized data.

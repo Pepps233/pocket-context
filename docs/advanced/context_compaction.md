@@ -42,7 +42,7 @@ The next model request contains this replacement before the agent chooses furthe
 The receipt reports the tag and measured character reduction.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.
 
-The tool instructions require task intent, constraints, paths, identifiers, command purposes and outcomes, uncertainty, and causal detail needed by surviving references.
+The compaction instructions require paths, identifiers, relevant evidence, command purposes and outcomes, reasoning, decisions, unsuccessful approaches, verification results, and causal detail needed by surviving references.
 The compaction agent receives preservation instructions and returns only its replacement summary.
 Empty, tool-calling, truncated, or failed child responses return a diagnostic without changing active history, allowing the main agent to continue.
 Internal formatting failures do not request new selection boundaries.

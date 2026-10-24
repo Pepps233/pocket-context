@@ -32,3 +32,24 @@ def response_text(message: dict) -> str:
         if block.get("type") in ("text", "output_text")
     )
     return re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL | re.IGNORECASE).strip()
+
+
+def format_input_message(**kwargs) -> dict:
+    """Serialize framework text/image content for the Responses API."""
+    content = kwargs.get("content", "")
+    blocks = [{"type": "text", "text": content}] if isinstance(content, str) else content
+    converted = []
+    for block in blocks:
+        if block.get("type") == "text":
+            converted.append({**block, "type": "input_text"})
+        elif block.get("type") == "image_url":
+            converted.append(
+                {
+                    "type": "input_image",
+                    "image_url": block["image_url"]["url"],
+                    **{key: value for key, value in block["image_url"].items() if key != "url"},
+                }
+            )
+        else:
+            converted.append(dict(block))
+    return {**kwargs, "type": "message", "role": kwargs.get("role", "user"), "content": converted}

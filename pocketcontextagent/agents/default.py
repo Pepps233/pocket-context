@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from pocketcontextagent import Environment, Model, __version__
 from pocketcontextagent.agents.compaction import CompactionAgent
-from pocketcontextagent.agents.context import ContextManager, SelectionError, relationships
+from pocketcontextagent.agents.context import ContextManager, ContextOperationError, SelectionError, relationships
 from pocketcontextagent.agents.utils.context_budget import (
     append_text,
     estimate_tokens,
@@ -292,6 +292,13 @@ class DefaultAgent:
         )
         try:
             return agent.run(history, start)
+        except Exception as exc:
+            agent.error = f"{type(exc).__name__}: {exc}"
+            if isinstance(exc, FormatError) and exc.messages:
+                agent.response = exc.messages[0]
+            raise ContextOperationError(
+                f"Summarization failed ({type(exc).__name__}); history preserved. Continue the task."
+            ) from exc
         finally:
             self.compactions.append(agent.serialize())
             self.cost += agent.response.get("extra", {}).get("cost", 0.0)
@@ -334,7 +341,7 @@ class DefaultAgent:
                     min_reduction=self.config.compact_min_reduction,
                     summarize=self.summarize_context,
                 )
-        except SelectionError as exc:
+        except (SelectionError, ContextOperationError) as exc:
             results = format_results(
                 message,
                 [

@@ -11,6 +11,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     format_toolcall_observation_messages as format_response_api_observation_messages,
 )
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
+from pocketcontextagent.models.utils.response import format_input_message
 
 
 def make_output(content: str, actions: list[dict], cost: float = 1.0) -> dict:
@@ -232,15 +233,7 @@ class DeterministicResponseAPIToolcallModel:
         return output
 
     def format_message(self, **kwargs) -> dict:
-        """Format message in Responses API format."""
-        role = kwargs.get("role", "user")
-        content = kwargs.get("content", "")
-        extra = kwargs.get("extra")
-        content_items = [{"type": "input_text", "text": content}] if isinstance(content, str) else content
-        msg: dict = {"type": "message", "role": role, "content": content_items}
-        if extra:
-            msg["extra"] = extra
-        return msg
+        return format_input_message(**kwargs)
 
     def format_observation_messages(
         self, message: dict, outputs: list[dict], template_vars: dict | None = None

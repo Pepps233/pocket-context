@@ -34,12 +34,14 @@ After selection validation, the compaction agent receives the entire active hist
 Messages before the selected start provide interpretation and task context; only the selected range is summarized and replaced.
 For history A, B, C, D and selection B through C, it receives A, B, C and never D or the triggering compaction call.
 History is rendered as inert evidence, preserving visible reasoning, tool arguments, results, and supported images while excluding hidden metadata.
+Context-management calls and their receipts are omitted from the summarizer input using tool-call metadata; their original records remain archived.
 Existing tagged summaries remain summaries; offloading does not recursively expand their archives.
 No task, hints, or instructions are derived from later messages.
 
 A successful replacement appears at the original position as `[ctx-0001]: <summary>`, explicitly labeled as assistant-generated memory.
 The next model request contains this replacement before the agent chooses further work.
 The receipt reports the tag and measured character reduction.
+It identifies the same archive as the earlier memory, not a second memory or a reused tag.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.
 
 The compaction instructions require paths, identifiers, relevant evidence, command purposes and outcomes, reasoning, decisions, unsuccessful approaches, verification results, and causal detail needed by surviving references.

@@ -3,8 +3,9 @@
 from dataclasses import dataclass, field
 
 from pocketcontextagent import Model
-from pocketcontextagent.agents.context import ContextOperationError, archived_content
+from pocketcontextagent.agents.context import ContextOperationError, archived_content, relationships
 from pocketcontextagent.agents.utils.context_budget import estimate_tokens, output_token_setting
+from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
 from pocketcontextagent.models.utils.response import has_tool_calls, response_text
 
 SYSTEM_PROMPT = """You are a context compaction agent.
@@ -32,6 +33,12 @@ class CompactionAgent:
     error: str = ""
 
     def run(self, history: list[dict], start: int) -> str:
+        context_calls = {
+            action["tool_call_id"]
+            for message in history
+            for action in message.get("extra", {}).get("actions", [])
+            if action.get("type") in CONTEXT_TOOLS
+        }
         content = [
             {
                 "type": "text",
@@ -42,6 +49,8 @@ class CompactionAgent:
             }
         ]
         for index, message in enumerate(history):
+            if any(context_calls.intersection(ids) for ids in relationships(message)):
+                continue
             blocks = archived_content({key: value for key, value in message.items() if key != "extra"})
             blocks[0]["text"] = (
                 f"History message {index + 1} ({'selected' if index >= start else 'earlier context'}):\n"

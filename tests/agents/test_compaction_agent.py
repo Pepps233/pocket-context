@@ -74,6 +74,46 @@ def test_compaction_agent_sees_prefix_without_future(tmp_path: Path, api):
     assert agent.serialize()["info"]["model_stats"]["api_calls"] == 7
 
 
+def test_recompaction_excludes_management_turns_but_keeps_evidence(tmp_path: Path, api):
+    agent = make_agent(
+        tmp_path,
+        api,
+        outputs=[
+            native_turn(
+                "bash", {"command": "printf 'archive-output'; printf '%06000d' 0"}, "a", "Inspect archive-start", api
+            ),
+            native_turn("bash", {"command": "echo retained-output"}, "b", "Keep working", api),
+            native_turn(
+                "compact_block",
+                compaction_args(summary="Remember original evidence " + "x" * 2100),
+                "compact",
+                "Manage context",
+                api,
+            ),
+            native_turn("expand_block", {"tag": "ctx-0001"}, "expand", "Retrieve archived evidence", api),
+            native_turn("bash", {"command": "echo latest"}, "latest", "Continue research", api),
+            native_turn(
+                "compact_block",
+                {"start_quote": "[ctx-0001]: Remember", "end_quote": "[ctx-0001]: (exp=1 part=2/2"},
+                "recompact",
+                "Combine evidence",
+                api,
+            ),
+            native_turn("bash", {"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"}, "done", "Finish", api),
+        ],
+    )
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.context.revision == 2 and len(agent.context.expansions) == 1
+    request = encode(agent.compactions[1]["messages"][1:])
+    assert "Remember original evidence" in request and "archive-output" + "0" * 6000 in request
+    assert "retained-output" in request and "Continue research" not in request
+    assert all(text not in request for text in ("Manage context", "Compacted [", "Expanded [", "Tool expand_block"))
+    blocks = read_blocks(agent)
+    assert blocks[1]["children"] == ["ctx-0001"]
+    assert "Compacted [ctx-0001]" in encode(blocks[1]["messages"])
+    assert "archive-output" + "0" * 6000 in encode(blocks[0]["messages"])
+
+
 @pytest.mark.parametrize(("failure",), [("empty",), ("tools",), ("truncated",), ("oversized",)])  # noqa: PT006
 def test_failed_summary_keeps_context_and_accounts_for_call(tmp_path: Path, api, failure: str):
     agent = make_agent(tmp_path, api)

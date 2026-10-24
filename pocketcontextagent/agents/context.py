@@ -731,7 +731,10 @@ class ContextManager:
                 response,
                 [
                     {
-                        "output": f"Compacted [{tag}]; reduced request by {reduction:{receipt_width}d} characters.",
+                        "output": (
+                            f"Compacted [{tag}]; reduced request by {reduction:{receipt_width}d} characters. "
+                            "Creation receipt; the memory is at the replaced range."
+                        ),
                         "returncode": 0,
                         "exception_info": "",
                     }

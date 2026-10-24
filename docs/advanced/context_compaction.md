@@ -44,8 +44,10 @@ The receipt reports the tag and measured character reduction.
 It identifies the same archive as the earlier memory, not a second memory or a reused tag.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.
 
-The compaction instructions require paths, identifiers, relevant evidence, command purposes and outcomes, reasoning, decisions, unsuccessful approaches, verification results, and causal detail needed by surviving references.
-The compaction agent receives preservation instructions and returns only its replacement summary.
+Summaries retain important facts, source identifiers, uncertainty, and brief outcomes of unsuccessful approaches.
+Earlier context only resolves references; task instructions, answer formats, counters, context-management history, and exhaustive search logs are omitted from the summary.
+An unsuccessful search does not rule out a lead or make its archive unhelpful.
+Archive identity and provenance come from framework headers rather than generated prose.
 Empty, tool-calling, truncated, or failed child responses return a diagnostic without changing active history, allowing the main agent to continue.
 Internal formatting failures do not request new selection boundaries.
 Adapters serialize child requests and expanded input content for their own API.

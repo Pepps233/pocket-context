@@ -5,6 +5,7 @@ import pytest
 from pocketcontextagent.agents.context import encode
 from pocketcontextagent.agents.default import DefaultAgent
 from pocketcontextagent.environments.local import LocalEnvironment
+from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models.test_models import make_output, make_response_api_output
 from tests.agents.test_compact_loop import (
     RecordingModel,
@@ -74,6 +75,70 @@ def test_compaction_agent_sees_prefix_without_future(tmp_path: Path, api):
     assert agent.serialize()["info"]["model_stats"]["api_calls"] == 7
 
 
+def test_recompaction_excludes_management_turns_but_keeps_evidence(tmp_path: Path, api):
+    agent = make_agent(
+        tmp_path,
+        api,
+        outputs=[
+            native_turn(
+                "bash", {"command": "printf 'archive-output'; printf '%06000d' 0"}, "a", "Inspect archive-start", api
+            ),
+            native_turn("bash", {"command": "echo retained-output"}, "b", "Keep working", api),
+            native_turn(
+                "compact_block",
+                compaction_args(summary="Remember original evidence " + "x" * 2100),
+                "compact",
+                "Manage context",
+                api,
+            ),
+            native_turn("expand_block", {"tag": "ctx-0001"}, "expand", "Retrieve archived evidence", api),
+            native_turn("bash", {"command": "echo latest"}, "latest", "Continue research", api),
+            native_turn(
+                "compact_block",
+                {"start_quote": "[ctx-0001]: Remember", "end_quote": "[ctx-0001]: (exp=1 part=2/2"},
+                "recompact",
+                "Combine evidence",
+                api,
+            ),
+            native_turn("bash", {"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"}, "done", "Finish", api),
+        ],
+    )
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.context.revision == 2 and len(agent.context.expansions) == 1
+    request = encode(agent.compactions[1]["messages"][1:])
+    assert "Remember original evidence" in request and "archive-output" + "0" * 6000 in request
+    assert "retained-output" in request and "Continue research" not in request
+    assert all(text not in request for text in ("Manage context", "Compacted [", "Expanded [", "Tool expand_block"))
+    blocks = read_blocks(agent)
+    assert blocks[1]["children"] == ["ctx-0001"]
+    assert "Compacted [ctx-0001]" in encode(blocks[1]["messages"])
+    assert "archive-output" + "0" * 6000 in encode(blocks[0]["messages"])
+
+
+@pytest.mark.parametrize(("limit_key",), [("max_tokens",), ("max_completion_tokens",), ("max_output_tokens",)])  # noqa: PT006
+@pytest.mark.parametrize(("compact_limit", "expected"), [(None, 16000), (2048, 2048)])
+def test_compaction_output_budget_defaults_to_main_with_optional_override(
+    tmp_path: Path, api, limit_key, compact_limit, expected
+):
+    agent = make_agent(
+        tmp_path, api, context_token_limit=128000, response_token_limit=8000, compact_response_token_limit=compact_limit
+    )
+    agent.model.config = agent.model.config.model_copy(update={"model_kwargs": {limit_key: 16000}})
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.model.query_options[3] == {"final_answer": True, limit_key: expected}
+    assert agent.model.query_options[0][limit_key] == agent.model.query_options[4][limit_key] == 16000
+    assert agent.model.config.model_kwargs == {limit_key: 16000}
+    assert agent.context.revision == 1
+
+
+def test_compaction_defaults_to_agent_output_allowance(tmp_path: Path, api):
+    agent = make_agent(tmp_path, api, context_token_limit=128000, response_token_limit=8000)
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.model.query_options[3] == {"final_answer": True, "max_tokens": 8000}
+    assert agent.model.query_options[0]["max_tokens"] == agent.model.query_options[4]["max_tokens"] == 8000
+    assert agent.context.revision == 1
+
+
 @pytest.mark.parametrize(("failure",), [("empty",), ("tools",), ("truncated",), ("oversized",)])  # noqa: PT006
 def test_failed_summary_keeps_context_and_accounts_for_call(tmp_path: Path, api, failure: str):
     agent = make_agent(tmp_path, api)
@@ -95,6 +160,25 @@ def test_failed_summary_keeps_context_and_accounts_for_call(tmp_path: Path, api,
     assert agent.cost == response["extra"]["cost"]
     assert agent.serialize()["info"]["model_stats"]["compaction_api_calls"] == 1
     assert not marker.exists()
+
+
+@pytest.mark.parametrize(("with_response",), [(False,), (True,)])  # noqa: PT006
+def test_child_format_error_preserves_history_diagnostics_and_cost(tmp_path: Path, api, with_response):
+    agent = make_agent(tmp_path, api)
+    response = (
+        make_response_api_output("Invalid child response", []) if api else make_output("Invalid child response", [])
+    )
+    response["extra"]["cost"] = 0.25
+    agent.model.config.outputs[3] = make_output("", [{"raise": FormatError(*([response] if with_response else []))}])
+    start_history(agent)
+    assert "history preserved. Continue the task" in encode(agent.step())
+    assert agent.context.revision == 0 and not read_blocks(agent)
+    assert agent.compactions[0]["response"] == (response if with_response else {})
+    assert agent.compactions[0]["error"] == "FormatError: "
+    assert agent.cost == (0.25 if with_response else 0)
+    agent.query()
+    assert "Invalid child response" not in encode(agent.model.requests[-1])
+    assert "archive-output" + "0" * 3000 in encode(agent.model.requests[-1])
 
 
 def test_invalid_selection_and_committed_replay_do_not_summarize(tmp_path: Path, api):

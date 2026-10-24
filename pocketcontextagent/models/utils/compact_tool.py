@@ -22,7 +22,8 @@ COMPACT_FUNCTION = {
         "Use exactly one compact_block call and no other tools. The summarizer receives history from its beginning "
         "through the selected end, without later messages. Defaults require 2000 visible characters selected "
         "and 512 characters net reduction. Failure preserves history; continue the task after an internal failure. "
-        "The archive stays local; expand_block retrieves it. Recompacting memories stores direct references."
+        "The archive stays local; expand_block retrieves it. Recompacting memories stores direct references. "
+        "Archive tags are unique within this run; a memory and its creation receipt refer to the same archive."
     ),
     "parameters": {
         "type": "object",

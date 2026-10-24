@@ -1,7 +1,7 @@
 # Agent-controlled context compaction and expansion
 
 Native tool models can call `compact_block` to replace a long, contiguous context range with an agent-written memory.
-The calling agent selects the bounds, then waits for a separate compaction agent using the same model and model settings to generate the summary.
+The calling agent selects the bounds, then waits for a separate compaction agent using the same model to generate the summary.
 The compaction agent has an independent conversation and cannot execute tools.
 Compaction and expansion each take a dedicated turn with exactly one call and no other tools.
 Text-based bash models keep their existing syntax.
@@ -34,16 +34,20 @@ After selection validation, the compaction agent receives the entire active hist
 Messages before the selected start provide interpretation and task context; only the selected range is summarized and replaced.
 For history A, B, C, D and selection B through C, it receives A, B, C and never D or the triggering compaction call.
 History is rendered as inert evidence, preserving visible reasoning, tool arguments, results, and supported images while excluding hidden metadata.
+Context-management calls and their receipts are omitted from the summarizer input using tool-call metadata; their original records remain archived.
 Existing tagged summaries remain summaries; offloading does not recursively expand their archives.
 No task, hints, or instructions are derived from later messages.
 
 A successful replacement appears at the original position as `[ctx-0001]: <summary>`, explicitly labeled as assistant-generated memory.
 The next model request contains this replacement before the agent chooses further work.
 The receipt reports the tag and measured character reduction.
+It identifies the same archive as the earlier memory, not a second memory or a reused tag.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.
 
-The compaction instructions require paths, identifiers, relevant evidence, command purposes and outcomes, reasoning, decisions, unsuccessful approaches, verification results, and causal detail needed by surviving references.
-The compaction agent receives preservation instructions and returns only its replacement summary.
+Summaries retain important facts, source identifiers, uncertainty, and brief outcomes of unsuccessful approaches.
+Earlier context only resolves references; task instructions, answer formats, counters, context-management history, and exhaustive search logs are omitted from the summary.
+An unsuccessful search does not rule out a lead or make its archive unhelpful.
+Archive identity and provenance come from framework headers rather than generated prose.
 Empty, tool-calling, truncated, or failed child responses return a diagnostic without changing active history, allowing the main agent to continue.
 Internal formatting failures do not request new selection boundaries.
 Adapters serialize child requests and expanded input content for their own API.
@@ -118,6 +122,7 @@ agent:
   context_db_path: /path/to/contexts.sqlite3
   compact_min_chars: 2000
   compact_min_reduction: 512
+  compact_response_token_limit: null
 ```
 
 `context_db_path` defaults to `global_config_dir/contexts/<run_id>.sqlite3`.
@@ -125,6 +130,9 @@ A shared path keeps separate records for each run.
 The minimum range counts visible text characters, excluding images and hidden metadata.
 The minimum reduction compares serialized request characters before and after compaction, including the retained compaction response, replacement, receipt, updated block catalog, and rebuilt cache markers.
 These limits are characters, not token estimates.
+`compact_response_token_limit` defaults to the main agent's output allowance: the model's configured output limit, or `response_token_limit` (16,384 by default).
+Set a positive value to override it only for summarization; the allowance is capped by the remaining context window.
+It includes reasoning tokens when the provider counts them toward its output limit.
 
 ## Archives and trajectories
 

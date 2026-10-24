@@ -73,9 +73,11 @@ class RecordingMixin:
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.requests = []
+        self.query_options = []
 
     def query(self, messages, **kwargs):
         self.requests.append(copy.deepcopy(messages))
+        self.query_options.append(copy.deepcopy(kwargs))
         return super().query(messages, **kwargs)
 
 

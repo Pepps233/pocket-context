@@ -26,7 +26,7 @@ Return only the replacement summary as plain text, without tools, preambles, con
 class CompactionAgent:
     model: Model
     context_token_limit: int = 0
-    response_token_limit: int = 16384
+    response_token_limit: int = 4096
     tokenizer: object = None
     messages: list[dict] = field(default_factory=list)
     response: dict = field(default_factory=dict)
@@ -59,7 +59,8 @@ class CompactionAgent:
             content.extend(blocks)
         request = self.model.format_message(role="user", content=content)
         self.messages = [self.model.format_message(role="system", content=SYSTEM_PROMPT), request]
-        key, allowance = output_token_setting(self.model, self.response_token_limit)
+        key, _ = output_token_setting(self.model, self.response_token_limit)
+        allowance = self.response_token_limit
         if self.context_token_limit:
             allowance = min(allowance, self.context_token_limit - estimate_tokens(self.messages, self.tokenizer))
             if allowance <= 0:

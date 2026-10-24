@@ -114,6 +114,19 @@ def test_recompaction_excludes_management_turns_but_keeps_evidence(tmp_path: Pat
     assert "archive-output" + "0" * 6000 in encode(blocks[0]["messages"])
 
 
+@pytest.mark.parametrize(("limit_key",), [("max_tokens",), ("max_completion_tokens",), ("max_output_tokens",)])  # noqa: PT006
+def test_compaction_output_budget_is_independent(tmp_path: Path, api, limit_key):
+    agent = make_agent(
+        tmp_path, api, context_token_limit=128000, response_token_limit=8000, compact_response_token_limit=2048
+    )
+    agent.model.config = agent.model.config.model_copy(update={"model_kwargs": {limit_key: 16000}})
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.model.query_options[3] == {"final_answer": True, limit_key: 2048}
+    assert agent.model.query_options[0][limit_key] == agent.model.query_options[4][limit_key] == 16000
+    assert agent.model.config.model_kwargs == {limit_key: 16000}
+    assert agent.context.revision == 1
+
+
 @pytest.mark.parametrize(("failure",), [("empty",), ("tools",), ("truncated",), ("oversized",)])  # noqa: PT006
 def test_failed_summary_keeps_context_and_accounts_for_call(tmp_path: Path, api, failure: str):
     agent = make_agent(tmp_path, api)

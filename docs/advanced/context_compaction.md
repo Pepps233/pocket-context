@@ -1,7 +1,7 @@
 # Agent-controlled context compaction and expansion
 
 Native tool models can call `compact_block` to replace a long, contiguous context range with an agent-written memory.
-The calling agent selects the bounds, then waits for a separate compaction agent using the same model and model settings to generate the summary.
+The calling agent selects the bounds, then waits for a separate compaction agent using the same model with an independent output-token limit to generate the summary.
 The compaction agent has an independent conversation and cannot execute tools.
 Compaction and expansion each take a dedicated turn with exactly one call and no other tools.
 Text-based bash models keep their existing syntax.
@@ -120,6 +120,7 @@ agent:
   context_db_path: /path/to/contexts.sqlite3
   compact_min_chars: 2000
   compact_min_reduction: 512
+  compact_response_token_limit: 4096
 ```
 
 `context_db_path` defaults to `global_config_dir/contexts/<run_id>.sqlite3`.
@@ -127,6 +128,8 @@ A shared path keeps separate records for each run.
 The minimum range counts visible text characters, excluding images and hidden metadata.
 The minimum reduction compares serialized request characters before and after compaction, including the retained compaction response, replacement, receipt, updated block catalog, and rebuilt cache markers.
 These limits are characters, not token estimates.
+`compact_response_token_limit` overrides the model's output-token allowance only for summarization and is capped by the remaining context window.
+It includes reasoning tokens when the provider counts them toward its output limit.
 
 ## Archives and trajectories
 

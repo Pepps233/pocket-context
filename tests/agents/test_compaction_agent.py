@@ -5,6 +5,7 @@ import pytest
 from pocketcontextagent.agents.context import encode
 from pocketcontextagent.agents.default import DefaultAgent
 from pocketcontextagent.environments.local import LocalEnvironment
+from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models.test_models import make_output, make_response_api_output
 from tests.agents.test_compact_loop import (
     RecordingModel,
@@ -159,6 +160,25 @@ def test_failed_summary_keeps_context_and_accounts_for_call(tmp_path: Path, api,
     assert agent.cost == response["extra"]["cost"]
     assert agent.serialize()["info"]["model_stats"]["compaction_api_calls"] == 1
     assert not marker.exists()
+
+
+@pytest.mark.parametrize(("with_response",), [(False,), (True,)])  # noqa: PT006
+def test_child_format_error_preserves_history_diagnostics_and_cost(tmp_path: Path, api, with_response):
+    agent = make_agent(tmp_path, api)
+    response = (
+        make_response_api_output("Invalid child response", []) if api else make_output("Invalid child response", [])
+    )
+    response["extra"]["cost"] = 0.25
+    agent.model.config.outputs[3] = make_output("", [{"raise": FormatError(*([response] if with_response else []))}])
+    start_history(agent)
+    assert "history preserved. Continue the task" in encode(agent.step())
+    assert agent.context.revision == 0 and not read_blocks(agent)
+    assert agent.compactions[0]["response"] == (response if with_response else {})
+    assert agent.compactions[0]["error"] == "FormatError: "
+    assert agent.cost == (0.25 if with_response else 0)
+    agent.query()
+    assert "Invalid child response" not in encode(agent.model.requests[-1])
+    assert "archive-output" + "0" * 3000 in encode(agent.model.requests[-1])
 
 
 def test_invalid_selection_and_committed_replay_do_not_summarize(tmp_path: Path, api):

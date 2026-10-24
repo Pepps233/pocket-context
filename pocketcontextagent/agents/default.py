@@ -317,8 +317,9 @@ class DefaultAgent:
             return agent.run(history, start)
         except Exception as exc:
             agent.error = f"{type(exc).__name__}: {exc}"
-            if isinstance(exc, FormatError) and exc.messages:
-                agent.response = exc.messages[0]
+            match exc:
+                case FormatError(messages=[response, *_]):
+                    agent.response = response
             raise ContextOperationError(
                 f"Summarization failed ({type(exc).__name__}); history preserved. Continue the task."
             ) from exc

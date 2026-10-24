@@ -205,15 +205,22 @@ class DefaultAgent:
         options = {"allow_text_response": True} if getattr(self.env, "is_final_answer", None) else {}
         if self.config.context_token_limit:
             key, allowance = output_token_setting(self.model, self.config.response_token_limit)
-            if self.context_tokens(self.context.projection()) + allowance >= self.config.context_token_limit * 0.95:
+            if (
+                self.context_tokens(self.context.request_projection(self.model)) + allowance
+                >= self.config.context_token_limit * 0.95
+            ):
                 self._final_generation = True
                 self.add_messages(
                     self.model.format_message(
-                        role="user", content=self._render_template(self.config.context_limit_template)
+                        role="user",
+                        content=self._render_template(self.config.context_limit_template),
+                        extra={"interrupt_type": "ContextLimit"},
                     )
                 )
                 options["final_answer"] = True
-            remaining = self.config.context_token_limit - self.context_tokens(self.context.projection())
+            remaining = self.config.context_token_limit - self.context_tokens(
+                self.context.request_projection(self.model)
+            )
             if remaining <= 0:
                 raise LimitsExceeded(
                     {
@@ -248,13 +255,14 @@ class DefaultAgent:
 
     def add_observations(self, messages: list[dict], *, origins: list[dict] | None = None) -> list[dict]:
         if messages and self.config.context_token_limit:
-            fit_observations(
-                messages,
-                int(self.config.context_token_limit * 0.95),
-                lambda results: self.context_tokens(self.context.projection() + results),
-            )
+            if not origins or not any(origin.get("provenance") == "expansion" for origin in origins):
+                fit_observations(
+                    messages,
+                    int(self.config.context_token_limit * 0.95),
+                    lambda results: self.context_tokens(self.context.request_projection(self.model) + results),
+                )
             _, allowance = output_token_setting(self.model, self.config.response_token_limit)
-            tokens = self.context_tokens(self.context.projection() + messages)
+            tokens = self.context_tokens(self.context.request_projection(self.model) + messages)
             tokens += min(allowance, max(0, self.config.context_token_limit - tokens))
             latest_result = next(
                 (
@@ -303,6 +311,16 @@ class DefaultAgent:
             self.compactions.append(agent.serialize())
             self.cost += agent.response.get("extra", {}).get("cost", 0.0)
 
+    def validate_expansion(self, results: list[dict]) -> None:
+        if not self.config.context_token_limit:
+            return
+        _, allowance = output_token_setting(self.model, self.config.response_token_limit)
+        tokens = self.context_tokens(self.context.request_projection(self.model) + results)
+        if tokens + allowance >= int(self.config.context_token_limit * 0.95):
+            raise SelectionError(
+                "Expansion exceeds the context budget; compact other history before expanding this tag."
+            )
+
     def dispatch_context_actions(self, message: dict) -> list[dict] | None:
         actions = message.get("extra", {}).get("actions", [])
         if not any(action.get("type") in (*CONTEXT_TOOLS, "rejected") for action in actions):
@@ -320,6 +338,7 @@ class DefaultAgent:
                     result["content"] = output["output"]
             return results
 
+        self.context.projection()
         origins = None
         operation = actions[0].get("type")
         try:
@@ -330,7 +349,9 @@ class DefaultAgent:
                     )
                 )
             if operation == "expand_block":
-                results, origins = self.context.expand(actions[0], message, self.model, format_results)
+                results, origins = self.context.expand(
+                    actions[0], message, self.model, format_results, validate=self.validate_expansion
+                )
             else:
                 results = self.context.compact(
                     actions[0],
@@ -341,11 +362,18 @@ class DefaultAgent:
                     min_reduction=self.config.compact_min_reduction,
                     summarize=self.summarize_context,
                 )
-        except (SelectionError, ContextOperationError) as exc:
+        except InterruptAgentFlow:
+            raise
+        except Exception as exc:
+            if isinstance(exc, (SelectionError, ContextOperationError)):
+                diagnostic = str(exc)
+            else:
+                self.logger.exception("Optional context operation failed")
+                diagnostic = f"Internal {type(exc).__name__}; history preserved. Continue the task."
             results = format_results(
                 message,
                 [
-                    {"output": f"{operation} error: {exc}", "returncode": -1, "exception_info": str(exc)}
+                    {"output": f"{operation} error: {diagnostic}", "returncode": -1, "exception_info": diagnostic}
                     for _ in actions
                 ],
             )

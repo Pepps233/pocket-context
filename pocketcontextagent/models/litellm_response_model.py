@@ -99,7 +99,7 @@ class LitellmResponseModel(LitellmModel):
         )
 
     def format_message(self, **kwargs) -> dict:
-        return format_input_message(**kwargs)
+        return format_input_message(**super().format_message(**kwargs))
 
     def format_observation_messages(
         self, message: dict, outputs: list[dict], template_vars: dict | None = None

@@ -172,7 +172,7 @@ def test_compaction_finishes_before_next_work_decision(tmp_path, api):
     assert "Assistant-generated memory" in get_content_string(agent.model.requests[4][2])
     assert "Retained latest output" in get_content_string(agent.model.requests[4][3])
     assert "0" * 1000 not in encode(agent.model.requests[4])
-    assert "Inspection printed" not in get_content_string(agent.model.requests[4][-1])
+    assert "Inspection printed" not in get_content_string(agent.model.requests[4][-2])
     assert read_blocks(agent)[0]["messages"] == agent.messages[2:4]
     assert read_blocks(agent)[0]["relationships"] == {"m000003": [["a"], []], "m000004": [[], ["a"]]}
     serialized = agent.save(tmp_path / "trajectory.json")
@@ -510,3 +510,16 @@ def test_plaintext_reasoning_quotes_exclude_signatures(tmp_path, api):
     from pocketcontextagent.agents.context import visible_text
 
     assert "hidden-signature" not in encode(visible_text(agent.messages[2]))
+
+
+def test_internal_archive_failure_is_diagnostic_and_agent_continues(tmp_path, api):
+    agent = make_agent(tmp_path, api)
+    start_history(agent)
+    before = list(agent.context.active)
+    with sqlite3.connect(agent.context.db_path) as db:
+        db.execute("INSERT INTO operations VALUES (?, ?, ?, ?)", (agent.context.run_id, "compact", 1, "invalid json"))
+    assert "Internal JSONDecodeError; history preserved. Continue the task" in get_content_string(agent.step()[0])
+    assert agent.context.active[: len(before)] == before and agent.context.revision == 0
+    assert not agent.compactions
+    agent.model.config.outputs[3] = native_turn("bash", {"command": "echo continued"}, "continue", "Continue", api)
+    assert "continued" in get_content_string(agent.step()[0])

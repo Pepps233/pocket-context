@@ -59,7 +59,7 @@ def test_production_responses_compaction_and_expansion(tmp_path, responses_serve
     for name, arguments in [
         ("bash", {"command": "printf 'archive-output'; printf '%03000d' 0"}),
         ("bash", {"command": "echo retained"}),
-        ("compact_block", {"start_quote": "Inspect archive-start", "end_quote": "archive-output0000"}),
+        ("compact_block", {"start_id": "b001", "end_id": "b001"}),
         (None, {}),
         ("expand_block", {"tag": "ctx-0001"}),
         ("bash", {"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"}),

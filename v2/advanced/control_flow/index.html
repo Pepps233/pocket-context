@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../../assets/mini_square.svg">
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.0">
     
     
       
@@ -26,10 +26,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -2636,6 +2636,7 @@
 <span class="sd">or https://minimal-agent.com for a tutorial on the basic building principles.</span>
 <span class="sd">"""</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
@@ -2647,12 +2648,13 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent</span><span class="w"> </span><span class="kn">import</span> <span class="n">Environment</span><span class="p">,</span> <span class="n">Model</span><span class="p">,</span> <span class="n">__version__</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.agents.compaction</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompactionAgent</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.agents.context</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContextManager</span><span class="p">,</span> <span class="n">SelectionError</span><span class="p">,</span> <span class="n">relationships</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.agents.context</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContextManager</span><span class="p">,</span> <span class="n">ContextOperationError</span><span class="p">,</span> <span class="n">SelectionError</span><span class="p">,</span> <span class="n">relationships</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.agents.utils.context_budget</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">append_text</span><span class="p">,</span>
     <span class="n">estimate_tokens</span><span class="p">,</span>
     <span class="n">fit_observations</span><span class="p">,</span>
     <span class="n">output_token_setting</span><span class="p">,</span>
+    <span class="n">retained_reasoning_tokens</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">FormatError</span><span class="p">,</span> <span class="n">InterruptAgentFlow</span><span class="p">,</span> <span class="n">LimitsExceeded</span><span class="p">,</span> <span class="n">Submitted</span><span class="p">,</span> <span class="n">TimeExceeded</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models.utils.compact_tool</span><span class="w"> </span><span class="kn">import</span> <span class="n">CONTEXT_TOOLS</span>
@@ -2683,6 +2685,8 @@
 <span class="w">    </span><span class="sd">"""Working context window, including the next response; 0 disables accounting."""</span>
     <span class="n">response_token_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">16384</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="w">    </span><span class="sd">"""Output reservation when model_kwargs does not specify an output-token limit."""</span>
+    <span class="n">compact_response_token_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">gt</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Summarization output-token limit; defaults to the main agent's allowance."""</span>
     <span class="n">context_limit_template</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="p">(</span>
         <span class="s2">"Your {{context_token_limit}} token context window has reached 95</span><span class="si">% o</span><span class="s2">f its budget. "</span>
         <span class="s2">"Stop searching and conclude the investigation now. Do not call any tools or manage memory. "</span>
@@ -2838,15 +2842,22 @@
         <span class="n">options</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"allow_text_response"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span> <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s2">"is_final_answer"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="p">{}</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span><span class="p">:</span>
             <span class="n">key</span><span class="p">,</span> <span class="n">allowance</span> <span class="o">=</span> <span class="n">output_token_setting</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">response_token_limit</span><span class="p">)</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">projection</span><span class="p">())</span> <span class="o">+</span> <span class="n">allowance</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">*</span> <span class="mf">0.95</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">request_projection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">))</span> <span class="o">+</span> <span class="n">allowance</span>
+                <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">*</span> <span class="mf">0.95</span>
+            <span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_final_generation</span> <span class="o">=</span> <span class="kc">True</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">add_messages</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">format_message</span><span class="p">(</span>
-                        <span class="n">role</span><span class="o">=</span><span class="s2">"user"</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_render_template</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_limit_template</span><span class="p">)</span>
+                        <span class="n">role</span><span class="o">=</span><span class="s2">"user"</span><span class="p">,</span>
+                        <span class="n">content</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_render_template</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_limit_template</span><span class="p">),</span>
+                        <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">"interrupt_type"</span><span class="p">:</span> <span class="s2">"ContextLimit"</span><span class="p">},</span>
                     <span class="p">)</span>
                 <span class="p">)</span>
                 <span class="n">options</span><span class="p">[</span><span class="s2">"final_answer"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="n">remaining</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">projection</span><span class="p">())</span>
+            <span class="n">remaining</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">request_projection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="k">if</span> <span class="n">remaining</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">LimitsExceeded</span><span class="p">(</span>
                     <span class="p">{</span>
@@ -2876,17 +2887,20 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">_prepare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">messages</span><span class="p">),</span>
             <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s2">"tokenizer"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
             <span class="n">text_based</span><span class="o">=</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="s2">"action_regex"</span><span class="p">),</span>
+            <span class="n">reasoning_tokens</span><span class="o">=</span><span class="n">retained_reasoning_tokens</span><span class="p">(</span><span class="n">messages</span><span class="p">),</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">add_observations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">origins</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">prepare_observations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">history</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">truncate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="n">messages</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">messages</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span><span class="p">:</span>
-            <span class="n">fit_observations</span><span class="p">(</span>
-                <span class="n">messages</span><span class="p">,</span>
-                <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">*</span> <span class="mf">0.95</span><span class="p">),</span>
-                <span class="k">lambda</span> <span class="n">results</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">projection</span><span class="p">()</span> <span class="o">+</span> <span class="n">results</span><span class="p">),</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">truncate</span><span class="p">:</span>
+                <span class="n">fit_observations</span><span class="p">(</span>
+                    <span class="n">messages</span><span class="p">,</span>
+                    <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">*</span> <span class="mf">0.95</span><span class="p">),</span>
+                    <span class="k">lambda</span> <span class="n">results</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="n">history</span> <span class="o">+</span> <span class="n">results</span><span class="p">),</span>
+                <span class="p">)</span>
             <span class="n">_</span><span class="p">,</span> <span class="n">allowance</span> <span class="o">=</span> <span class="n">output_token_setting</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">response_token_limit</span><span class="p">)</span>
-            <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">projection</span><span class="p">()</span> <span class="o">+</span> <span class="n">messages</span><span class="p">)</span>
+            <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="n">history</span> <span class="o">+</span> <span class="n">messages</span><span class="p">)</span>
             <span class="n">tokens</span> <span class="o">+=</span> <span class="nb">min</span><span class="p">(</span><span class="n">allowance</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">-</span> <span class="n">tokens</span><span class="p">))</span>
             <span class="n">latest_result</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
                 <span class="p">(</span>
@@ -2897,7 +2911,17 @@
                 <span class="n">messages</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
             <span class="p">)</span>
             <span class="n">append_text</span><span class="p">(</span><span class="n">latest_result</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"[CURRENT CONTEXT TOKEN: </span><span class="si">{</span><span class="n">tokens</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_messages</span><span class="p">(</span><span class="o">*</span><span class="n">messages</span><span class="p">,</span> <span class="n">origins</span><span class="o">=</span><span class="n">origins</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">messages</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_observations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">origins</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_messages</span><span class="p">(</span>
+            <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">prepare_observations</span><span class="p">(</span>
+                <span class="n">messages</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">request_projection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="k">else</span> <span class="p">[],</span>
+                <span class="n">truncate</span><span class="o">=</span><span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">origin</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"provenance"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"expansion"</span> <span class="k">for</span> <span class="n">origin</span> <span class="ow">in</span> <span class="n">origins</span> <span class="ow">or</span> <span class="p">[]),</span>
+            <span class="p">),</span>
+            <span class="n">origins</span><span class="o">=</span><span class="n">origins</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">finish_context_limited_episode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
         <span class="n">text</span> <span class="o">=</span> <span class="n">response_text</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
@@ -2919,14 +2943,33 @@
         <span class="n">agent</span> <span class="o">=</span> <span class="n">CompactionAgent</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span><span class="p">,</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">response_token_limit</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">compact_response_token_limit</span>
+            <span class="ow">or</span> <span class="n">output_token_setting</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">response_token_limit</span><span class="p">)[</span><span class="mi">1</span><span class="p">],</span>
             <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s2">"tokenizer"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">history</span><span class="p">,</span> <span class="n">start</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">agent</span><span class="o">.</span><span class="n">error</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span>
+            <span class="k">match</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">FormatError</span><span class="p">(</span><span class="n">messages</span><span class="o">=</span><span class="p">[</span><span class="n">response</span><span class="p">,</span> <span class="o">*</span><span class="k">_</span><span class="p">]):</span>
+                    <span class="n">agent</span><span class="o">.</span><span class="n">response</span> <span class="o">=</span> <span class="n">response</span>
+            <span class="k">raise</span> <span class="n">ContextOperationError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Summarization failed (</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">); history preserved. Continue the task."</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">compactions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cost</span> <span class="o">+=</span> <span class="n">agent</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"extra"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cost"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_expansion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">results</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">allowance</span> <span class="o">=</span> <span class="n">output_token_setting</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">response_token_limit</span><span class="p">)</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_tokens</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">request_projection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="o">+</span> <span class="n">results</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">tokens</span> <span class="o">+</span> <span class="n">allowance</span> <span class="o">&gt;=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">context_token_limit</span> <span class="o">*</span> <span class="mf">0.95</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">SelectionError</span><span class="p">(</span>
+                <span class="s2">"Expansion exceeds the context budget; compact other history before expanding this tag."</span>
+            <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dispatch_context_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">actions</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"extra"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"actions"</span><span class="p">,</span> <span class="p">[])</span>
@@ -2945,6 +2988,7 @@
                     <span class="n">result</span><span class="p">[</span><span class="s2">"content"</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s2">"output"</span><span class="p">]</span>
             <span class="k">return</span> <span class="n">results</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">projection</span><span class="p">()</span>
         <span class="n">origins</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">operation</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
@@ -2955,7 +2999,9 @@
                     <span class="p">)</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">"expand_block"</span><span class="p">:</span>
-                <span class="n">results</span><span class="p">,</span> <span class="n">origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">format_results</span><span class="p">)</span>
+                <span class="n">results</span><span class="p">,</span> <span class="n">origins</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span>
+                    <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">format_results</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">validate_expansion</span>
+                <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">compact</span><span class="p">(</span>
                     <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
@@ -2965,12 +3011,20 @@
                     <span class="n">min_chars</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">compact_min_chars</span><span class="p">,</span>
                     <span class="n">min_reduction</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">compact_min_reduction</span><span class="p">,</span>
                     <span class="n">summarize</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">summarize_context</span><span class="p">,</span>
+                    <span class="n">prepare_results</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prepare_observations</span><span class="p">,</span>
                 <span class="p">)</span>
-        <span class="k">except</span> <span class="n">SelectionError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">except</span> <span class="n">InterruptAgentFlow</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="p">(</span><span class="n">SelectionError</span><span class="p">,</span> <span class="n">ContextOperationError</span><span class="p">)):</span>
+                <span class="n">diagnostic</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">"Optional context operation failed"</span><span class="p">)</span>
+                <span class="n">diagnostic</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Internal </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">; history preserved. Continue the task."</span>
             <span class="n">results</span> <span class="o">=</span> <span class="n">format_results</span><span class="p">(</span>
                 <span class="n">message</span><span class="p">,</span>
                 <span class="p">[</span>
-                    <span class="p">{</span><span class="s2">"output"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2"> error: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"returncode"</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"exception_info"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)}</span>
+                    <span class="p">{</span><span class="s2">"output"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2"> error: </span><span class="si">{</span><span class="n">diagnostic</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"returncode"</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"exception_info"</span><span class="p">:</span> <span class="n">diagnostic</span><span class="p">}</span>
                     <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">actions</span>
                 <span class="p">],</span>
             <span class="p">)</span>
@@ -3001,7 +3055,7 @@
             <span class="s2">"compactions"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">compactions</span><span class="p">,</span>
             <span class="s2">"trajectory_format"</span><span class="p">:</span> <span class="s2">"mini-swe-agent-1.1"</span><span class="p">,</span>
         <span class="p">}</span>
-        <span class="k">return</span> <span class="n">recursive_merge</span><span class="p">(</span><span class="n">agent_data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">serialize</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">serialize</span><span class="p">(),</span> <span class="o">*</span><span class="n">extra_dicts</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">recursive_merge</span><span class="p">(</span><span class="n">agent_data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">serialize</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">serialize</span><span class="p">(),</span> <span class="o">*</span><span class="n">extra_dicts</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="n">extra_dicts</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Save the trajectory of the agent to a file if path is given. Returns full serialized data.</span>
@@ -3215,10 +3269,10 @@ This uses exceptions that inherit from <code>InterruptAgentFlow</code>. All thes
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.top", "content.action.edit", "navigation.footer", "content.code.copy", "content.footnote.tooltips", "header.autohide", "announce.dismiss", "content.code.annotate", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.top", "content.action.edit", "navigation.footer", "content.code.copy", "content.footnote.tooltips", "header.autohide", "announce.dismiss", "content.code.annotate", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../assets/js/sh-annotation.js"></script>
       

@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../../assets/mini_square.svg">
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.0">
     
     
       
@@ -26,10 +26,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -2797,9 +2797,13 @@ This is done with the <code>model_kwargs</code> dictionary which is directly pas
 <span class="w">    </span><span class="no">You are Pocket Context, an agent that completes tasks using a computer and manages its own working context.</span>
 
 <span class="w">    </span><span class="no">Use bash to inspect the environment, make changes, and verify results.</span>
-<span class="w">    </span><span class="no">Use compact_block when older observations, completed work, or dead ends crowd out useful context.</span>
-<span class="w">    </span><span class="no">Use expand_block when the next step depends on evidence omitted from a summary.</span>
-<span class="w">    </span><span class="no">Avoid unnecessary context operations and repeated work.</span>
+<span class="w">    </span><span class="no">Manage context to support accurate task completion.</span>
+<span class="w">    </span><span class="no">Keep details available while they remain useful for reasoning, verification, or upcoming work.</span>
+<span class="w">    </span><span class="no">Use compact_block when replacing older material with a summary would meaningfully help you continue; select IDs from the current context block catalog.</span>
+<span class="w">    </span><span class="no">Use expand_block when a summary lacks evidence needed to proceed reliably.</span>
+<span class="w">    </span><span class="no">Treat the current-context token marker as planning information.</span>
+<span class="w">    </span><span class="no">Consider the remaining work, available space, and value of retained evidence when choosing whether to continue investigating, compact older history, or produce your final answer.</span>
+<span class="w">    </span><span class="no">Prefer completing the task directly when the existing context is sufficient.</span>
 <span class="w">    </span><span class="no">Verify your results before finishing.</span>
 <span class="w">    </span><span class="no">Finish by issuing echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT as a standalone command.</span>
 <span class="w">  </span><span class="nt">instance_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
@@ -3287,10 +3291,10 @@ then this must also match <code>litellm_provider</code> in the config!</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.top", "content.action.edit", "navigation.footer", "content.code.copy", "content.footnote.tooltips", "header.autohide", "announce.dismiss", "content.code.annotate", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.top", "content.action.edit", "navigation.footer", "content.code.copy", "content.footnote.tooltips", "header.autohide", "announce.dismiss", "content.code.annotate", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../assets/js/sh-annotation.js"></script>
       

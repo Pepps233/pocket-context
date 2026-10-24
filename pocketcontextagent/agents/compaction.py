@@ -23,7 +23,7 @@ Return only the plain-text memory, without a preamble or tag header.
 class CompactionAgent:
     model: Model
     context_token_limit: int = 0
-    response_token_limit: int = 4096
+    response_token_limit: int = 16384
     tokenizer: object = None
     messages: list[dict] = field(default_factory=list)
     response: dict = field(default_factory=dict)

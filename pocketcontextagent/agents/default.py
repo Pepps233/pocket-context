@@ -51,8 +51,8 @@ class AgentConfig(BaseModel):
     """Working context window, including the next response; 0 disables accounting."""
     response_token_limit: int = Field(default=16384, gt=0)
     """Output reservation when model_kwargs does not specify an output-token limit."""
-    compact_response_token_limit: int = Field(default=4096, gt=0)
-    """Independent output-token limit for summarization calls."""
+    compact_response_token_limit: int | None = Field(default=None, gt=0)
+    """Summarization output-token limit; defaults to the main agent's allowance."""
     context_limit_template: str = (
         "Your {{context_token_limit}} token context window has reached 95% of its budget. "
         "Stop searching and conclude the investigation now. Do not call any tools or manage memory. "
@@ -309,7 +309,8 @@ class DefaultAgent:
         agent = CompactionAgent(
             self.model,
             self.config.context_token_limit,
-            self.config.compact_response_token_limit,
+            self.config.compact_response_token_limit
+            or output_token_setting(self.model, self.config.response_token_limit)[1],
             getattr(self.env, "tokenizer", None),
         )
         try:

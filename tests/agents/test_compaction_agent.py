@@ -115,15 +115,26 @@ def test_recompaction_excludes_management_turns_but_keeps_evidence(tmp_path: Pat
 
 
 @pytest.mark.parametrize(("limit_key",), [("max_tokens",), ("max_completion_tokens",), ("max_output_tokens",)])  # noqa: PT006
-def test_compaction_output_budget_is_independent(tmp_path: Path, api, limit_key):
+@pytest.mark.parametrize(("compact_limit", "expected"), [(None, 16000), (2048, 2048)])
+def test_compaction_output_budget_defaults_to_main_with_optional_override(
+    tmp_path: Path, api, limit_key, compact_limit, expected
+):
     agent = make_agent(
-        tmp_path, api, context_token_limit=128000, response_token_limit=8000, compact_response_token_limit=2048
+        tmp_path, api, context_token_limit=128000, response_token_limit=8000, compact_response_token_limit=compact_limit
     )
     agent.model.config = agent.model.config.model_copy(update={"model_kwargs": {limit_key: 16000}})
     assert agent.run("Find evidence")["exit_status"] == "Submitted"
-    assert agent.model.query_options[3] == {"final_answer": True, limit_key: 2048}
+    assert agent.model.query_options[3] == {"final_answer": True, limit_key: expected}
     assert agent.model.query_options[0][limit_key] == agent.model.query_options[4][limit_key] == 16000
     assert agent.model.config.model_kwargs == {limit_key: 16000}
+    assert agent.context.revision == 1
+
+
+def test_compaction_defaults_to_agent_output_allowance(tmp_path: Path, api):
+    agent = make_agent(tmp_path, api, context_token_limit=128000, response_token_limit=8000)
+    assert agent.run("Find evidence")["exit_status"] == "Submitted"
+    assert agent.model.query_options[3] == {"final_answer": True, "max_tokens": 8000}
+    assert agent.model.query_options[0]["max_tokens"] == agent.model.query_options[4]["max_tokens"] == 8000
     assert agent.context.revision == 1
 
 

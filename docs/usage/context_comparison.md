@@ -1,27 +1,52 @@
 # Comparing context-management methods
 
-This foundation runs **Pocket Context, ReAct, training-free ReSum, and ACM** through the same BrowseComp-Plus harness and reports five measurements. It does not contain benchmark results or run paid evaluations automatically.
+Run **Pocket Context, ReAct, training-free ReSum, and ACM Base** on the same BrowseComp-Plus tasks, corpus and policy weights. The comparison reports success rate, total tokens, cost, latency and peak input context. It does not run paid evaluations automatically or contain benchmark performance results.
 
-ReSum and ACM are **local, training-free adaptations**, not the authors' official implementations or trained policies. Treat results as comparisons of context strategies in this harness, not reproductions of paper scores. Before claiming paper-level parity, validate their prompts, boundaries, retrieval semantics, and hyperparameters against the upstream implementations.
+## Preserve the methods, share the evaluation plumbing
 
-## Methods
+Published methods live separately from Pocket Context:
 
-| `--method` | Working-context behavior | Recall |
+```text
+pocketcontextagent/comparisons/
+  methods/
+    base.py             # Native transport, audit history and resource accounting
+    react.py            # Append-only ReAct baseline
+    resum.py            # ReSum threshold, full restart and recurrent summaries
+    resum_prompts.py    # Pinned original summary/continuation prompts
+    acm.py              # ACM Base compression boundaries and archive recall
+    acm_prompts.py       # Pinned original policy, compressor and recall prompts
+  tools.py              # Native corpus tools and original ACM memory schemas
+  registry.py           # Method selection and source/settings provenance
+  report.py             # Matched-run validation and judge imports
+  upstream/             # Source pins, fidelity notes and upstream license notices
+```
+
+These are **versioned shared-harness ports**, not loose “X-style” implementations. They do not use Pocket Context's generic compressor or its block-selection interface. They also do **not** claim reproduction of published scores: backbone, corpus, tokenizer, transport, serving configuration and budgets are deliberately controlled here.
+
+| Method | Preserved mechanism | Source |
 | --- | --- | --- |
-| `pocket_context` | Existing agent-selected `compact_block` ranges; separate same-model compressor | `expand_block` returns archived text |
-| `react` | Append-only history; no context catalog or memory tools | Retrieve source documents again |
-| `resum` | Automatically rolls older working history into a summary at an estimated 64,000 input tokens | No archive-retrieval interface |
-| `acm` | Agent calls argument-free `manage_context`; framework summarizes the unsummarized interval | `query_memory(tag, query)` calls a separate same-model querier |
+| `pocket_context` | Agent-selected `compact_block` ranges; exact archived-text restoration through `expand_block` | This repository |
+| `react` | Append-only reasoning/action/observation loop; no memory tools or block catalog | ACM's released no-memory BCP ReAct baseline |
+| `resum` | Original summary and continuation prompts; near-limit trigger; restart from original question plus summary, retaining **no** recent exchange | ReSum / DeepResearch `f72f75d8c3eb842f2bbbab096a12206ff66e270f` |
+| `acm` | Original structured working-memory and recall prompts; argument-free interval compression; summary returned as a tool result; integer-ID, model-mediated recall | ACM `f06f90e728af8580a4515812425c1620144145a2` |
 
-All methods retain system instructions, the original question, and complete tool-call/result exchanges. Both baseline compressors conservatively retain the latest exchange. ReSum folds its previous summary into the next one; ACM keeps earlier memories and archives separate and advances its boundary only after successful compaction. Audit trajectories remain on disk for every method, but are not accessible through the corpus interface. ReAct and ReSum cannot access memory archives. ACM cannot invoke Pocket Context's verbatim expansion.
+ReSum defaults to `0.9 * (context_window - 1000)` and a 4,096-token summary output cap. Its previous summary is passed separately when making the next summary. A successful restart leaves only system instructions and the summary-conditioned question in live history. Failed calls/storage resets preserve the preceding live history and summary. There is no retrieval primitive or ReSum-GRPO training.
 
-The native LiteLLM and OpenRouter interfaces, including their Responses variants, support per-method tool schemas. The deterministic native-tool replay models support offline tests. Text-action and other unsupported baseline interfaces fail explicitly rather than silently exposing Pocket Context's tools.
+ACM emits the original `<memory>` structure with **Knowledge state** and **Thoughts**, including concrete next steps. Compression has the released 4,096-token cap, one retry for malformed memory output, and final-attempt fallback. `query_memory(summary_id, query)` uses an integer ID, loads one raw archive, and follows the original recall prompt and normal per-turn output allowance. Earlier summary exchanges are excluded from subsequent compression. Archives are losslessly stored; recall is model-mediated, not guaranteed-perfect extraction or verbatim expansion.
 
-## Develop without touching the held-out set
+### Necessary, explicit adaptations
 
-First follow [BrowseComp-Plus setup](browsecomp_plus.md), including Java 21, the pinned corpus, and model credentials. Tune prompts, thresholds, and budgets only on `development680`.
+- **ACM boundary choice:** the paper/tool description excludes the assistant requesting compression, while the released evaluation defaults to dropping it. This port follows the **paper-described exclusion**, retaining a valid native call/result pair. Mixed batches finalize the boundary after all sibling results to avoid splitting their exchange. This is not bit-for-bit reproduction of the release's `mc_drop_call_message=True` configuration.
+- **Storage and wire format:** SQLite replaces per-summary JSON files; native Chat/Responses messages replace Qwen XML serialization. Prompts see visible reasoning, tool names/arguments and results, not private usage metadata.
+- **Corpus setting:** all four explicit methods expose native `search(query)` and `get_document(docid)` backed by the same corpus. ReSum's original live-web `search`/`visit` stack is not used. Its main prompt is the published BCP ReAct prompt; its original summary/continuation prompts are retained.
+- **Weights:** the same configured model/endpoint handles policy and auxiliary calls. ReSumTool-30B, ReSum-GRPO and ACM-Post-Trained are separate system configurations, not silently substituted into this same-policy comparison.
+- **Pressure policy:** the baseline ports check current-history usage at 95% and do not silently truncate tool observations. Pocket Context retains its existing projected-window guard. These method-specific stop rules and the shared window must be reported; the defaults do not reproduce the authors' complete serving setups.
 
-For example, smoke-test one development task for each method:
+Detailed source-file provenance, transport/batching decisions and licenses ship in `pocketcontextagent/comparisons/upstream/SOURCES.md`. Copied prompts/schemas have offline hash-parity tests against the pinned originals. For the papers, see [ReSum](https://arxiv.org/html/2509.13313v3), [ACM](https://arxiv.org/html/2607.23809v1), and [BrowseComp-Plus](https://arxiv.org/html/2508.06600v1).
+
+## Develop before touching the held-out set
+
+Follow [BrowseComp-Plus setup](browsecomp_plus.md), including Java 21, the pinned corpus and model credentials. Tune only on `development680`.
 
 ```bash
 for method in pocket_context react resum acm; do
@@ -32,15 +57,15 @@ for method in pocket_context react resum acm; do
 done
 ```
 
-These commands make model calls and incur costs. Nothing in the comparison/reporting command makes model calls. The model profile is optional; alternatively pass the same `--model`, `--model-class`, and common YAML settings to every method.
+These commands incur model costs. The comparison/reporting command below makes no model calls. Alternatively pass identical `--model`, `--model-class` and common YAML overrides to each run.
 
-`--method` is applied after YAML overrides and controls the agent class and memory-tool exposure. The shared system template branches on the available tools; retrieval settings, the question, final-answer format, and research instructions stay shared. ReSum's trigger can be tuned with `-c agent.resum_token_threshold=64000` on its run. Freeze it before held-out evaluation.
+`--method` is applied after YAML overrides. It selects the method's class, native research/memory schemas and, for baseline ports, canonical published policy/answer prompts. Literal prompt placeholders are preserved rather than accidentally interpreted as Jinja variables. Method-specific prompts are allowed to differ: forcing Pocket Context's prompt onto every baseline would change the methods being tested.
 
-The cost and wall-time thresholds include auxiliary summarization and memory-query calls. They are checked between calls, not hard billing caps. `agent.step_limit` counts **main-agent calls**, not all inference calls; auxiliary calls are separately counted and included in total token usage and cost. The context limit and response allowance are the same across methods. There is no additional hard cumulative-token cap. Keep provider routing, reasoning effort, generation settings, and worker count fixed when comparing. Latency is sensitive to provider load and local contention; repeat or interleave runs before interpreting small differences.
+ReSum-specific settings are `agent.resum_trigger_ratio` (0.9), `agent.resum_headroom_tokens` (1000), and `agent.resum_summary_token_limit` (4096 maximum). Freeze any development-set changes before evaluation. Shared model routing, reasoning effort, generation settings, retrieval configuration and worker count should stay fixed. Main policy and auxiliary model settings are recorded; independent summarizer-model selection is not yet supported by this runner.
 
-## Freeze and run all 150 evaluation tasks
+Cost and wall-time thresholds include auxiliary inference and are checked between calls, not hard billing caps. `agent.step_limit` counts main-agent calls; summaries/queries have separate counts and contribute fully to usage and cost. There is no additional hard cumulative-token cap. Repeat or interleave runs before interpreting small latency differences caused by provider load or local contention.
 
-Use separate output directories and the same selection for every method:
+## Freeze and evaluate all 150 tasks
 
 ```bash
 for method in pocket_context react resum acm; do
@@ -51,17 +76,17 @@ for method in pocket_context react resum acm; do
 done
 ```
 
-A method can exit with status 1 when a task hits a budget; its failed-task artifact must remain in the evaluation denominator. Inspect failures before continuing. Missing task artifacts cause the comparison command to reject the run, rather than compare only an intersection or successful tasks.
+A run may exit with status 1 when an attempt hits a budget. Inspect the retained failure record; keep it in the denominator. Missing task artifacts cause comparison to fail rather than evaluate only the intersection or successful tasks.
 
-Explicit method runs and all `eval150` runs retain every recorded attempt on resume, including failures. They do not silently retry until success. `--redo-existing` explicitly replaces attempts; use a fresh directory for independent repeats and do not select the best result across reruns as Pass@1. Legacy development runs without `--method` retain their previous retry-incomplete behavior.
+Explicit method runs and all local `eval150` runs retain **all** attempts on resume, including failures. They do not silently retry until success. `--redo-existing` explicitly replaces attempts; use new directories for independent repetitions, not best-of-reruns Pass@1. Legacy development runs without `--method` retain retry-incomplete behavior.
 
-Each `run.yaml` records the selected question IDs, effective configuration, worker count, attempt-retention policy, pinned data/index revisions, index inventory, method, and a hash of the installed Python implementation. Results carry the manifest fingerprint. Changing code, selection, data, or configuration requires a new output directory; do not combine old runs with new ones. Existing manifests created before this foundation do not contain the required provenance: rerun into fresh directories.
+Manifests record selected IDs, source/index revisions, inventory, workers, attempt policy, implementation hash, and **per-method upstream revision, prompt hash and method settings**. Changing code, selection, configuration or data requires fresh output directories. Old local “X-style” runs lack the new method provenance and are intentionally rejected by the comparison importer.
 
-The matched-comparison workflow uses the **local `run` command**. The existing Daytona launcher does not yet have a `--method` matrix or matching parent-manifest support; do not feed Daytona parent directories into `compare`.
+This workflow uses the local `run` command. The Daytona parent launcher does not yet support the method matrix/provenance contract; do not use its parent output as `compare` input.
 
-## Grade with the upstream evaluator
+## Grade and compare
 
-Use the pinned official Qwen judge described in [BrowseComp-Plus evaluation](browsecomp_plus.md#evaluate), separately for each method's run directory. For example, on the Linux GPU judge machine:
+Run the pinned official Qwen judge from [BrowseComp-Plus evaluation](browsecomp_plus.md#evaluate) separately for each method, on the GPU judge machine:
 
 ```bash
 for method in pocket_context react resum acm; do
@@ -75,20 +100,7 @@ for method in pocket_context react resum acm; do
 done
 ```
 
-The upstream evaluator mirrors the path following `runs/`, so these judgments are under `runs/browsecomp-plus/judgments/browsecomp-plus/eval-comparison/METHOD/`. The comparison importer expects one subdirectory per method and reads upstream `*_eval.json` records recursively beneath each one.
-
-It validates query IDs and the exact submitted response against the run, rejects duplicate judgments and differing judge models/settings, and accepts only boolean `judge_result.correct` without a parse error. Unparseable or missing grades for completed submissions remain unknown, never a success. Noncompleted tasks count as incorrect. Keep the judge revision/configuration fixed externally as well; the importer can only validate metadata present in the upstream artifacts. Reference answers and judge inputs never enter the agent context.
-
-## Generate the five-column comparison
-
-Before grading, inspect costs, usage, and latency with success rates shown as `N/A`:
-
-```bash
-mini-extra browsecomp-plus compare \
-  --runs runs/browsecomp-plus/eval-comparison
-```
-
-Then import the judgments and save a machine-readable report outside individual method directories:
+The upstream evaluator mirrors the path after `runs/`. With these paths, judgments live beneath `runs/browsecomp-plus/judgments/browsecomp-plus/eval-comparison/METHOD/`.
 
 ```bash
 mini-extra browsecomp-plus compare \
@@ -97,26 +109,26 @@ mini-extra browsecomp-plus compare \
   --output runs/browsecomp-plus/eval-comparison/comparison.yaml
 ```
 
+Omit `--grades` to inspect resource usage before grading; correctness remains unknown for ungraded completed submissions. Reports must be written outside individual method result directories.
+
 | Measurement | Definition |
 | --- | --- |
-| Success rate | Correct / all attempted tasks, including budget failures. `N/A` until every completed submission has a valid correctness grade. A completed submission is not itself a correct answer. |
-| Total tokens/task | Mean provider-reported input + output tokens over all attempts, including compressor/querier calls and persisted format errors. Repeated input tokens are counted on every call. |
-| Cost USD/task | Mean accumulated model cost over all attempts, including auxiliary calls. OpenRouter reports cost; LiteLLM derives it from its pricing registry. Retrieval infrastructure and judge costs are excluded. |
-| Latency s/task | Mean monotonic elapsed time inside `agent.run`, including model retries, tools, auxiliary calls, and per-step trajectory saving. Excludes model/environment initialization, queueing, and external grading. |
-| Peak input tokens/task | Mean per-task maximum provider-reported input usage across all main and auxiliary calls. This is not KV-cache size or a token estimate. The YAML also reports the maximum across tasks. |
+| Success rate | Correct / all attempted tasks, including budget failures. Unknown until every completed submission has a valid grade; completion alone is not correctness. |
+| Total tokens/task | Mean provider-reported input + output tokens over every attempt, including all compressor/querier attempts and persisted format errors. Repeated inputs count on every call. |
+| Cost USD/task | Mean accumulated model cost, including auxiliary calls. OpenRouter reports cost; LiteLLM estimates from its pricing registry. Infrastructure and external judge costs are excluded. |
+| Latency s/task | Mean monotonic time inside `agent.run`, including retries, tools, auxiliary calls and per-step saving; excludes environment/model setup, queueing and grading. |
+| Peak input tokens/task | Mean per-task maximum provider-reported input across main and auxiliary calls; not KV-cache size. YAML also reports the global maximum. |
 
-Missing or partial provider usage yields `N/A`, not a misleading zero or an average over only measured tasks. YAML summaries include measurement coverage, grading counts, input/output totals, cached-input totals where reported, and semantic tool counts. Cached input is a subset of input tokens, never added a second time. Use normal cost tracking for cost comparisons. Native LiteLLM/OpenRouter responses mark unavailable cost explicitly, so `cost_tracking: ignore_errors` fallback zeros become `N/A` rather than free runs; genuine provider-reported zero prices remain zero. Legacy or third-party adapters without cost provenance cannot make this distinction.
+Missing or partial measurement yields `N/A`, not zero or a measured-subset average. YAML includes grading/usage coverage, token and cached-input totals, tool counts and per-method provenance. Cached input is an input subset, never counted twice. Native LiteLLM/OpenRouter unavailable-cost markers make ignored-pricing fallback zeros unknown rather than free; older adapters without provenance cannot make that distinction.
 
-The report rejects differing model settings, common prompts, retrieval configuration, budgets, selected IDs, implementation hashes, and dataset/index inventories. This is intentionally strict for matched local experiments, including index file timestamps; moved/rebuilt indexes may require fresh matched runs.
-
-This is an evaluation foundation, not statistical evidence of superiority. Report paired uncertainty and repeat runs before interpreting small accuracy differences on 150 tasks. Check compaction/recall activity and add the planned ablations before attributing a gain to selective compaction or exact restoration.
+The report validates shared model/retrieval/budget settings, selected IDs, worker count, code/data/index provenance, and each port's canonical policy prompts/tool configuration. It allows explicitly recorded method-specific settings and prompts. Upstream judge records must match IDs and exact submissions, contain boolean correctness without parse errors, and identify matching judge metadata. Metadata validation cannot establish complete grading provenance: keep judge source/version/settings fixed externally. Do not mix published paper scores into this matched table; their judge, retriever, windows or weights may differ.
 
 ## Offline verification
 
 ```bash
-pytest -q tests/agents/test_baselines.py tests/models/test_method_tools.py \
-  tests/run/test_benchmark_metrics.py tests/run/test_context_comparison.py \
-  tests/run/test_browsecomp_plus.py
+pytest -q tests/comparisons tests/models/test_comparison_tools.py \
+  tests/models/test_method_tools.py tests/run/test_benchmark_metrics.py \
+  tests/run/test_context_comparison.py tests/run/test_browsecomp_plus.py
 ```
 
-The corpus tests build a small real Lucene index. Replay tests exercise compaction, recall, safe exchange grouping, auxiliary costs, failure preservation, and schema isolation without paid calls, mocks, or patches.
+Replay tests cover copied prompt/schema parity, full resets, repeated archive boundaries, native call/result integrity, query-only recall, parser fallback/retry, failure rollback and billed auxiliary errors without mocks or paid calls. Corpus tests build a small real Lucene index. These tests establish implementation behavior, not statistical superiority: inspect memory usage, run ablations and report paired uncertainty/repetitions for benchmark claims.

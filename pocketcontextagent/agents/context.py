@@ -431,7 +431,11 @@ class ContextManager:
         return blocks
 
     def _catalog(self, model, blocks: dict[str, list[str]], records: dict[str, ContextMessage]) -> list[dict]:
-        if not blocks or hasattr(model.config, "action_regex"):
+        if (
+            not blocks
+            or hasattr(model.config, "action_regex")
+            or getattr(model.config, "context_tools", "pocket_context") != "pocket_context"
+        ):
             return []
         lines = []
         for block_id, group in blocks.items():

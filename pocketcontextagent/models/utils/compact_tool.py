@@ -2,8 +2,13 @@
 
 import json
 import re
+from copy import deepcopy
+from typing import Literal
+
+from pocketcontextagent.comparisons.tools import acm_tools
 
 CONTEXT_TOOLS = ("compact_block", "expand_block")
+ACM_TOOLS = ("manage_context", "query_memory")
 
 
 def canonical_tag(tag) -> bool:
@@ -58,6 +63,37 @@ EXPAND_TOOL = {"type": "function", "function": EXPAND_FUNCTION}
 EXPAND_TOOL_RESPONSE_API = {"type": "function", **EXPAND_FUNCTION}
 
 
+def native_request_kwargs(
+    *, tools: list[dict], model_kwargs: dict, overrides: dict, responses_api: bool = False
+) -> dict:
+    """Build isolated request options, allowing per-call tools but never permanent overrides."""
+    if "tools" in model_kwargs:
+        raise ValueError("model_kwargs.tools cannot override native tools; configure context_tools instead.")
+    options = {**model_kwargs, **overrides}
+    options["tools"] = deepcopy(options.get("tools", tools))
+    if responses_api and "max_tokens" in options:
+        options.setdefault("max_output_tokens", options.pop("max_tokens"))
+    return options
+
+
+def context_tools(mode: Literal["pocket_context", "none", "acm"], *, responses_api: bool = False) -> list[dict]:
+    """Build memory schemas without sharing mutable definitions across requests."""
+    if mode == "acm":
+        return acm_tools(responses_api=responses_api)
+    functions = {
+        "pocket_context": [COMPACT_FUNCTION, EXPAND_FUNCTION],
+        "none": [],
+    }
+    if mode not in functions:
+        raise ValueError(f"Unknown context_tools mode: {mode}")
+    return [
+        {"type": "function", **deepcopy(function)}
+        if responses_api
+        else {"type": "function", "function": deepcopy(function)}
+        for function in functions[mode]
+    ]
+
+
 def parse_native_calls(calls: list[dict]) -> list[dict]:
     """Normalize both API formats, retaining a result slot for every rejected call."""
     context_tool = next((call["name"] for call in calls if call["name"] in CONTEXT_TOOLS), None)
@@ -71,6 +107,7 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
             for call in calls
         ]
     actions = []
+    acm_batch = any(call["name"] in ACM_TOOLS for call in calls)
     for call in calls:
         error = ""
         try:
@@ -79,35 +116,55 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
             args = {}
             error = f"Error parsing tool call arguments: {exc}."
         name = call["name"]
-        required = {"compact_block": ["start_id", "end_id"], "expand_block": ["tag"]}.get(name, ["command"])
+        required = {
+            "compact_block": ["start_id", "end_id"],
+            "expand_block": ["tag"],
+            "manage_context": [],
+            "query_memory": ["summary_id", "query"],
+            "search": ["query"],
+            "get_document": ["docid"],
+        }.get(name, ["command"])
         if name == "compact_block" and isinstance(args, dict) and set(args) == {"start_quote", "end_quote"}:
             required = ["start_quote", "end_quote"]
-        if name not in ("bash", *CONTEXT_TOOLS):
+        if name not in ("bash", "search", "get_document", *CONTEXT_TOOLS, *ACM_TOOLS):
             error += f"Unknown tool '{name}'."
         if not isinstance(args, dict) or any(
-            not isinstance(args.get(key), str) or (name in CONTEXT_TOOLS and not args[key]) for key in required
+            (
+                type(args.get(key)) is not int or args[key] <= 0
+                if key == "summary_id"
+                else not isinstance(args.get(key), str)
+                or (name in CONTEXT_TOOLS and not args[key])
+                or (name in (*ACM_TOOLS, "search", "get_document") and not args[key].strip())
+            )
+            for key in required
         ):
             error += (
                 "Missing 'command' argument in bash tool call."
                 if name == "bash"
                 else f"Missing or invalid {', '.join(required)} argument in {name} tool call."
             )
-        if name in CONTEXT_TOOLS:
+        if name in (*CONTEXT_TOOLS, *ACM_TOOLS, "search", "get_document"):
             if isinstance(args, dict) and set(args) != set(required):
                 error += f"Use only {', '.join(required)} arguments."
             if name == "expand_block" and (not isinstance(args, dict) or not canonical_tag(args.get("tag"))):
                 error += "Use a canonical tag such as ctx-0001 from this run."
-            actions.append(
-                {
+            if name in ("search", "get_document"):
+                action = {"type": name, "tool_call_id": call["id"]}
+                if not error:
+                    action["command"] = f"{name} {args[required[0]]}"
+            else:
+                action = {
                     **({key: args[key] for key in required if key in args} if isinstance(args, dict) else {}),
                     "type": name,
                     "tool_call_id": call["id"],
                 }
-            )
+            actions.append(action)
             if error:
                 actions[-1]["error"] = error
         elif error:
-            raise ValueError(error)
+            if not acm_batch:
+                raise ValueError(error)
+            actions.append({"type": "rejected", "tool_call_id": call["id"], "error": error})
         else:
             actions.append({"command": args["command"], "tool_call_id": call["id"]})
     return actions

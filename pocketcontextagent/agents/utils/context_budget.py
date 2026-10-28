@@ -43,18 +43,26 @@ def _without_encrypted_reasoning(value: object) -> object:
 
 
 def estimate_tokens(
-    messages: list[dict], tokenizer=None, *, text_based: bool = False, reasoning_tokens: int = 0
+    messages: list[dict],
+    tokenizer=None,
+    *,
+    text_based: bool = False,
+    reasoning_tokens: int = 0,
+    tools: list[dict] | None = None,
 ) -> int:
     """Count serialized request tokens, falling back to four UTF-8 bytes per token.
 
     The corpus tokenizer is used when configured; schemas and message framing are included.
+    Pass tools to count the actual exposed schemas; None preserves the Pocket Context default.
     Encrypted reasoning is excluded from text counts; retained reasoning uses reported usage instead.
     This is an estimate rather than the provider's exact chat-template token count.
     """
+    if tools is None:
+        tools = [] if text_based else [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL]
     text = encode(
         {
             "messages": _without_encrypted_reasoning(messages),
-            "tools": [] if text_based else [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL],
+            "tools": tools,
         }
     )
     return reasoning_tokens + (

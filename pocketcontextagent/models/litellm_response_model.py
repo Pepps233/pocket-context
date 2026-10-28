@@ -13,7 +13,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
 )
-from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API
+from pocketcontextagent.models.utils.compact_tool import context_tools
 from pocketcontextagent.models.utils.response import format_input_message, has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
 
@@ -39,12 +39,17 @@ class LitellmResponseModel(LitellmModel):
                 result.append({k: v for k, v in msg.items() if k != "extra"})
         return result
 
+    def get_tools(self) -> list[dict]:
+        if hasattr(self.config, "action_regex"):
+            return []
+        return [BASH_TOOL_RESPONSE_API, *context_tools(self.config.context_tools, responses_api=True)]
+
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
             return litellm.responses(
                 model=self.config.model_name,
                 input=messages,
-                tools=[BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API],
+                tools=self.get_tools(),
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:

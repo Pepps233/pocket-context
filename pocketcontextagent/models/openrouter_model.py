@@ -5,7 +5,7 @@ import time
 from typing import Any, Literal
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
@@ -16,7 +16,7 @@ from pocketcontextagent.models.utils.actions_toolcall import (
 )
 from pocketcontextagent.models.utils.anthropic_utils import _reorder_anthropic_thinking_blocks
 from pocketcontextagent.models.utils.cache_control import set_cache_control
-from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL, EXPAND_TOOL
+from pocketcontextagent.models.utils.compact_tool import context_tools
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
 from pocketcontextagent.models.utils.response import has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
@@ -27,6 +27,8 @@ logger = logging.getLogger("openrouter_model")
 class OpenRouterModelConfig(BaseModel):
     model_name: str
     model_kwargs: dict[str, Any] = {}
+    context_tools: Literal["pocket_context", "none", "acm"] = "pocket_context"
+    """Native memory tools exposed alongside bash."""
     set_cache_control: Literal["default_end"] | None = None
     """Set explicit cache control markers, for example for Anthropic models"""
     cost_tracking: Literal["default", "ignore_errors"] = os.getenv("MSWEA_COST_TRACKING", "default")
@@ -40,6 +42,13 @@ class OpenRouterModelConfig(BaseModel):
     """Template used to render the observation after executing an action."""
     multimodal_regex: str = ""
     """Regex to extract multimodal content. Empty string disables multimodal processing."""
+
+    @field_validator("model_kwargs")
+    @classmethod
+    def reject_tool_overrides(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if "tools" in value:
+            raise ValueError("model_kwargs.tools cannot override native tools; configure context_tools instead.")
+        return value
 
 
 class OpenRouterAPIError(Exception):
@@ -62,6 +71,11 @@ class OpenRouterModel:
         self._api_url = "https://openrouter.ai/api/v1/chat/completions"
         self._api_key = os.getenv("OPENROUTER_API_KEY", "")
 
+    def get_tools(self) -> list[dict]:
+        if hasattr(self.config, "action_regex"):
+            return []
+        return [BASH_TOOL, *context_tools(self.config.context_tools)]
+
     def _query(self, messages: list[dict[str, str]], **kwargs):
         headers = {
             "Authorization": f"Bearer {self._api_key}",
@@ -71,9 +85,9 @@ class OpenRouterModel:
         payload = {
             "model": self.config.model_name,
             "messages": messages,
-            "tools": [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL],
             "usage": {"include": True},
             **(self.config.model_kwargs | kwargs),
+            "tools": self.get_tools(),
         }
 
         try:

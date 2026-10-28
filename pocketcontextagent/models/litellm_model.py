@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import litellm
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
@@ -18,7 +18,7 @@ from pocketcontextagent.models.utils.actions_toolcall import (
 )
 from pocketcontextagent.models.utils.anthropic_utils import _reorder_anthropic_thinking_blocks
 from pocketcontextagent.models.utils.cache_control import set_cache_control
-from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL, EXPAND_TOOL
+from pocketcontextagent.models.utils.compact_tool import context_tools
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
 from pocketcontextagent.models.utils.response import has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
@@ -31,6 +31,8 @@ class LitellmModelConfig(BaseModel):
     """Model name. Highly recommended to include the provider in the model name, e.g., `anthropic/claude-sonnet-4-5-20250929`."""
     model_kwargs: dict[str, Any] = {}
     """Additional arguments passed to the API."""
+    context_tools: Literal["pocket_context", "none", "acm"] = "pocket_context"
+    """Native memory tools exposed alongside bash."""
     litellm_model_registry: Path | str | None = os.getenv("LITELLM_MODEL_REGISTRY_PATH")
     """Model registry for cost tracking and model metadata. See the local model guide (https://mini-swe-agent.com/latest/models/local_models/) for more details."""
     set_cache_control: Literal["default_end"] | None = None
@@ -46,6 +48,13 @@ class LitellmModelConfig(BaseModel):
     """Template used to render the observation after executing an action."""
     multimodal_regex: str = ""
     """Regex to extract multimodal content. Empty string disables multimodal processing."""
+
+    @field_validator("model_kwargs")
+    @classmethod
+    def reject_tool_overrides(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if "tools" in value:
+            raise ValueError("model_kwargs.tools cannot override native tools; configure context_tools instead.")
+        return value
 
 
 class LitellmModel:
@@ -63,12 +72,17 @@ class LitellmModel:
         if self.config.litellm_model_registry and Path(self.config.litellm_model_registry).is_file():
             litellm.utils.register_model(json.loads(Path(self.config.litellm_model_registry).read_text()))
 
+    def get_tools(self) -> list[dict]:
+        if hasattr(self.config, "action_regex"):
+            return []
+        return [BASH_TOOL, *context_tools(self.config.context_tools)]
+
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
-                tools=[BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL],
+                tools=self.get_tools(),
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:

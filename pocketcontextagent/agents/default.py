@@ -87,6 +87,7 @@ class DefaultAgent:
             self.env.get_template_vars(),
             self.model.get_template_vars(),
             {
+                "context_tools": getattr(self.model.config, "context_tools", "pocket_context"),
                 "n_model_calls": self.n_calls,
                 "model_cost": self.cost,
                 "elapsed_seconds": int(time.time() - self._start_time),
@@ -254,6 +255,7 @@ class DefaultAgent:
             getattr(self.env, "tokenizer", None),
             text_based=hasattr(self.model.config, "action_regex"),
             reasoning_tokens=retained_reasoning_tokens(messages),
+            tools=self.model.get_tools() if hasattr(self.model, "get_tools") else None,
         )
 
     def prepare_observations(self, messages: list[dict], history: list[dict], *, truncate: bool = True) -> list[dict]:

@@ -19,7 +19,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
 )
-from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API
+from pocketcontextagent.models.utils.compact_tool import context_tools
 from pocketcontextagent.models.utils.response import format_input_message, has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
 
@@ -43,6 +43,11 @@ class OpenRouterResponseModel(OpenRouterModel):
         self.config = OpenRouterResponseModelConfig(**kwargs)
         self._api_url = "https://openrouter.ai/api/v1/responses"
 
+    def get_tools(self) -> list[dict]:
+        if hasattr(self.config, "action_regex"):
+            return []
+        return [BASH_TOOL_RESPONSE_API, *context_tools(self.config.context_tools, responses_api=True)]
+
     def _query(self, messages: list[dict[str, str]], **kwargs):
         headers = {
             "Authorization": f"Bearer {self._api_key}",
@@ -51,8 +56,8 @@ class OpenRouterResponseModel(OpenRouterModel):
         payload = {
             "model": self.config.model_name,
             "input": messages,
-            "tools": [BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API],
             **(self.config.model_kwargs | kwargs),
+            "tools": self.get_tools(),
         }
         try:
             response = requests.post(self._api_url, headers=headers, data=json.dumps(payload), timeout=60)

@@ -253,8 +253,9 @@ class ComparisonAgent(DefaultAgent):
             return call["response"]
         except Exception as exc:
             call["error"] = f"{type(exc).__name__}: {exc}"
-            if isinstance(exc, FormatError) and exc.messages:
-                call["response"] = exc.messages[0]
+            match exc:
+                case FormatError(messages=[response, *_]):
+                    call["response"] = response
             raise ContextOperationError(f"Auxiliary call failed ({type(exc).__name__}); history preserved") from exc
         finally:
             self.cost += call["response"].get("extra", {}).get("cost", 0.0)

@@ -372,7 +372,7 @@ def test_metrics_count_context_calls_and_deduplicate_responses():
             },
         ]
     )
-    assert metrics == {
+    expected_metrics = {
         "peak_input_tokens": 100,
         "peak_total_tokens": 105,
         "total_input_tokens": 415,
@@ -381,7 +381,10 @@ def test_metrics_count_context_calls_and_deduplicate_responses():
         "tool_call_counts": {"search": 1, "compact_block": 1, "expand_block": 1, "submit": 1},
         "total_tool_calls": 4,
     }
-    assert summarize_results([{"metrics": metrics, "status": "completed", "model_stats": {"instance_cost": 0.2}}]) == {
+    for key, value in expected_metrics.items():
+        assert metrics[key] == value
+    summary = summarize_results([{"metrics": metrics, "status": "completed", "model_stats": {"instance_cost": 0.2}}])
+    expected_summary = {
         "tasks": 1,
         "completed": 1,
         "peak_input_tokens": 100,
@@ -391,6 +394,10 @@ def test_metrics_count_context_calls_and_deduplicate_responses():
         "tool_call_counts": metrics["tool_call_counts"],
         "cost_usd": 0.2,
     }
+    for key, value in expected_summary.items():
+        assert summary[key] == value
+    assert summary["success_rate"] is None
+    assert summary["avg_total_tokens_per_task"] == 440
 
 
 @pytest.mark.parametrize(("final_action", "valid"), [([], True), ([{"command": "search bananas"}], True), ([], False)])
@@ -547,3 +554,97 @@ def test_memory_aware_retrieval(bm25_index: Path, tmp_path: Path, expand: bool):
 def test_answer_extraction(text: str, answer: str, confidence: int):
     assert extract_answer(text) == {"final_answer": answer, "confidence": confidence}
     assert BrowseCompPlusEnvironment.is_final_answer(text) == bool(answer)
+
+
+def test_four_method_cli_comparison_with_real_corpus(bm25_index: Path, tmp_path: Path):
+    from pocketcontextagent.run.benchmarks.utils.methods import METHODS
+
+    queries = tmp_path / "queries.jsonl"
+    queries.write_text(json.dumps({"query_id": "smoke", "query": "Which city hosts the festival?", "answer": "SECRET"}))
+    outputs = []
+    for index, command in enumerate(("search jazz festival", "get_document city")):
+        outputs.append(
+            make_toolcall_output(
+                "Gather evidence.",
+                [
+                    {
+                        "id": str(index),
+                        "type": "function",
+                        "function": {"name": "bash", "arguments": json.dumps({"command": command})},
+                    }
+                ],
+                [{"command": command, "tool_call_id": str(index)}],
+            )
+        )
+    outputs.append(make_output("Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%", []))
+    config = tmp_path / "replay.yaml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "model": {
+                    "model_class": "pocketcontextagent.models.test_models.DeterministicToolcallModel",
+                    "model_name": "replay",
+                    "outputs": outputs,
+                },
+                "agent": {"cost_limit": 0},
+            }
+        )
+    )
+    root = tmp_path / "runs"
+    for method in METHODS:
+        result = CliRunner().invoke(
+            app,
+            [
+                "run",
+                "--method",
+                method,
+                "--queries",
+                str(queries),
+                "--index",
+                str(bm25_index),
+                "--output",
+                str(root / method),
+                "--split",
+                "all",
+                "-c",
+                str(config),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        trajectory = (root / method / "trajectories/smoke/trajectory.json").read_text()
+        assert "SECRET" not in trajectory
+        data = json.loads((root / method / "smoke.json").read_text())
+        assert data["status"] == "completed"
+        assert data["metrics"]["latency_seconds"] > 0
+        assert data["metrics"]["cost_usd"] == 3
+        assert data["metrics"]["total_tokens"] is None
+        prompt = json.loads(trajectory)["messages"][0]["content"]
+        assert ("Use compact_block" in prompt) == (method == "pocket_context")
+        assert ("Use manage_context" in prompt) == (method == "acm")
+    comparison = CliRunner().invoke(app, ["compare", "--runs", str(root)])
+    assert comparison.exit_code == 0, comparison.output
+    assert "N/A" in comparison.output and all(method in comparison.output for method in METHODS)
+    failed_output = tmp_path / "failed-attempt"
+    command = [
+        "run",
+        "--method",
+        "react",
+        "--queries",
+        str(queries),
+        "--index",
+        str(bm25_index),
+        "--output",
+        str(failed_output),
+        "--split",
+        "all",
+        "-c",
+        str(config),
+        "-c",
+        "agent.step_limit=1",
+    ]
+    assert CliRunner().invoke(app, command).exit_code == 1
+    before = (failed_output / "smoke.json").stat().st_mtime_ns
+    assert CliRunner().invoke(app, command).exit_code == 1
+    assert (failed_output / "smoke.json").stat().st_mtime_ns == before
+    assert CliRunner().invoke(app, command + ["--redo-existing"]).exit_code == 1
+    assert (failed_output / "smoke.json").stat().st_mtime_ns != before

@@ -407,6 +407,11 @@ class DefaultAgent:
             "info": {
                 "model_stats": {
                     "instance_cost": self.cost,
+                    "cost_available": all(
+                        message.get("extra", {}).get("cost_available", True)
+                        for message in self.messages
+                        + [call["response"] for call in self.compactions + getattr(self, "memory_queries", [])]
+                    ),
                     "api_calls": self.n_calls + sum(bool(call["response"]) for call in self.compactions),
                     "compaction_api_calls": sum(bool(call["response"]) for call in self.compactions),
                 },

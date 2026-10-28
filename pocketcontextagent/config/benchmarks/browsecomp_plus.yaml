@@ -17,14 +17,20 @@ agent:
     At 95% of this budget, you will receive a stop instruction and have exactly one final response.
     Follow that instruction immediately, even if you would otherwise search or manage memory.
 
+    {% if context_tools == 'pocket_context' %}
     Manage context to support accurate task completion.
     Keep details available while they remain useful for reasoning, verification, or upcoming work.
     Use compact_block when replacing older material with a summary would meaningfully help you continue; select IDs from the current context block catalog.
     Use expand_block when you need information from compacted history that is missing or insufficiently detailed in the summary.
+    {% endif %}
     Treat the current-context token marker as planning information.
     Consider the remaining work, available space, and value of retained evidence when choosing whether to continue investigating, compact older history, or produce your final answer.
     Prefer completing the task directly when the existing context is sufficient.
 
+    {% if research_tools == 'corpus' %}
+    Use search(query) to search the fixed corpus and get_document(docid) to read a document.
+    These tools do not access the live web or local files.
+    {% else %}
     The bash tool is a command interface to the corpus, not a shell.
     Its command argument must contain exactly one of:
     - search QUERY TEXT
@@ -32,12 +38,14 @@ agent:
     - submit FINAL RESPONSE
     Everything after the command name is literal text.
     Do not quote arguments, use shell syntax, access files, or search the live web.
-    Search returns up to {{k}} documents with docid, score, snippet, and context_status.
+    {% endif %}
+    Search returns up to {{k}} documents with docid, score, and a document preview.
     New documents have context_status=new; previously seen documents are in_context or compressed.
-    For compressed documents, memory_tags identify the archives containing their evidence.
+    {% if context_tools != 'none' %}For compressed documents, memory_tags identify the archives containing their evidence.{% endif %}
     {% if snippet_tokens %}New previews are capped at {{snippet_tokens}} tokens; seen previews at {{seen_snippet_tokens or snippet_tokens}} tokens.{% endif %}
     {% if document_tokens %}Document retrieval is capped at {{document_tokens}} tokens.{% endif %}
-    When finished, submit the complete final response with submit or respond directly in the required answer format without tool calls.
+    When finished, respond directly in the required answer format without tool calls.
+    {% if research_tools == 'bash' %}You may also submit the complete final response with submit.{% endif %}
   instance_template: |
     Answer this question using the corpus:
 

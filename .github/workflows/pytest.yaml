@@ -32,7 +32,8 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Keep the container-runtime ABI stable instead of following ubuntu-latest upgrades.
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash -l {0}
@@ -54,14 +55,26 @@ jobs:
         run: |
           sudo apt-get install -y bubblewrap
           sudo chmod u+s $(which bwrap)  # ensure we can set uid permissions
-      - name: Install singularity/apptainer
+      - name: Install pinned singularity/apptainer
         run: |
-            sudo apt-get install -y wget
-            cd /tmp
-            wget https://github.com/apptainer/apptainer/releases/download/v1.3.4/apptainer_1.3.4_amd64.deb
-            sudo dpkg -i apptainer_1.3.4_amd64.deb || sudo apt-get install -f -y
-            # Create singularity symlink for compatibility
-            sudo ln -sf /usr/bin/apptainer /usr/bin/singularity
+          sudo apt-get install -y fakeroot uidmap libfuse3-3 squashfs-tools
+          package="$RUNNER_TEMP/apptainer_1.3.4_amd64.deb"
+          curl --fail --location --retry 3 \
+            https://github.com/apptainer/apptainer/releases/download/v1.3.4/apptainer_1.3.4_amd64.deb \
+            --output "$package"
+          sudo apt-get install -y "$package"
+          test "$(apptainer version)" = "1.3.4"
+          sudo apptainer config fakeroot --add "$(id -un)"
+          sudo ln -sf /usr/bin/apptainer /usr/bin/singularity
+      - name: Verify writable fakeroot container execution
+        run: |
+          smoke_root=$(mktemp -d "$RUNNER_TEMP/apptainer-smoke.XXXXXX")
+          trap 'sudo rm -rf "$smoke_root"' EXIT
+          singularity version
+          singularity build --sandbox "$smoke_root/sandbox" docker://python:3.11-slim
+          singularity --quiet exec --contain --cleanenv --fakeroot --writable \
+            "$smoke_root/sandbox" bash -c \
+            'test "$(id -u)" = 0 && touch /usr/pocket-context-ci-smoke && test -f /usr/pocket-context-ci-smoke && echo "fakeroot execution verified"'
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh

@@ -34,6 +34,7 @@ class BrowseCompPlusConfig:
     snippet_tokens: int = 0
     seen_snippet_tokens: int = 0
     document_tokens: int = 0
+    context_tools: str = "pocket_context"
 
 
 class BrowseCompPlusEnvironment:
@@ -47,9 +48,12 @@ class BrowseCompPlusEnvironment:
         snippet_tokens: int = 0,
         seen_snippet_tokens: int = 0,
         document_tokens: int = 0,
+        context_tools: str = "pocket_context",
     ):
+        if context_tools not in ("pocket_context", "none", "acm"):
+            raise ValueError("context_tools must be pocket_context, none, or acm")
         self.config = BrowseCompPlusConfig(
-            k, snippet_chars, tokenizer_name, snippet_tokens, seen_snippet_tokens, document_tokens
+            k, snippet_chars, tokenizer_name, snippet_tokens, seen_snippet_tokens, document_tokens, context_tools
         )
         if k < 1 or min(snippet_chars, snippet_tokens, seen_snippet_tokens, document_tokens) < 0:
             raise ValueError("k must be positive and text limits must be nonnegative")
@@ -96,11 +100,16 @@ class BrowseCompPlusEnvironment:
                 "context_status": "in_context",
                 "hint": f"Seen earlier and still in active context. Use get_document {docid} for source text if needed.",
             }
+        recall = {
+            "pocket_context": "Use expand_block with a memory_tags tag to recover archived evidence, or ",
+            "acm": "Use query_memory with a memory_tags tag and a question to recall evidence, or ",
+            "none": "",
+        }[self.config.context_tools]
         return {
             "previously_retrieved": True,
             "context_status": "compressed",
-            "memory_tags": self.memory_tags.get(docid, []),
-            "hint": f"Seen earlier but compacted. Use expand_block with a memory_tags tag to recover archived evidence, or get_document {docid} for source text.",
+            "memory_tags": self.memory_tags.get(docid, []) if self.config.context_tools != "none" else [],
+            "hint": f"Seen earlier but compacted. {recall}Use get_document {docid} for source text.",
         }
 
     def truncate(self, text: str, limit: int) -> str:

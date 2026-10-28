@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import Path
@@ -12,6 +13,8 @@ from dotenv import load_dotenv
 
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
+from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
 from pocketcontextagent.models import get_model, get_model_name
@@ -55,6 +58,15 @@ def reserve(data_dir: Path = typer.Option(DEFAULT_DATA_DIR)) -> None:
     typer.echo(yaml.safe_dump(reserve_evaluation(data_dir)))
 
 
+def implementation_hash() -> str:
+    root = Path(__file__).resolve().parents[2]
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*.py")):
+        digest.update(str(path.relative_to(root)).encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
 def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retriever, fingerprint: str) -> bool:
     query_id = str(instance["query_id"])
     trajectory_dir = output / "trajectories" / query_id
@@ -66,9 +78,11 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
         | {"output_path": trajectory_dir / "trajectory.json", "context_db_path": trajectory_dir / "context.sqlite"},
         default_type="default",
     )
+    started = time.monotonic()
     try:
         agent.run(instance["query"])
     finally:
+        latency_seconds = time.monotonic() - started
         info = agent.save(trajectory_dir / "trajectory.json")["info"]
         result = {
             "query_id": query_id,
@@ -77,9 +91,20 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
             "retrieved_docids": sorted(env.retrieved_docids),
             "result": [{"type": "output_text", "output": info["submission"]}],
             **extract_answer(info["submission"]),
-            "metadata": {"model": agent.model.config.model_name, "retriever": "BM25", "fingerprint": fingerprint},
+            "metadata": {
+                "model": agent.model.config.model_name,
+                "method": config["agent"].get("agent_class", "default"),
+                "retriever": "BM25",
+                "fingerprint": fingerprint,
+            },
             "model_stats": info["model_stats"],
-            "metrics": episode_metrics(agent.messages + [call["response"] for call in agent.compactions]),
+            "metrics": episode_metrics(
+                agent.messages
+                + [call["response"] for call in agent.compactions]
+                + [call["response"] for call in getattr(agent, "memory_queries", [])],
+                model_stats=info["model_stats"],
+                latency_seconds=latency_seconds,
+            ),
         }
         temporary = output / f"{query_id}.json.tmp"
         temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -96,6 +121,7 @@ def run(
     output: Path = typer.Option(Path("runs/browsecomp-plus/default"), "-o", "--output"),
     model: str | None = typer.Option(None, "-m", "--model", help="Provider/model name; can also be set in config."),
     model_class: str | None = typer.Option(None, help="Existing model interface, e.g. litellm or openrouter."),
+    method: str | None = typer.Option(None, help="Context strategy: pocket_context, react, resum, or acm."),
     config_spec: list[str] = typer.Option([], "-c", "--config", help="YAML or key=value overrides, merged in order."),
     query_id: list[str] = typer.Option([], help="Run only these query IDs (repeatable)."),
     offset: int = typer.Option(0, min=0, help="Skip this many selected queries."),
@@ -113,11 +139,20 @@ def run(
     config["model"]["model_name"] = get_model_name(model, config["model"])
     if model_class:
         config["model"]["model_class"] = model_class
+    if method is not None:
+        config = configure_method(config, method)
     instances = load_instances(queries, split=split, query_ids=query_id, offset=offset, limit=limit)
     manifest = {
         "config": config,
         "split": split,
+        "workers": workers,
+        "retain_recorded_attempts": method is not None or split == "eval150",
+        "selected_query_ids": [str(instance["query_id"]) for instance in instances],
+        "method": method,
+        "method_description": METHODS[method].description if method is not None else "Configured agent",
+        "method_provenance": method_provenance(config, method) if method is not None else None,
         "version": __version__,
+        "implementation_sha256": implementation_hash(),
         "dataset_revision": DATASET_REVISION,
         "index_revision": INDEX_REVISION,
         "queries_sha256": hashlib.sha256(queries.read_bytes()).hexdigest(),
@@ -141,19 +176,38 @@ def run(
             instance
             for instance in instances
             if not (path := output / f"{instance['query_id']}.json").exists()
-            or json.loads(path.read_text())["status"] != "completed"
+            or (not manifest["retain_recorded_attempts"] and json.loads(path.read_text())["status"] != "completed")
         ]
     typer.echo(f"Running {len(instances)} queries; results: {output}")
-    if not instances:
-        return
-    with closing(BM25Retriever(index)) as retriever, ThreadPoolExecutor(max_workers=workers) as executor:
-        completed = list(
-            executor.map(lambda instance: run_instance(instance, output, config, retriever, fingerprint), instances)
-        )
+    if instances:
+        with closing(BM25Retriever(index)) as retriever, ThreadPoolExecutor(max_workers=workers) as executor:
+            list(
+                executor.map(lambda instance: run_instance(instance, output, config, retriever, fingerprint), instances)
+            )
     results = [json.loads(path.read_text()) for path in sorted(output.glob("*.json"))]
     (output / "summary.yaml").write_text(yaml.safe_dump(summarize_results(results)), encoding="utf-8")
-    if not all(completed):
+    if any(result["status"] != "completed" for result in results):
         raise typer.Exit(1)
+
+
+@app.command("compare")
+def compare(
+    runs: Path = typer.Option(..., help="Directory containing pocket_context/, react/, resum/, and acm/ runs."),
+    grades: Path | None = typer.Option(
+        None, help="Directory with matching method subdirectories of upstream *_eval.json files."
+    ),
+    output: Path | None = typer.Option(
+        None, help="Optional YAML report path; never place it in a method's run directory."
+    ),
+) -> None:
+    """Validate matched runs and report the five evaluation metrics without model calls."""
+    report = compare_runs(runs, grades)
+    if output is not None:
+        if output.resolve().parent in {(runs / method).resolve() for method in METHODS}:
+            raise ValueError("Write comparison reports outside individual run directories")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(yaml.safe_dump(report, sort_keys=False), encoding="utf-8")
+    typer.echo(comparison_markdown(report))
 
 
 if __name__ == "__main__":

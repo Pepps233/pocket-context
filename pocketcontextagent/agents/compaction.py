@@ -59,7 +59,15 @@ class CompactionAgent:
         key, _ = output_token_setting(self.model, self.response_token_limit)
         allowance = self.response_token_limit
         if self.context_token_limit:
-            allowance = min(allowance, self.context_token_limit - estimate_tokens(self.messages, self.tokenizer))
+            allowance = min(
+                allowance,
+                self.context_token_limit
+                - estimate_tokens(
+                    self.messages,
+                    self.tokenizer,
+                    tools=self.model.get_tools() if hasattr(self.model, "get_tools") else None,
+                ),
+            )
             if allowance <= 0:
                 raise ContextOperationError("Compaction prefix exceeds the context window; select an earlier end bound")
         self.response = self.model.query(self.messages, final_answer=True, **{key: allowance})

@@ -3,6 +3,7 @@
 Run Pocket Context Agent on [BrowseComp-Plus](https://github.com/texttron/BrowseComp-Plus), a research benchmark with 830 questions and a fixed corpus of 100,195 documents.
 This integration uses the official Lucene BM25 index and exports the files expected by the upstream evaluator.
 It runs this repository's agent and context tools, so its trajectories differ from the upstream baseline agents.
+For matched Pocket Context, ReAct, ReSum, and ACM experiments, see [Context-method comparison](context_comparison.md).
 
 ## Install and prepare
 
@@ -153,8 +154,8 @@ Create a fresh pool after application changes or after idle deletion.
 
 Use repeated `--query-id ID`, `--offset N`, and `--limit N` to select queries in dataset order.
 `--queries FILE` accepts an alternative decrypted JSONL with `query_id` and `query` fields, and `--index DIR` accepts an alternative Lucene index.
-Runs automatically skip completed queries, retry incomplete queries, and reject changed settings in an existing output directory.
-Use `--redo-existing` to rerun completed queries with the same settings.
+Local development runs without `--method` skip completed queries and retry incomplete queries. Explicit method runs and local `eval150` runs retain all recorded attempts, including failures, to avoid retry-until-success bias. Runs reject changed settings in an existing output directory.
+Use `--redo-existing` to explicitly replace recorded attempts with the same settings; use fresh directories for independent evaluation repeats.
 A batch exits with status 1 if any query does not finish by submission, while preserving its failure record and trajectory.
 Unexpected exceptions preserve the current query's record and propagate to the caller.
 

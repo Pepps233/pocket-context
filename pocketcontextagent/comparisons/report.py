@@ -7,14 +7,15 @@ from pathlib import Path
 
 import yaml
 
-from pocketcontextagent.run.benchmarks.utils.methods import METHODS
+from pocketcontextagent.comparisons.registry import METHOD_AGENT_FIELDS, METHODS, configure_method, method_provenance
 from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
 
 
 def shared_settings(manifest: dict) -> dict:
     config = copy.deepcopy(manifest["config"])
     config["agent"].pop("agent_class", None)
-    config["agent"].pop("resum_token_threshold", None)
+    for key in METHOD_AGENT_FIELDS:
+        config["agent"].pop(key, None)
     config["model"].pop("context_tools", None)
     config["environment"].pop("context_tools", None)
     return {
@@ -47,6 +48,13 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
         manifest = yaml.safe_load((directory / "run.yaml").read_text())
         if manifest.get("method") != method:
             raise ValueError(f"{directory}: expected a run created with --method {method}")
+        expected = configure_method(manifest["config"], method)
+        if expected != manifest["config"]:
+            raise ValueError(
+                f"{method}: method-specific prompts or native tool configuration differ from the versioned port"
+            )
+        if manifest.get("method_provenance") != method_provenance(manifest["config"], method):
+            raise ValueError(f"{method}: missing or changed method provenance")
         settings = shared_settings(manifest)
         if reference is not None and reference != settings:
             raise ValueError(
@@ -88,7 +96,14 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
                     judge_settings = identity
                     result["correct"] = correct if result["status"] == "completed" else False
         rows[method] = summarize_results(results)
-    return {"settings": reference, "judge": judge_settings, "methods": rows}
+    return {
+        "settings": reference,
+        "judge": judge_settings,
+        "methods": rows,
+        "method_provenance": {
+            name: yaml.safe_load((runs / name / "run.yaml").read_text())["method_provenance"] for name in METHODS
+        },
+    }
 
 
 def comparison_markdown(report: dict) -> str:

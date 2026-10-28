@@ -557,12 +557,16 @@ def test_answer_extraction(text: str, answer: str, confidence: int):
 
 
 def test_four_method_cli_comparison_with_real_corpus(bm25_index: Path, tmp_path: Path):
-    from pocketcontextagent.run.benchmarks.utils.methods import METHODS
+    from pocketcontextagent.comparisons.registry import METHODS
 
     queries = tmp_path / "queries.jsonl"
     queries.write_text(json.dumps({"query_id": "smoke", "query": "Which city hosts the festival?", "answer": "SECRET"}))
     outputs = []
-    for index, command in enumerate(("search jazz festival", "get_document city")):
+    from pocketcontextagent.models.utils.compact_tool import parse_native_calls
+
+    for index, (name, arguments) in enumerate(
+        (("search", {"query": "jazz festival"}), ("get_document", {"docid": "city"}))
+    ):
         outputs.append(
             make_toolcall_output(
                 "Gather evidence.",
@@ -570,10 +574,10 @@ def test_four_method_cli_comparison_with_real_corpus(bm25_index: Path, tmp_path:
                     {
                         "id": str(index),
                         "type": "function",
-                        "function": {"name": "bash", "arguments": json.dumps({"command": command})},
+                        "function": {"name": name, "arguments": json.dumps(arguments)},
                     }
                 ],
-                [{"command": command, "tool_call_id": str(index)}],
+                parse_native_calls([{"id": str(index), "name": name, "arguments": json.dumps(arguments)}]),
             )
         )
     outputs.append(make_output("Explanation: Jazz [city].\nExact Answer: Montréal\nConfidence: 100%", []))
@@ -620,7 +624,9 @@ def test_four_method_cli_comparison_with_real_corpus(bm25_index: Path, tmp_path:
         assert data["metrics"]["total_tokens"] is None
         prompt = json.loads(trajectory)["messages"][0]["content"]
         assert ("Use compact_block" in prompt) == (method == "pocket_context")
-        assert ("Use manage_context" in prompt) == (method == "acm")
+        assert ('The "manage_context" tool takes no arguments.' in prompt) == (method == "acm")
+        assert json.loads((root / method / "smoke.json").read_text())["metadata"]["fingerprint"]
+        assert yaml.safe_load((root / method / "run.yaml").read_text())["method_provenance"]["name"] == method
     comparison = CliRunner().invoke(app, ["compare", "--runs", str(root)])
     assert comparison.exit_code == 0, comparison.output
     assert "N/A" in comparison.output and all(method in comparison.output for method in METHODS)

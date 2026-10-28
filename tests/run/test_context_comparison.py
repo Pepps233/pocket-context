@@ -6,9 +6,9 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.run.benchmarks.browsecomp_plus import app
-from pocketcontextagent.run.benchmarks.utils.comparison import compare_runs, comparison_markdown
-from pocketcontextagent.run.benchmarks.utils.methods import METHODS, configure_method
 from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics
 
 
@@ -34,6 +34,7 @@ def write_runs(root: Path) -> None:
             "index_files": [["segments_1", 10, 1]],
             "implementation_sha256": "source",
         }
+        manifest["method_provenance"] = method_provenance(manifest["config"], method)
         (directory / "run.yaml").write_text(yaml.safe_dump(manifest))
         fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
         for iid in ("a", "b"):
@@ -91,7 +92,21 @@ def test_matched_report_requires_grading_and_counts_failed_tasks(tmp_path: Path)
 
 @pytest.mark.parametrize(
     ("mutation",),  # noqa: PT006
-    [(value,) for value in ("budget", "workers", "task", "fingerprint", "method", "extra-result", "missing-result")],
+    [
+        (value,)
+        for value in (
+            "budget",
+            "workers",
+            "task",
+            "fingerprint",
+            "method",
+            "method-prompt",
+            "pressure",
+            "provenance",
+            "extra-result",
+            "missing-result",
+        )
+    ],
 )
 def test_report_rejects_unmatched_or_partial_runs(tmp_path: Path, mutation: str):
     write_runs(tmp_path)
@@ -105,6 +120,12 @@ def test_report_rejects_unmatched_or_partial_runs(tmp_path: Path, mutation: str)
         manifest["selected_query_ids"] = ["different"]
     elif mutation == "method":
         manifest["method"] = "react"
+    elif mutation == "method-prompt":
+        manifest["config"]["agent"]["system_template"] = "A different memory policy"
+    elif mutation == "pressure":
+        manifest["config"]["agent"]["context_pressure_fraction"] = 0.1
+    elif mutation == "provenance":
+        manifest["method_provenance"]["revision"] = "different-revision"
     elif mutation == "fingerprint":
         result = json.loads((directory / "a.json").read_text())
         result["metadata"]["fingerprint"] = "stale"

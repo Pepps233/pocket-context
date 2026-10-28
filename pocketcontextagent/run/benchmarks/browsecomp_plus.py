@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
+from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
 from pocketcontextagent.models import get_model, get_model_name
@@ -25,8 +27,6 @@ from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
     prepare_data,
     reserve_evaluation,
 )
-from pocketcontextagent.run.benchmarks.utils.comparison import compare_runs, comparison_markdown
-from pocketcontextagent.run.benchmarks.utils.methods import METHODS, configure_method
 from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics, summarize_results
 from pocketcontextagent.utils.serialize import recursive_merge
 
@@ -150,6 +150,7 @@ def run(
         "selected_query_ids": [str(instance["query_id"]) for instance in instances],
         "method": method,
         "method_description": METHODS[method].description if method is not None else "Configured agent",
+        "method_provenance": method_provenance(config, method) if method is not None else None,
         "version": __version__,
         "implementation_sha256": implementation_hash(),
         "dataset_revision": DATASET_REVISION,

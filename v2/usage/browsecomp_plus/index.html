@@ -11,7 +11,7 @@
         <link rel="prev" href="../programbench/">
       
       
-        <link rel="next" href="../inspector/">
+        <link rel="next" href="../context_comparison/">
       
       
         
@@ -553,6 +553,8 @@
       
         
       
+        
+      
     
     
     
@@ -850,6 +852,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context-method comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2773,7 +2803,8 @@
 <h1 id="browsecomp-plus">BrowseComp-Plus</h1>
 <p>Run Pocket Context Agent on <a href="https://github.com/texttron/BrowseComp-Plus">BrowseComp-Plus</a>, a research benchmark with 830 questions and a fixed corpus of 100,195 documents.
 This integration uses the official Lucene BM25 index and exports the files expected by the upstream evaluator.
-It runs this repository's agent and context tools, so its trajectories differ from the upstream baseline agents.</p>
+It runs this repository's agent and context tools, so its trajectories differ from the upstream baseline agents.
+For matched Pocket Context, ReAct, ReSum, and ACM experiments, see <a href="../context_comparison/">Context-method comparison</a>.</p>
 <h2 id="install-and-prepare">Install and prepare</h2>
 <p>Use Python 3.11 and Java 21 with <code>java</code> on your <code>PATH</code>.
 Set <code>JAVA_HOME</code> to your Java 21 installation if your machine has several Java versions.
@@ -2903,8 +2934,8 @@ Use <code>daytona status</code> to inspect workers and <code>daytona delete</cod
 Create a fresh pool after application changes or after idle deletion.</p>
 <p>Use repeated <code>--query-id ID</code>, <code>--offset N</code>, and <code>--limit N</code> to select queries in dataset order.
 <code>--queries FILE</code> accepts an alternative decrypted JSONL with <code>query_id</code> and <code>query</code> fields, and <code>--index DIR</code> accepts an alternative Lucene index.
-Runs automatically skip completed queries, retry incomplete queries, and reject changed settings in an existing output directory.
-Use <code>--redo-existing</code> to rerun completed queries with the same settings.
+Local development runs without <code>--method</code> skip completed queries and retry incomplete queries. Explicit method runs and local <code>eval150</code> runs retain all recorded attempts, including failures, to avoid retry-until-success bias. Runs reject changed settings in an existing output directory.
+Use <code>--redo-existing</code> to explicitly replace recorded attempts with the same settings; use fresh directories for independent evaluation repeats.
 A batch exits with status 1 if any query does not finish by submission, while preserving its failure record and trajectory.
 Unexpected exceptions preserve the current query's record and propagate to the caller.</p>
 <p>Each run contains:</p>
@@ -3042,13 +3073,13 @@ They verify retrieval, token caps and markers, document lookup, answer extractio
         
         
           
-          <a href="../inspector/" class="md-footer__link md-footer__link--next" aria-label="Next: Inspector">
+          <a href="../context_comparison/" class="md-footer__link md-footer__link--next" aria-label="Next: Context-method comparison">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Inspector
+                Context-method comparison
               </div>
             </div>
             <div class="md-footer__button md-icon">

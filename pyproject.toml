@@ -113,7 +113,7 @@ where = ["."]
 include = ["pocketcontextagent*"]
 
 [tool.setuptools.package-data]
-pocketcontextagent = ["config/**/*"]
+pocketcontextagent = ["config/**/*", "comparisons/upstream/*"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

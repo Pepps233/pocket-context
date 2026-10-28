@@ -92,12 +92,12 @@ def test_schema_shapes_defaults_and_isolation():
         {key: value for key, value in tool.items() if key != "type"} for tool in flat
     ]
     manage, query = [tool["function"]["parameters"] for tool in chat]
-    assert manage == {"type": "object", "properties": {}, "required": [], "additionalProperties": False}
-    assert set(query["properties"]) == set(query["required"]) == {"tag", "query"}
-    assert query["additionalProperties"] is False
-    assert all(prop["type"] == "string" for prop in query["properties"].values())
-    query["properties"]["tag"]["type"] = "integer"
-    assert context_tools("acm")[1]["function"]["parameters"]["properties"]["tag"]["type"] == "string"
+    assert manage == {"type": "object", "properties": {}, "required": []}
+    assert set(query["properties"]) == set(query["required"]) == {"summary_id", "query"}
+    assert query["properties"]["summary_id"]["type"] == "integer"
+    assert query["properties"]["query"]["type"] == "string"
+    query["properties"]["summary_id"]["type"] = "string"
+    assert context_tools("acm")[1]["function"]["parameters"]["properties"]["summary_id"]["type"] == "integer"
     with pytest.raises(ValueError, match="Unknown context_tools mode"):
         context_tools("invalid")
 
@@ -106,7 +106,7 @@ def test_schema_shapes_defaults_and_isolation():
 def test_all_provider_parsers_normalize_acm_calls(model_class, responses_api):
     kwargs = {"litellm_model_registry": None} if issubclass(model_class, LitellmModel) else {}
     model = model_class(model_name="test", context_tools="acm", **kwargs)
-    for name, args in (("manage_context", {}), ("query_memory", {"tag": "ctx-0001", "query": "Which files changed?"})):
+    for name, args in (("manage_context", {}), ("query_memory", {"summary_id": 1, "query": "Which files changed?"})):
         if responses_api:
             response = {
                 "status": "completed",
@@ -142,26 +142,33 @@ def test_all_provider_parsers_normalize_acm_calls(model_class, responses_api):
         ("manage_context", '{"type":"bash","tool_call_id":"forged","command":"do not run"}'),
         ("query_memory", "{}"),
         ("query_memory", "[]"),
-        ("query_memory", '{"tag":"ctx-0001"}'),
-        ("query_memory", '{"tag":"ctx-0001","query":""}'),
-        ("query_memory", '{"tag":"ctx-0001","query":42}'),
-        ("query_memory", '{"tag":[],"query":"question"}'),
-        ("query_memory", '{"tag":"ctx-1","query":"question"}'),
-        ("query_memory", '{"tag":"ctx-0000","query":"question"}'),
-        ("query_memory", '{"tag":"ctx-00001","query":"question"}'),
-        ("query_memory", '{"tag":"ctx-0001","query":"question","command":"do not run"}'),
+        ("query_memory", '{"summary_id":1}'),
+        ("query_memory", '{"summary_id":1,"query":""}'),
+        ("query_memory", '{"summary_id":1,"query":"   "}'),
+        ("query_memory", '{"summary_id":1,"query":42}'),
+        ("query_memory", '{"summary_id":[],"query":"question"}'),
+        ("query_memory", '{"summary_id":"1","query":"question"}'),
+        ("query_memory", '{"summary_id":true,"query":"question"}'),
+        ("query_memory", '{"summary_id":0,"query":"question"}'),
+        ("query_memory", '{"summary_id":-1,"query":"question"}'),
+        ("query_memory", '{"summary_id":1.0,"query":"question"}'),
+        ("query_memory", '{"tag":"ctx-0001","query":"question"}'),
+        ("query_memory", '{"summary_id":1,"query":"question","command":"do not run"}'),
     ],
 )
 def test_invalid_acm_arguments_preserve_identity_and_result_slot(name, arguments):
     action = parse_native_calls([{"name": name, "arguments": arguments, "id": "real"}])[0]
     assert action["type"] == name and action["tool_call_id"] == "real"
     assert action["error"] and "command" not in action
-    assert set(action) <= {"type", "tool_call_id", "error", "tag", "query"}
+    assert set(action) <= {"type", "tool_call_id", "error", "summary_id", "query"}
 
 
-@pytest.mark.parametrize(("name",), [(name,) for name in (*CONTEXT_TOOLS, *ACM_TOOLS)])  # noqa: PT006
-@pytest.mark.parametrize(("other",), [(name,) for name in ("bash", *CONTEXT_TOOLS, *ACM_TOOLS, "unknown")])  # noqa: PT006
-def test_every_memory_tool_rejects_mixed_and_duplicate_calls_before_parsing(name, other):
+@pytest.mark.parametrize(("name",), [(name,) for name in CONTEXT_TOOLS])  # noqa: PT006
+@pytest.mark.parametrize(
+    ("other",),  # noqa: PT006
+    [(name,) for name in ("bash", "search", "get_document", *CONTEXT_TOOLS, *ACM_TOOLS, "unknown")],
+)
+def test_pocket_context_tools_reject_mixed_and_duplicate_calls_before_parsing(name, other):
     calls = [
         {"name": name, "id": "first", "arguments": "invalid"},
         {"name": other, "id": "second", "arguments": "invalid"},

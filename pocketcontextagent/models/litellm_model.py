@@ -9,6 +9,7 @@ from typing import Any, Literal
 import litellm
 from pydantic import BaseModel, field_validator
 
+from pocketcontextagent.comparisons.tools import corpus_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.utils.actions_toolcall import (
@@ -18,7 +19,7 @@ from pocketcontextagent.models.utils.actions_toolcall import (
 )
 from pocketcontextagent.models.utils.anthropic_utils import _reorder_anthropic_thinking_blocks
 from pocketcontextagent.models.utils.cache_control import set_cache_control
-from pocketcontextagent.models.utils.compact_tool import context_tools
+from pocketcontextagent.models.utils.compact_tool import context_tools, native_request_kwargs
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
 from pocketcontextagent.models.utils.response import has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
@@ -32,7 +33,9 @@ class LitellmModelConfig(BaseModel):
     model_kwargs: dict[str, Any] = {}
     """Additional arguments passed to the API."""
     context_tools: Literal["pocket_context", "none", "acm"] = "pocket_context"
-    """Native memory tools exposed alongside bash."""
+    """Native memory tools exposed alongside the configured research tools."""
+    research_tools: Literal["bash", "corpus"] = "bash"
+    """Use bash by default or the native comparison corpus search tools."""
     litellm_model_registry: Path | str | None = os.getenv("LITELLM_MODEL_REGISTRY_PATH")
     """Model registry for cost tracking and model metadata. See the local model guide (https://mini-swe-agent.com/latest/models/local_models/) for more details."""
     set_cache_control: Literal["default_end"] | None = None
@@ -75,15 +78,17 @@ class LitellmModel:
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        return [BASH_TOOL, *context_tools(self.config.context_tools)]
+        research = corpus_tools(self.config.context_tools) if self.config.research_tools == "corpus" else [BASH_TOOL]
+        return [*research, *context_tools(self.config.context_tools)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
-                tools=self.get_tools(),
-                **(self.config.model_kwargs | kwargs),
+                **native_request_kwargs(
+                    tools=self.get_tools(), model_kwargs=self.config.model_kwargs, overrides=kwargs
+                ),
             )
         except litellm.exceptions.AuthenticationError as e:
             e.message += " You can permanently set your API key with `mini-extra config set KEY VALUE`."
@@ -133,13 +138,15 @@ class LitellmModel:
         }
         return message
 
-    def _calculate_cost(self, response) -> dict[str, float]:
+    def _calculate_cost(self, response) -> dict[str, float | bool]:
+        available = True
         try:
             cost = litellm.cost_calculator.completion_cost(response, model=self.config.model_name)
             if cost <= 0.0:
                 raise ValueError(f"Cost must be > 0.0, got {cost}")
         except Exception as e:
             cost = 0.0
+            available = False
             if self.config.cost_tracking != "ignore_errors":
                 msg = (
                     f"Error calculating cost for model {self.config.model_name}: {e}, perhaps it's not registered? "
@@ -151,7 +158,7 @@ class LitellmModel:
                 )
                 logger.critical(msg)
                 raise RuntimeError(msg) from e
-        return {"cost": cost}
+        return {"cost": cost, "cost_available": available}
 
     def _parse_actions(self, response) -> list[dict]:
         """Parse tool calls from the response. Raises FormatError if unknown tool."""

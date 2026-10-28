@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import litellm
 
+from pocketcontextagent.comparisons.tools import corpus_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.litellm_model import LitellmModel, LitellmModelConfig
@@ -13,7 +14,7 @@ from pocketcontextagent.models.utils.actions_toolcall_response import (
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
 )
-from pocketcontextagent.models.utils.compact_tool import context_tools
+from pocketcontextagent.models.utils.compact_tool import context_tools, native_request_kwargs
 from pocketcontextagent.models.utils.response import format_input_message, has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
 
@@ -42,15 +43,21 @@ class LitellmResponseModel(LitellmModel):
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        return [BASH_TOOL_RESPONSE_API, *context_tools(self.config.context_tools, responses_api=True)]
+        research = (
+            corpus_tools(self.config.context_tools, responses_api=True)
+            if self.config.research_tools == "corpus"
+            else [BASH_TOOL_RESPONSE_API]
+        )
+        return [*research, *context_tools(self.config.context_tools, responses_api=True)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
             return litellm.responses(
                 model=self.config.model_name,
                 input=messages,
-                tools=self.get_tools(),
-                **(self.config.model_kwargs | kwargs),
+                **native_request_kwargs(
+                    tools=self.get_tools(), model_kwargs=self.config.model_kwargs, overrides=kwargs, responses_api=True
+                ),
             )
         except litellm.exceptions.AuthenticationError as e:
             e.message += " You can permanently set your API key with `mini-extra config set KEY VALUE`."

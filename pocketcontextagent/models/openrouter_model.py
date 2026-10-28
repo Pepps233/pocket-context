@@ -7,6 +7,7 @@ from typing import Any, Literal
 import requests
 from pydantic import BaseModel, field_validator
 
+from pocketcontextagent.comparisons.tools import corpus_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.utils.actions_toolcall import (
@@ -16,7 +17,7 @@ from pocketcontextagent.models.utils.actions_toolcall import (
 )
 from pocketcontextagent.models.utils.anthropic_utils import _reorder_anthropic_thinking_blocks
 from pocketcontextagent.models.utils.cache_control import set_cache_control
-from pocketcontextagent.models.utils.compact_tool import context_tools
+from pocketcontextagent.models.utils.compact_tool import context_tools, native_request_kwargs
 from pocketcontextagent.models.utils.openai_multimodal import expand_multimodal_content
 from pocketcontextagent.models.utils.response import has_tool_calls
 from pocketcontextagent.models.utils.retry import retry
@@ -28,7 +29,9 @@ class OpenRouterModelConfig(BaseModel):
     model_name: str
     model_kwargs: dict[str, Any] = {}
     context_tools: Literal["pocket_context", "none", "acm"] = "pocket_context"
-    """Native memory tools exposed alongside bash."""
+    """Native memory tools exposed alongside the configured research tools."""
+    research_tools: Literal["bash", "corpus"] = "bash"
+    """Use bash by default or the native comparison corpus search tools."""
     set_cache_control: Literal["default_end"] | None = None
     """Set explicit cache control markers, for example for Anthropic models"""
     cost_tracking: Literal["default", "ignore_errors"] = os.getenv("MSWEA_COST_TRACKING", "default")
@@ -74,7 +77,8 @@ class OpenRouterModel:
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        return [BASH_TOOL, *context_tools(self.config.context_tools)]
+        research = corpus_tools(self.config.context_tools) if self.config.research_tools == "corpus" else [BASH_TOOL]
+        return [*research, *context_tools(self.config.context_tools)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):
         headers = {
@@ -86,8 +90,7 @@ class OpenRouterModel:
             "model": self.config.model_name,
             "messages": messages,
             "usage": {"include": True},
-            **(self.config.model_kwargs | kwargs),
-            "tools": self.get_tools(),
+            **native_request_kwargs(tools=self.get_tools(), model_kwargs=self.config.model_kwargs, overrides=kwargs),
         }
 
         try:
@@ -144,7 +147,7 @@ class OpenRouterModel:
         }
         return message
 
-    def _calculate_cost(self, response) -> dict[str, float]:
+    def _calculate_cost(self, response) -> dict[str, float | bool]:
         usage = response.get("usage", {})
         cost = usage.get("cost", 0.0)
         if cost <= 0.0 and self.config.cost_tracking != "ignore_errors":
@@ -155,7 +158,7 @@ class OpenRouterModel:
                 "(for example for free/local models), more information at https://klieret.short.gy/mini-local-models "
                 "for more details. Still stuck? Please open a github issue at https://github.com/SWE-agent/mini-swe-agent/issues/new/choose!"
             )
-        return {"cost": cost}
+        return {"cost": cost, "cost_available": "cost" in usage and cost >= 0.0}
 
     def _parse_actions(self, response: dict) -> list[dict]:
         """Parse tool calls from the response. Raises FormatError if unknown tool."""

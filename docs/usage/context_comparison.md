@@ -48,16 +48,28 @@ Detailed source-file provenance, transport/batching decisions and licenses ship 
 
 Follow [BrowseComp-Plus setup](browsecomp_plus.md), including Java 21, the pinned corpus and model credentials. Tune only on `development680`.
 
+The examples below use `browsecomp_plus_deepseek`: direct `deepseek/deepseek-flash` inference through LiteLLM at `https://api.deepseek.com`, using `DEEPSEEK_API_KEY` from your shell or ignored `.env`. No OpenRouter key is required. Thinking is enabled with high effort. The experimental cap remains 128,000 tokens even when the provider supports a larger window. The Qwen corpus tokenizer is deliberately retained for consistent preview/document caps; context estimates are not exact DeepSeek chat-template token counts, while measured usage comes from the provider.
+
+Use this profile **instead of**, not after, `browsecomp_plus_openrouter`; merging provider profiles can retain incompatible routing options. DeepSeek changes the policy model, not just its credentials. All four methods must use this same profile and fresh output directories, separate from any Qwen/OpenRouter results. DeepSeek's model alias can change its served checkpoint; retain raw responses and record the evaluation date rather than assuming immutable weights. See [DeepSeek's current model documentation](https://api-docs.deepseek.com/) and [thinking/tool-call requirements](https://api-docs.deepseek.com/guides/thinking_mode).
+
 ```bash
 for method in pocket_context react resum acm; do
   mini-extra browsecomp-plus run \
     --method "$method" --split development680 --limit 1 \
-    -c browsecomp_plus_openrouter \
+    -c browsecomp_plus_deepseek \
     --output "runs/browsecomp-plus/dev-comparison/$method"
 done
 ```
 
 These commands incur model costs. The comparison/reporting command below makes no model calls. Alternatively pass identical `--model`, `--model-class` and common YAML overrides to each run.
+
+### Muse Spark 1.3 Contributor
+
+Use `-c browsecomp_plus_muse_spark_1_3_contributor` **instead of** the DeepSeek profile to evaluate the exact `meta/muse-spark-1.3-contributor` model. It calls Meta directly at `https://api.meta.ai/v1`, loading `META_API_KEY` from your shell or ignored `.env`. It never substitutes `muse-spark-1.3` (Standard) or `muse-spark-1.2-contributor`. Keep separate output directories, for example `runs/browsecomp-plus/muse-1.3-contributor-dev/METHOD/`, and use the same profile for all four methods. Never layer provider profiles or mix their result directories.
+
+The profile uses stateless Responses API requests with `store: false` and `include: [reasoning.encrypted_content]`, preserving opaque reasoning items during active tool-turn replay. Reasoning effort is `high`, not `max`, which Contributor does not support. Human-readable reasoning summaries are requested with `summary: auto` but may be absent; summarizers cannot read the encrypted reasoning itself. The same 128,000-token experimental window, main-call/output allowances, corpus limits and cost/time thresholds apply. Provider-reported usage includes reasoning tokens; estimated context uses the fixed corpus tokenizer and retained-reasoning accounting.
+
+**Contributor is a data-contribution mode, not just a model name or discount.** Meta's [pricing and data-use documentation](https://ai.developer.meta.com/docs/pricing-rate-limits) says it may use your submitted prompts, code, files, context and returned responses to train future models. `store: false` disables server-managed response storage; it does not revoke Contributor training permission. Confirm that this is acceptable for your benchmark/data policy before submitting held-out tasks. Configuration and read-only model-catalog checks do not submit benchmark content. No automatic inference, account-mode changes or Standard-mode fallback are performed. See [Meta reasoning/replay behavior](https://ai.developer.meta.com/docs/reasoning).
 
 `--method` is applied after YAML overrides. It selects the method's class, native research/memory schemas and, for baseline ports, canonical published policy/answer prompts. Literal prompt placeholders are preserved rather than accidentally interpreted as Jinja variables. Method-specific prompts are allowed to differ: forcing Pocket Context's prompt onto every baseline would change the methods being tested.
 
@@ -71,7 +83,7 @@ Cost and wall-time thresholds include auxiliary inference and are checked betwee
 for method in pocket_context react resum acm; do
   mini-extra browsecomp-plus run \
     --method "$method" --split eval150 --workers 4 \
-    -c browsecomp_plus_openrouter \
+    -c browsecomp_plus_deepseek \
     --output "runs/browsecomp-plus/eval-comparison/$method"
 done
 ```

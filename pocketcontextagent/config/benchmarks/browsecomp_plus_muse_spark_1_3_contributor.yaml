@@ -1,0 +1,34 @@
+# Exact Contributor-mode model. Do not substitute muse-spark-1.3 (Standard mode).
+# LiteLLM reads META_API_KEY from the environment; never put the key in YAML.
+# Contributor mode permits Meta to use request/response content for training.
+agent:
+  context_token_limit: 128000
+  step_limit: 100
+  cost_limit: 0.5
+  wall_time_limit_seconds: 1800
+environment:
+  k: 10
+  # Fixed corpus tokenization across provider comparisons, not Meta's chat template.
+  tokenizer_name: Qwen/Qwen3.5-9B
+  snippet_tokens: 512
+  seen_snippet_tokens: 128
+  document_tokens: 8192
+model:
+  # Stateless Responses replay preserves encrypted reasoning across tool turns.
+  model_class: litellm_response
+  model_name: meta/muse-spark-1.3-contributor
+  cost_tracking: default
+  model_kwargs:
+    api_base: https://api.meta.ai/v1
+    max_output_tokens: 16384
+    tool_choice: auto
+    reasoning:
+      effort: high
+      summary: auto
+    include:
+      - reasoning.encrypted_content
+    store: false
+  observation_template: |
+    {{output.output}}
+    Model calls remaining: {{step_limit - n_model_calls}}.
+    Submit your best supported answer before the call limit is exhausted.

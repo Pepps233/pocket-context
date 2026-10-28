@@ -1,0 +1,33 @@
+# Direct DeepSeek API; LiteLLM reads DEEPSEEK_API_KEY from the environment.
+# Keep the 128K experimental cap even when the provider supports a larger window.
+agent:
+  context_token_limit: 128000
+  step_limit: 100
+  cost_limit: 0.5
+  wall_time_limit_seconds: 1800
+environment:
+  k: 10
+  # Keep corpus preview/document tokenization fixed across the comparison.
+  # This is not the DeepSeek chat-template tokenizer; context counts are estimates.
+  tokenizer_name: Qwen/Qwen3.5-9B
+  snippet_tokens: 512
+  seen_snippet_tokens: 128
+  document_tokens: 8192
+model:
+  model_class: litellm
+  model_name: deepseek/deepseek-flash
+  cost_tracking: default
+  model_kwargs:
+    api_base: https://api.deepseek.com
+    max_tokens: 16384
+    tool_choice: auto
+    thinking:
+      type: enabled
+    # Forward the effort explicitly; some LiteLLM versions map the standard
+    # reasoning_effort option to a thinking toggle without forwarding its value.
+    extra_body:
+      reasoning_effort: high
+  observation_template: |
+    {{output.output}}
+    Model calls remaining: {{step_limit - n_model_calls}}.
+    Submit your best supported answer before the call limit is exhausted.

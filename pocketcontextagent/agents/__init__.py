@@ -8,9 +8,9 @@ from pocketcontextagent import Agent, Environment, Model
 _AGENT_MAPPING = {
     "default": "pocketcontextagent.agents.default.DefaultAgent",
     "interactive": "pocketcontextagent.agents.interactive.InteractiveAgent",
-    "react": "pocketcontextagent.agents.baselines.ReActAgent",
-    "resum": "pocketcontextagent.agents.baselines.ReSumAgent",
-    "acm": "pocketcontextagent.agents.baselines.ACMAgent",
+    "react": "pocketcontextagent.comparisons.methods.react.ReActAgent",
+    "resum": "pocketcontextagent.comparisons.methods.resum.ReSumAgent",
+    "acm": "pocketcontextagent.comparisons.methods.acm.ACMAgent",
 }
 
 

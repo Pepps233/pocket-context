@@ -35,6 +35,7 @@ class BrowseCompPlusConfig:
     seen_snippet_tokens: int = 0
     document_tokens: int = 0
     context_tools: str = "pocket_context"
+    research_tools: str = "bash"
 
 
 class BrowseCompPlusEnvironment:
@@ -49,11 +50,21 @@ class BrowseCompPlusEnvironment:
         seen_snippet_tokens: int = 0,
         document_tokens: int = 0,
         context_tools: str = "pocket_context",
+        research_tools: str = "bash",
     ):
         if context_tools not in ("pocket_context", "none", "acm"):
             raise ValueError("context_tools must be pocket_context, none, or acm")
+        if research_tools not in ("bash", "corpus"):
+            raise ValueError("research_tools must be bash or corpus")
         self.config = BrowseCompPlusConfig(
-            k, snippet_chars, tokenizer_name, snippet_tokens, seen_snippet_tokens, document_tokens, context_tools
+            k,
+            snippet_chars,
+            tokenizer_name,
+            snippet_tokens,
+            seen_snippet_tokens,
+            document_tokens,
+            context_tools,
+            research_tools,
         )
         if k < 1 or min(snippet_chars, snippet_tokens, seen_snippet_tokens, document_tokens) < 0:
             raise ValueError("k must be positive and text limits must be nonnegative")
@@ -65,6 +76,9 @@ class BrowseCompPlusEnvironment:
 
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.retriever = retriever
+        self.reset()
+
+    def reset(self) -> None:
         self.tool_call_counts = {"search": 0, "get_document": 0}
         self.retrieved_docids: set[str] = set()
         self.in_context_docids: set[str] = set()
@@ -89,7 +103,13 @@ class BrowseCompPlusEnvironment:
                 for key in event["selected_ids"]
                 for docid in context.records[key].message.get("extra", {}).get("docids", [])
             }:
-                self.memory_tags.setdefault(docid, []).append(f"ctx-{event['revision']:04d}")
+                if event.get("operation") == "manage_context":
+                    tag = str(event["summary_id"])
+                elif event.get("operation") == "resum":
+                    continue
+                else:
+                    tag = f"ctx-{event['revision']:04d}"
+                self.memory_tags.setdefault(docid, []).append(tag)
 
     def document_state(self, docid: str) -> dict:
         if docid not in self.retrieved_docids:
@@ -102,7 +122,7 @@ class BrowseCompPlusEnvironment:
             }
         recall = {
             "pocket_context": "Use expand_block with a memory_tags tag to recover archived evidence, or ",
-            "acm": "Use query_memory with a memory_tags tag and a question to recall evidence, or ",
+            "acm": "Use query_memory(summary_id, query) to recall relevant archived evidence, or ",
             "none": "",
         }[self.config.context_tools]
         return {
@@ -167,8 +187,22 @@ class BrowseCompPlusEnvironment:
             docids = [str(document["docid"])] if document is not None else []
             self.in_context_docids.update(docids)
             result = document if document is not None else {"error": f"Document {argument!r} not found"}
+        output = json.dumps(result, ensure_ascii=False)
+        if self.config.research_tools == "corpus":
+            if command == "search":
+                parts = []
+                for index, hit in enumerate(result, 1):
+                    hint = ""
+                    if hit["context_status"] == "in_context":
+                        hint = "\n[seen earlier; this preview is truncated. Call get_document(docid) for the full text if needed.]"
+                    elif hit["context_status"] == "compressed":
+                        hint = "\n[seen earlier but compressed; " + hit["hint"] + "]"
+                    parts.append(f"[{index}] docid={hit['docid']} score={hit['score']:.2f}\n{hit['snippet']}{hint}")
+                output = "\n\n".join(parts) or "No results found."
+            elif document is not None:
+                output = f"docid={document['docid']}\n\n{document['text']}"
         return {
-            "output": json.dumps(result, ensure_ascii=False),
+            "output": output,
             "returncode": 0,
             "exception_info": "",
             "extra": {"docids": docids},

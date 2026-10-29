@@ -62,7 +62,7 @@ docker.io/swebench/sweb.eval.x86_64.<normalized-instance-id>:latest
 
 Normalize the instance ID by replacing `__` with `_1776_` and lowercasing. For example, `django__django-11099` maps to `docker.io/swebench/sweb.eval.x86_64.django_1776_django-11099:latest`. Image names are derived from instance IDs, not arbitrary dataset-supplied image URLs. The official `:latest` tags are **mutable**, not immutable revision pins. Record the requested image and any resolved digest available from provisioning; a pinned dataset alone does not pin image contents.
 
-The coding sandbox allocation is **2 CPU, 8 GB RAM and 40 GB disk per sandbox**. At 120 concurrent slots that is up to 240 CPUs, 960 GB RAM and 4,800 GB disk provisioned. Verify account quotas and image availability before a paid launch; lower concurrency when necessary without changing the selected cohort. The orchestrator also holds active model histories and performs token accounting, so monitor its RAM/CPU before scaling to 120 local agent threads.
+The coding sandbox allocation is **2 CPU, 8 GB RAM and 10 GB disk per sandbox**. At 120 concurrent slots that is up to 240 CPUs, 960 GB RAM and 1,200 GB disk provisioned. Verify account quotas and image availability before a paid launch; lower concurrency when necessary without changing the selected cohort. The orchestrator also holds active model histories and performs token accounting, so monitor its RAM/CPU before scaling to 120 local agent threads.
 
 ## One-task smoke: validate first
 

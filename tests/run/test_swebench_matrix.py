@@ -283,7 +283,7 @@ def test_sandbox_spec_uses_official_image_without_control_or_model_keys():
     assert spec.image.startswith("docker.io/swebench/") and spec.os_user == "root"
     assert spec.network_block_all is True and spec.public is False
     assert set(spec.env_vars) == {"BASH_ENV", "PAGER", "GIT_TERMINAL_PROMPT"}
-    assert spec.resources.cpu == 2 and spec.resources.memory == 8 and spec.resources.disk == 40
+    assert spec.resources.cpu == 2 and spec.resources.memory == 8 and spec.resources.disk == 10
     assert not any("API_KEY" in key for key in spec.env_vars)
     assert spec.volumes is None and spec.secrets is None
 

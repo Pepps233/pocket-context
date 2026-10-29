@@ -217,7 +217,7 @@ def sandbox_params(instance: dict, method: str):
         network_block_all=True,
         env_vars={"BASH_ENV": "/root/.bashrc", "PAGER": "cat", "GIT_TERMINAL_PROMPT": "0"},
         labels={"project": "pocket-context", "benchmark": "swebench-verified", "method": method},
-        resources=Resources(cpu=2, memory=8, disk=40),
+        resources=Resources(cpu=2, memory=8, disk=10),
         auto_stop_interval=30,
         auto_delete_interval=0,
     )

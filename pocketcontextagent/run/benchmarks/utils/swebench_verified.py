@@ -24,7 +24,6 @@ Only tasks.jsonl (the explicit public allowlist below) is safe for agents.
 
 import json
 import re
-import sys
 from collections.abc import Iterable
 from pathlib import Path
 from shlex import join
@@ -126,6 +125,7 @@ def evaluator_command(
     grading_dataset_path: Path,
     max_workers: int = 1,
     timeout: int = 1800,
+    python_executable: str = "python",
 ) -> str:
     """Run outside coding sandboxes after installing swebench at HARNESS_REVISION.
 
@@ -133,11 +133,16 @@ def evaluator_command(
     NOT sanitized tasks.jsonl. Use a fresh unique run_id: the harness reuses old
     reports. import_official_results also verifies every report's saved patch.
     """
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", run_id) or max_workers <= 0 or timeout <= 0:
+    if (
+        not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", run_id)
+        or max_workers <= 0
+        or timeout <= 0
+        or not python_executable.strip()
+    ):
         raise ValueError("Use a nonempty safe run_id and positive workers/timeout")
     return join(
         [
-            sys.executable,
+            python_executable,
             "-m",
             "swebench.harness.run_evaluation",
             "--dataset_name",

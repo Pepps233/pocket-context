@@ -25,6 +25,11 @@ subcommands = [
     ),
     ("pocketcontextagent.run.benchmarks.programbench", ["programbench"], "Run on ProgramBench (batch mode)"),
     ("pocketcontextagent.run.benchmarks.browsecomp_plus", ["browsecomp-plus"], "Prepare and run BrowseComp-Plus"),
+    (
+        "pocketcontextagent.run.benchmarks.browsecomp_plus_daytona",
+        ["benchmark-matrix"],
+        "Run matched corpus and coding methods in Daytona sandboxes",
+    ),
 ]
 
 

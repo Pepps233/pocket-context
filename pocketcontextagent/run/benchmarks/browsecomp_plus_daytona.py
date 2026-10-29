@@ -649,7 +649,7 @@ def publish_matrix_task(task: Path, output: Path, query_id: str, expected: dict)
 def run_matrix(
     pool: Path = typer.Option(DEFAULT_POOL),
     data_dir: Path = typer.Option(Path("data/browsecomp-plus")),
-    split: str = typer.Option("development680"),
+    split: str | None = typer.Option(None, help="Defaults to development680 for corpus tasks or test for coding."),
     query_id: list[str] = typer.Option([], help="Select specific IDs (repeatable)."),
     limit: int = typer.Option(1, min=0, help="Questions per method; 0 selects the entire split."),
     seed: int | None = typer.Option(None, help="Sample once without replacement using this random seed."),
@@ -659,11 +659,32 @@ def run_matrix(
     workers_per_method: int = typer.Option(
         1, min=1, max=30, help="Dedicated sandboxes per method; one task per sandbox."
     ),
+    benchmark: str = typer.Option("browsecomp-plus", help="browsecomp-plus or swebench-verified."),
 ) -> None:
     """Run matched questions with up to 30 parallel sandboxes per method."""
     from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
     from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
 
+    if benchmark == "swebench-verified":
+        from pocketcontextagent.run.benchmarks.benchmark_matrix import run_matrix as run_coding_matrix
+
+        if pool != DEFAULT_POOL:
+            raise ValueError("Coding tasks create fresh official instance-image sandboxes; omit --pool")
+        run_coding_matrix(
+            data_dir=Path("data/swebench-verified") if data_dir == Path("data/browsecomp-plus") else data_dir,
+            split=split or "test",
+            query_ids=query_id,
+            limit=limit,
+            seed=seed,
+            config_spec=config_spec,
+            output=Path("runs/swebench-verified/matrix") if output == Path("runs/browsecomp-plus/matrix") else output,
+            dry_run=dry_run,
+            workers_per_method=workers_per_method,
+        )
+        return
+    if benchmark != "browsecomp-plus":
+        raise ValueError("Select browsecomp-plus or swebench-verified")
+    split = split or "development680"
     instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_id, limit, seed)
     config = matrix_config(config_spec)
     for method in METHODS:
@@ -749,3 +770,70 @@ def delete_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
         list(executor.map(api.delete, sandboxes))
     pool.unlink()
     typer.echo("Pool deleted")
+
+
+@app.command("prepare")
+def prepare_benchmark(
+    benchmark: str = typer.Option("swebench-verified"),
+    data_dir: Path | None = typer.Option(None),
+) -> None:
+    """Prepare pinned public tasks and separate private grading data; no model calls."""
+    if benchmark == "swebench-verified":
+        from pocketcontextagent.run.benchmarks.benchmark_matrix import prepare
+
+        prepare(data_dir or Path("data/swebench-verified"))
+    elif benchmark == "browsecomp-plus":
+        from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import prepare_data
+
+        prepare_data(data_dir or Path("data/browsecomp-plus"))
+    else:
+        raise ValueError("Select browsecomp-plus or swebench-verified")
+
+
+@app.command("allocation")
+def show_allocation(
+    browsecomp_data: Path = typer.Option(Path("data/browsecomp-plus")),
+    swebench_data: Path = typer.Option(Path("data/swebench-verified")),
+    output: Path | None = typer.Option(None),
+) -> None:
+    """Freeze all 150 corpus and 125 sampled coding tasks; never starts sandboxes."""
+    from pocketcontextagent.run.benchmarks.benchmark_allocation import allocation
+
+    allocation(browsecomp_data, swebench_data, output)
+
+
+@app.command("compare")
+def compare_matrix(
+    runs: Path = typer.Option(...), grades: Path | None = typer.Option(None), output: Path | None = typer.Option(None)
+) -> None:
+    """Compare matched attempts; coding correctness requires official test reports."""
+    from pocketcontextagent.run.benchmarks.browsecomp_plus import compare
+
+    compare(runs=runs, grades=grades, output=output)
+
+
+@app.command("export-swebench")
+def export_swebench(
+    runs: Path = typer.Option(...),
+    data_dir: Path = typer.Option(Path("data/swebench-verified")),
+    run_prefix: str = typer.Option(...),
+    max_workers: int = typer.Option(1, min=1),
+    harness_python: str = typer.Option("python", help="Python executable in the trusted grading environment."),
+) -> None:
+    """Export predictions and print trusted Docker-host grading commands; never executes them."""
+    from pocketcontextagent.run.benchmarks.benchmark_grading import export_evaluation
+
+    export_evaluation(runs, data_dir, run_prefix, max_workers, harness_python)
+
+
+@app.command("import-swebench")
+def import_swebench(
+    runs: Path = typer.Option(...),
+    logs: Path = typer.Option(Path("logs/run_evaluation")),
+    run_prefix: str = typer.Option(...),
+    output: Path = typer.Option(...),
+) -> None:
+    """Validate and import official reports bound to the exact predicted patches."""
+    from pocketcontextagent.run.benchmarks.benchmark_grading import import_evaluation
+
+    import_evaluation(runs, logs, run_prefix, output)

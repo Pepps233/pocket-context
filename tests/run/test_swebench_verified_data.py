@@ -99,7 +99,18 @@ def test_official_command_uses_private_pinned_grading_file_and_image_contract(tm
             tmp_path / "predictions with spaces.jsonl", "unique_run", grading_dataset_path=tmp_path / "private.jsonl"
         )
     )
-    assert command[1:3] == ["-m", "swebench.harness.run_evaluation"]
+    assert command[:3] == ["python", "-m", "swebench.harness.run_evaluation"]
+    assert (
+        split(
+            evaluator_command(
+                tmp_path / "preds.jsonl",
+                "safe",
+                grading_dataset_path=tmp_path / "private",
+                python_executable="/grading venv/bin/python",
+            )
+        )[0]
+        == "/grading venv/bin/python"
+    )
     assert command[command.index("--dataset_name") + 1] == str(tmp_path / "private.jsonl")
     assert command[command.index("--predictions_path") + 1] == str(tmp_path / "predictions with spaces.jsonl")
     assert command[command.index("--namespace") + 1] == "swebench"

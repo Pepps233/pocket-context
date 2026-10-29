@@ -20,6 +20,14 @@ def shared_settings(manifest: dict) -> dict:
     config["environment"].pop("context_tools", None)
     return {
         "config": config,
+        **(
+            {
+                key: manifest[key]
+                for key in ("benchmark", "runtime", "task_images", "harness_revision", "grading_dataset_sha256")
+            }
+            if config.get("benchmark") == "swebench-verified"
+            else {}
+        ),
         **{
             key: manifest[key]
             for key in (
@@ -48,6 +56,11 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
         manifest = yaml.safe_load((directory / "run.yaml").read_text())
         if manifest.get("method") != method:
             raise ValueError(f"{directory}: expected a run created with --method {method}")
+        if (
+            manifest["config"].get("benchmark") == "swebench-verified"
+            and manifest.get("benchmark") != "swebench-verified"
+        ):
+            raise ValueError(f"{directory}: coding benchmark provenance is missing or inconsistent")
         expected = configure_method(manifest["config"], method)
         if expected != manifest["config"]:
             raise ValueError(
@@ -62,6 +75,7 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
             )
         reference = settings
         fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+        official_tests = manifest["config"].get("benchmark") == "swebench-verified"
         results = [json.loads(path.read_text()) for path in sorted(directory.glob("*.json"))]
         ids = [str(result["query_id"]) for result in results]
         if len(ids) != len(set(ids)) or set(ids) != set(manifest["selected_query_ids"]):
@@ -79,7 +93,7 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
         for result in results:
             if result.get("metadata", {}).get("fingerprint") != fingerprint:
                 raise ValueError(f"{method}: result {result['query_id']} does not match its run manifest")
-            result["correct"] = False if result["status"] != "completed" else None
+            result["correct"] = None if official_tests or result["status"] == "completed" else False
             if judgment := judgments.get(str(result["query_id"])):
                 response = result["result"][-1]["output"] if result["result"] else ""
                 if judgment.get("response") != response or judgment.get("is_completed") != (
@@ -94,7 +108,7 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
                     if judge_settings is not None and identity != judge_settings:
                         raise ValueError("Judge model or settings differ between judgments")
                     judge_settings = identity
-                    result["correct"] = correct if result["status"] == "completed" else False
+                    result["correct"] = correct if official_tests or result["status"] == "completed" else False
         rows[method] = summarize_results(results)
     return {
         "settings": reference,

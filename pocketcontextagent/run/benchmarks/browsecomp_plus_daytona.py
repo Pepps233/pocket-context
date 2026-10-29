@@ -27,7 +27,7 @@ from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import DATASET_REVI
 from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
 from pocketcontextagent.utils.serialize import recursive_merge
 
-app = typer.Typer(add_completion=False, no_args_is_help=True)
+app = typer.Typer(add_completion=False, no_args_is_help=True, pretty_exceptions_show_locals=False)
 DEFAULT_POOL = Path("data/browsecomp-plus/daytona-pool.json")
 REMOTE_INDEX = "/opt/browsecomp-plus/indexes/bm25"
 TOKENIZER = "Qwen/Qwen3.5-9B"

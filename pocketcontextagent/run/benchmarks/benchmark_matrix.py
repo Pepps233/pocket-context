@@ -6,6 +6,7 @@ This keeps model and control-plane credentials outside agent-controlled checkout
 
 import hashlib
 import json
+import os
 import random
 import sys
 import tarfile
@@ -141,7 +142,11 @@ def run_manifest(config: dict, method: str, instances: list[dict], workers: int,
         "index": "",
         "index_files": [],
         "task_images": {row["query_id"]: row["image"] for row in instances},
-        "runtime": "local-agent/daytona-shell/shared-immutable-snapshot",
+        "runtime": "trusted-cloud-agent/daytona-shell/shared-immutable-snapshot"
+        if os.getenv("MSWEA_CONTROLLER_ID")
+        else "local-agent/daytona-shell/shared-immutable-snapshot",
+        "controller_id": os.getenv("MSWEA_CONTROLLER_ID"),
+        "transport_retry_limit": int(os.getenv("MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT", "10")),
         "harness_revision": swe.HARNESS_REVISION,
     }
 
@@ -270,6 +275,7 @@ def run_matrix(
         "sandbox_idle_stop_minutes": 0,
         "sandbox_ttl_minutes": runtime.ttl_minutes,
         "task_wall_time_limit_seconds": config["agent"]["wall_time_limit_seconds"],
+        "controller_id": os.getenv("MSWEA_CONTROLLER_ID"),
     }
     manifests = {
         method: run_manifest(config, method, instances, active, data_dir / "queries.jsonl", split) for method in METHODS

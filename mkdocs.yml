@@ -70,6 +70,7 @@ nav:
       - "BrowseComp-Plus": usage/browsecomp_plus.md
       - "Context-method comparison": usage/context_comparison.md
       - "Corpus and coding matrix": usage/context_benchmarks.md
+      - "Trusted cloud controller": usage/benchmark_controller.md
       - "Inspector": usage/inspector.md
       - "Output files": usage/output_files.md
     - "Language models":

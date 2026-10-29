@@ -30,6 +30,11 @@ subcommands = [
         ["benchmark-matrix"],
         "Run matched corpus and coding methods in Daytona sandboxes",
     ),
+    (
+        "pocketcontextagent.run.benchmarks.benchmark_controller",
+        ["benchmark-controller"],
+        "Manage a durable SSH-accessible trusted Daytona benchmark controller",
+    ),
 ]
 
 

@@ -1,0 +1,476 @@
+"""Durable, SSH-accessible Daytona controllers for isolated SWE-bench workers."""
+
+import hashlib
+import json
+import os
+import shlex
+import subprocess
+import tempfile
+from dataclasses import asdict
+from pathlib import Path
+from uuid import uuid4
+
+import typer
+import yaml
+
+from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
+from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+    build_wheel,
+    client,
+    matrix_provider_key,
+    provider_environment,
+)
+from pocketcontextagent.run.benchmarks.utils.controller_setup import (
+    ControllerConfig,
+    extract_artifacts,
+    provider_endpoint,
+    sandbox_params,
+    write_private_json,
+)
+from pocketcontextagent.run.benchmarks.utils.swebench_daytona import RuntimeConfig, delete_resources, sandbox_metadata
+
+app = typer.Typer(add_completion=False, no_args_is_help=True, pretty_exceptions_show_locals=False)
+DEFAULT_MANIFEST = Path("runs/context-evaluation/controller.json")
+ROOT = "/workspace/pocket-controller"
+PYTHON = "/usr/local/bin/python"
+
+
+def digest(path: Path) -> str:
+    value = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            value.update(block)
+    return value.hexdigest()
+
+
+def _exec(sandbox, command: list[str], *, timeout: int = 60) -> str:
+    response = sandbox.process.exec(shlex.join(command), cwd=ROOT, timeout=timeout)
+    if response.exit_code:
+        text = response.result
+        for name, value in os.environ.items():
+            if name.endswith("_API_KEY") and value:
+                text = text.replace(value, "[REDACTED]")
+        raise RuntimeError(f"Controller command failed ({response.exit_code}): {text[-3000:]}")
+    return response.result.strip()
+
+
+def _remote(sandbox, operation: str, **arguments) -> dict:
+    code = "import json,sys; from pocketcontextagent.run.benchmarks.utils.controller_remote import action; print(json.dumps(action(*json.loads(sys.argv[1]))))"
+    return json.loads(
+        _exec(
+            sandbox,
+            [PYTHON, "-c", code, json.dumps([operation, ROOT, arguments])],
+            timeout=240 if operation in {"pack", "cleanup"} else 60,
+        )
+    )
+
+
+def _upload(sandbox, data: bytes, target: str) -> None:
+    temporary = target + "." + uuid4().hex + ".tmp"
+    sandbox.fs.upload_file(data, temporary)
+    sandbox.fs.set_file_permissions(temporary, mode="600")
+    _exec(sandbox, ["mv", temporary, target])
+
+
+def _credentials(key: str) -> dict:
+    values = {
+        "DAYTONA_API_KEY": os.environ["DAYTONA_API_KEY"],
+        **provider_environment(key),
+        **{name: os.environ[name] for name in ("DAYTONA_API_URL", "DAYTONA_TARGET") if os.getenv(name)},
+    }
+    if any(any(character in value for character in "\0\r\n") for value in values.values()):
+        raise ValueError("Credentials and routing settings must be single-line values")
+    return values
+
+
+def _load(manifest: Path, *, start: bool = False):
+    document = json.loads(manifest.read_text())
+    api = client()
+    sandbox = api.get(document["sandboxes"][0].get("id") or document["sandboxes"][0]["name"])
+    if sandbox.labels.get("role") != "trusted-controller" or (
+        document.get("organization_id") and document["organization_id"] != sandbox.organization_id
+    ):
+        raise ValueError("Controller identity/organization differs from the saved manifest")
+    if start and getattr(sandbox.state, "value", sandbox.state) in {"stopped", "archived", "paused"}:
+        api.start(sandbox, timeout=180)
+        sandbox = api.get(sandbox.id)
+        _remote(sandbox, "enable")
+    if start and getattr(sandbox.state, "value", sandbox.state) == "started":
+        sandbox_metadata(sandbox.model_dump(), RuntimeConfig(**document["settings"]))
+    return api, sandbox, document
+
+
+def _runtime_image(project: Path):
+    from daytona import Image
+
+    return (
+        Image.base("python:3.11-slim-bookworm")
+        .run_commands(
+            "apt-get update && apt-get install -y --no-install-recommends git curl openssh-client tmux procps && rm -rf /var/lib/apt/lists/*"
+        )
+        .pip_install_from_pyproject(str(project / "pyproject.toml"), ["daytona"], extra_options="--no-cache-dir")
+        .workdir(ROOT)
+    )
+
+
+@app.command("create")
+def create(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    project: Path = typer.Option(Path(".")),
+    cpu: int = typer.Option(2, min=1),
+    memory: int = typer.Option(8, min=1),
+    disk: int = typer.Option(10, min=1),
+    ttl_minutes: int = typer.Option(
+        0, min=0, help="0 requests no absolute destruction deadline; actual server policy is verified."
+    ),
+    provider_key: str = typer.Option("DEEPSEEK_API_KEY"),
+) -> None:
+    """Create a persistent trusted controller; no benchmark inference is launched."""
+    from daytona import CreateSnapshotParams, Resources
+
+    if manifest.exists():
+        raise ValueError("Controller manifest already exists; reuse it or explicitly delete its resources")
+    config = ControllerConfig(cpu=cpu, memory=memory, disk=disk, ttl_minutes=ttl_minutes)
+    api = client()
+    credentials = _credentials(provider_key)
+    identifier = uuid4().hex[:12]
+    document = {
+        "version": 1,
+        "role": "trusted-controller",
+        "state": "creating",
+        "root": ROOT,
+        "settings": asdict(config),
+        "implementation_sha256": implementation_hash(),
+        "sandboxes": [{"name": f"pca-trusted-controller-{identifier}"}],
+        "snapshots": [{"name": f"pca-controller-runtime-{identifier}"}],
+        "jobs": [],
+    }
+    write_private_json(manifest, document)
+    complete = False
+    try:
+        with tempfile.TemporaryDirectory(prefix="pca-controller-build-") as temporary:
+            wheel = build_wheel(project, Path(temporary))
+            document["wheel_sha256"] = digest(wheel)
+            write_private_json(manifest, document)
+            snapshot = api.snapshot.create(
+                CreateSnapshotParams(
+                    name=document["snapshots"][0]["name"],
+                    image=_runtime_image(project),
+                    resources=Resources(cpu=cpu, memory=memory, disk=disk),
+                ),
+                timeout=1800,
+            )
+            sandbox = api.create(sandbox_params(snapshot.name, document["sandboxes"][0]["name"], config), timeout=180)
+            document["sandboxes"][0]["id"] = sandbox.id
+            document["organization_id"] = sandbox.organization_id
+            document["lifecycle"] = sandbox_metadata(
+                api.get(sandbox.id).model_dump(),
+                RuntimeConfig(cpu=cpu, memory=memory, disk=disk, ttl_minutes=ttl_minutes),
+            )
+            write_private_json(manifest, document)
+            sandbox.fs.create_folder(ROOT, "700")
+            sandbox.fs.set_file_permissions(ROOT, mode="700")
+            sandbox.fs.create_folder(ROOT + "/jobs", "700")
+            sandbox.fs.create_folder(ROOT + "/credentials", "700")
+            remote_wheel = ROOT + "/" + wheel.name
+            _upload(sandbox, wheel.read_bytes(), remote_wheel)
+            _exec(
+                sandbox,
+                [PYTHON, "-m", "pip", "install", "--no-deps", "--disable-pip-version-check", remote_wheel],
+                timeout=180,
+            )
+            sandbox.fs.delete_file(remote_wheel)
+            _upload(sandbox, json.dumps(credentials).encode(), ROOT + "/credentials.json")
+            document["dependencies"] = json.loads(
+                _exec(
+                    sandbox,
+                    [
+                        PYTHON,
+                        "-c",
+                        "import json,importlib.metadata; print(json.dumps({d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))",
+                    ],
+                )
+            )
+        document["state"] = "ready"
+        _upload(sandbox, json.dumps(document).encode(), ROOT + "/controller.json")
+        write_private_json(manifest, document)
+        complete = True
+    finally:
+        if not complete:
+            delete_resources(api, document)
+            document["state"] = "failed_cleanup_confirmed"
+            write_private_json(manifest, document)
+    typer.echo(
+        f"Controller ready: {document['sandboxes'][0]['id']}\nManifest: {manifest}\nNo inference launched. Running controller compute is billable until explicitly stopped."
+    )
+
+
+@app.command("check")
+def check(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    config_spec: list[str] = typer.Option([], "-c", "--config"),
+) -> None:
+    """Check provider connectivity FROM THE CLOUD without requesting inference."""
+    from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config
+
+    config = benchmark_config(config_spec)
+    provider_endpoint(config["model"])
+    _, sandbox, _ = _load(manifest, start=True)
+    key = matrix_provider_key(config)
+    _upload(sandbox, json.dumps(_credentials(key)).encode(), ROOT + "/credentials.json")
+    typer.echo(json.dumps(_remote(sandbox, "check", model=config["model"], provider_key=key), indent=2))
+
+
+def submission_plan(
+    data_dir: Path, config_spec: list[str], limit: int, seed: int, workers: int, query_ids: list[str]
+) -> tuple[dict, dict]:
+    from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config, load_instances, run_manifest
+
+    config = benchmark_config(config_spec)
+    if not 1 <= workers <= 30:
+        raise ValueError("Select 1 to 30 workers per method")
+    instances = load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed)
+    run_manifest(config, "react", instances, min(workers, len(instances)), data_dir / "queries.jsonl", "test")
+    provider_endpoint(config["model"])
+    return config, {
+        "benchmark": "swebench-verified",
+        "selected_query_ids": [row["query_id"] for row in instances],
+        "limit": limit,
+        "seed": seed,
+        "query_ids": query_ids,
+        "workers_per_method": workers,
+        "maximum_active_coding_sandboxes": min(workers, len(instances)) * 4,
+        "planned_attempts": len(instances) * 4,
+        "model": config["model"]["model_name"],
+        "implementation_sha256": implementation_hash(),
+    }
+
+
+@app.command("submit")
+def submit(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    data_dir: Path = typer.Option(Path("data/swebench-verified")),
+    limit: int = typer.Option(1, min=0),
+    seed: int = typer.Option(42),
+    workers_per_method: int = typer.Option(1, min=1, max=30),
+    query_ids: list[str] = typer.Option([], "--query-id"),
+    config_spec: list[str] = typer.Option([], "-c", "--config"),
+    preflight: bool = typer.Option(False, help="Infrastructure-only four-method check; no model inference."),
+    dry_run: bool = typer.Option(False, help="Print a local plan; no API calls, uploads or inference."),
+) -> None:
+    """Accept one detached matched SWE job; it continues after laptop/SSH disconnect."""
+    config, plan = submission_plan(data_dir, config_spec, limit, seed, workers_per_method, query_ids)
+    plan.update(preflight_only=preflight, attempts=0 if preflight else plan["planned_attempts"])
+    if dry_run:
+        typer.echo(yaml.safe_dump(plan, sort_keys=False))
+        return
+    _, sandbox, document = _load(manifest, start=True)
+    if document["implementation_sha256"] != plan["implementation_sha256"]:
+        raise ValueError("Controller code differs from this checkout; create a new frozen controller before submitting")
+    if any(row.get("runner_alive") or row.get("child_alive") for row in _remote(sandbox, "view")["jobs"].values()):
+        raise ValueError("Controller already has an active job")
+    key = matrix_provider_key(config)
+    _upload(sandbox, json.dumps(_credentials(key)).encode(), ROOT + "/credentials.json")
+    readiness = _remote(sandbox, "check", model=config["model"], provider_key=key)
+    identifier = uuid4().hex[:12]
+    remote = f"{ROOT}/jobs/{identifier}"
+    record = {"id": identifier, "remote": remote, "state": "staging", "selection": plan, "provider_check": readiness}
+    document["jobs"].append(record)
+    write_private_json(manifest, document)
+    sandbox.fs.create_folder(remote, "700")
+    sandbox.fs.create_folder(remote + "/input", "700")
+    sandbox.fs.create_folder(remote + "/input/data", "700")
+    job_credentials = f"{ROOT}/credentials/{identifier}.json"
+    _upload(sandbox, json.dumps(_credentials(key)).encode(), job_credentials)
+    for filename in ("queries.jsonl", "manifest.json", "grading_dataset.jsonl"):
+        path = data_dir / filename
+        if path.exists():
+            _upload(sandbox, path.read_bytes(), remote + "/input/data/" + filename)
+    _upload(sandbox, yaml.safe_dump(config).encode(), remote + "/input/config.yaml")
+    arguments = [
+        PYTHON,
+        "-m",
+        "pocketcontextagent.run.utilities.mini_extra",
+        "benchmark-matrix",
+        "matrix",
+        "--benchmark",
+        "swebench-verified",
+        "--data-dir",
+        remote + "/input/data",
+        "--limit",
+        str(limit),
+        "--seed",
+        str(seed),
+        "--workers-per-method",
+        str(workers_per_method),
+        "-c",
+        remote + "/input/config.yaml",
+        "--output",
+        remote + "/output",
+    ]
+    for identifier_value in query_ids:
+        arguments.extend(["--query-id", identifier_value])
+    if preflight:
+        arguments.append("--preflight")
+    remote_plan = yaml.safe_load(_exec(sandbox, [*arguments, "--dry-run"]))
+    if remote_plan["selected_query_ids"] != plan["selected_query_ids"]:
+        raise ValueError("Remote selection differs from the frozen local cohort")
+    _upload(sandbox, json.dumps(plan).encode(), remote + "/plan.json")
+    _upload(
+        sandbox,
+        json.dumps(
+            {
+                "argv": arguments,
+                "cwd": remote,
+                "secrets_path": job_credentials,
+                "env": {
+                    "MSWEA_CONTROLLER_ID": sandbox.id,
+                    "MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT": "2",
+                    "PYTHONUNBUFFERED": "1",
+                },
+            }
+        ).encode(),
+        remote + "/request.json",
+    )
+    record.update(_remote(sandbox, "launch", job=identifier), state="submitted")
+    write_private_json(manifest, document)
+    _upload(sandbox, json.dumps(document).encode(), ROOT + "/controller.json")
+    if record["acceptance"]["state"] in {"staged", "starting"} or record["acceptance"].get("error_type"):
+        raise ValueError(
+            f"Job {identifier} acceptance is pending or failed; inspect status, do not resubmit automatically"
+        )
+    typer.echo(
+        f"Job submitted: {identifier}\nController: {sandbox.id}\nRemote directory: {remote}\nSafe to disconnect: execution and cleanup are cloud-side, not laptop polling."
+    )
+
+
+@app.command("status")
+def status(manifest: Path = typer.Option(DEFAULT_MANIFEST), job: str | None = typer.Option(None)) -> None:
+    """Read controller state and durable job status; does not start a stopped controller."""
+    _, sandbox, document = _load(manifest)
+    result = {
+        "controller_id": sandbox.id,
+        "controller_state": str(sandbox.state),
+        "state": str(sandbox.state),
+        "auto_destroy_at": str(sandbox.auto_destroy_at),
+    }
+    if getattr(sandbox.state, "value", sandbox.state) == "started":
+        result.update(_remote(sandbox, "status", job=job) if job else _remote(sandbox, "view"))
+    else:
+        result["saved_jobs"] = document["jobs"]
+    typer.echo(json.dumps(result, indent=2))
+
+
+@app.command("logs")
+def logs(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    job: str = typer.Option(...),
+    lines: int = typer.Option(100, min=1, max=10000),
+) -> None:
+    """Read the redacted cloud log; use SSH and tail -f for continuous following."""
+    _, sandbox, _ = _load(manifest)
+    typer.echo(_remote(sandbox, "logs", job=job, lines=lines)["log"], nl=False)
+
+
+@app.command("ssh")
+def ssh(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    command: str | None = typer.Option(None),
+    expires_minutes: int = typer.Option(60, min=1),
+) -> None:
+    """Attach with a fresh native SSH credential; no API keys/tokens are printed or saved."""
+    _, sandbox, _ = _load(manifest, start=True)
+    access = sandbox.create_ssh_access(expires_in_minutes=expires_minutes)
+    arguments = shlex.split(access.ssh_command)
+    if not arguments or arguments[0] != "ssh":
+        raise ValueError("Unexpected SSH command from Daytona")
+    try:
+        result = subprocess.run([*arguments, *([command] if command else [])], check=False)
+    finally:
+        sandbox.revoke_ssh_access(access.token)
+    if result.returncode:
+        raise typer.Exit(result.returncode)
+
+
+@app.command("fetch")
+def fetch(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    job: str = typer.Option(...),
+    output: Path = typer.Option(...),
+    max_bytes: int = typer.Option(2_000_000_000, min=1),
+) -> None:
+    """Download verified outputs/log/status only, never controller credentials or private grading inputs."""
+    if output.exists() and any(output.iterdir()):
+        raise ValueError("Use a fresh output directory")
+    _, sandbox, _ = _load(manifest, start=True)
+    packed = _remote(sandbox, "pack", job=job)
+    if packed["bytes"] > max_bytes:
+        raise ValueError("Archive exceeds download budget; increase --max-bytes or collect individual files over SSH")
+    with tempfile.TemporaryDirectory(prefix="pca-controller-fetch-") as temporary:
+        archive = Path(temporary) / "artifacts.tar.gz"
+        sandbox.fs.download_file(packed["path"], str(archive))
+        if digest(archive) != packed["sha256"]:
+            raise ValueError("Controller artifact checksum mismatch")
+        extract_artifacts(archive, output)
+    sandbox.fs.delete_file(packed["path"])
+    typer.echo(f"Collected unchanged run artifacts: {output}")
+
+
+@app.command("cancel")
+def cancel(manifest: Path = typer.Option(DEFAULT_MANIFEST), job: str = typer.Option(...)) -> None:
+    """Stop an owned matrix process group, retaining uncollected workers for explicit recovery."""
+    _, sandbox, _ = _load(manifest)
+    typer.echo(json.dumps(_remote(sandbox, "cancel", job=job), indent=2))
+    typer.echo(
+        "Inspect worker journals before cleanup; cancellation does not fabricate patches or silently discard worker state."
+    )
+
+
+@app.command("cleanup")
+def cleanup(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    job: str = typer.Option(...),
+    discard_uncollected: bool = typer.Option(False),
+) -> None:
+    """Reconcile only a stopped job's owned workers; reject uncollected state unless explicitly discarded."""
+    _, sandbox, _ = _load(manifest, start=True)
+    typer.echo(json.dumps(_remote(sandbox, "cleanup", job=job, discard=discard_uncollected), indent=2))
+
+
+@app.command("start")
+def start(manifest: Path = typer.Option(DEFAULT_MANIFEST)) -> None:
+    """Start the existing filesystem; interrupted jobs are never automatically rerun."""
+    _, sandbox, _ = _load(manifest, start=True)
+    _remote(sandbox, "enable")
+    typer.echo(f"Controller started: {sandbox.id}; no jobs rerun")
+
+
+@app.command("stop")
+def stop(manifest: Path = typer.Option(DEFAULT_MANIFEST)) -> None:
+    """Stop idle controller compute, preserving disk; refuses an active job."""
+    api, sandbox, _ = _load(manifest)
+    if getattr(sandbox.state, "value", sandbox.state) in {"stopped", "archived"}:
+        typer.echo("Controller already stopped; disk retained")
+        return
+    _remote(sandbox, "maintenance")
+    api.stop(sandbox, timeout=180)
+    typer.echo("Controller stopped; disk retained. No job can continue across a controller stop.")
+
+
+@app.command("delete")
+def delete(manifest: Path = typer.Option(DEFAULT_MANIFEST), discard_uncollected: bool = typer.Option(False)) -> None:
+    """Confirm deletion of controller/owned snapshot after reconciling worker journals; active jobs block deletion."""
+    document = json.loads(manifest.read_text())
+    if document["state"] == "ready":
+        api, sandbox, _ = _load(manifest, start=True)
+        _remote(sandbox, "maintenance")
+        for job in _remote(sandbox, "view")["jobs"]:
+            journal = _remote(sandbox, "journal", job=job)
+            write_private_json(manifest.parent / "controller-recovery" / job / "sandbox-cleanup.json", journal)
+            _remote(sandbox, "cleanup", job=job, discard=discard_uncollected)
+    else:
+        api = client()
+    delete_resources(api, document)
+    document["state"] = "deleted_cleanup_confirmed"
+    write_private_json(manifest, document)
+    typer.echo("Controller and owned runtime snapshot deletion confirmed; public recovery manifest retained.")

@@ -25,6 +25,13 @@ The seed fixes selection, not model determinism. Selection happens once per benc
 
 ## Prerequisites and execution boundaries
 
+For unattended SWE runs or a laptop that cannot reach the model provider, use the
+[trusted Daytona controller](benchmark_controller.md). Its detached cloud jobs continue
+after laptop/SSH disconnect; native SSH, status, log and artifact commands let you reconnect.
+The direct `benchmark-matrix matrix` commands below run the model loop on their **invoking
+host** and only shell tools in coding sandboxes. Invoke them on a trusted cloud host, or
+use `benchmark-controller submit`, rather than assuming a coding sandbox also hosts inference.
+
 - Put `DAYTONA_API_KEY` and `DEEPSEEK_API_KEY` in the orchestrator's environment or ignored `.env`. Do not print credentials or commit them.
 - Prepare the pinned BrowseComp-Plus corpus/index, tokenizer and compatible snapshot using the [existing setup](browsecomp_plus.md). These examples retain its `pocket-browsecomp-plus` snapshot name; confirm it exists in your Daytona account and contains the current application and required corpus/runtime dependencies.
 - Use `browsecomp_plus_deepseek` for BrowseComp-Plus and `context_benchmark_deepseek` for SWE-bench Verified, consistently across all four methods within each benchmark. Do not layer provider profiles.
@@ -37,7 +44,7 @@ The seed fixes selection, not model determinism. Selection happens once per benc
 | --- | --- | --- |
 | Provisioning | Existing precreated `--pool` | Automatically create and delete one fresh sandbox per method/task attempt |
 | Runtime | Existing corpus worker application | Four independent sandboxes from one shared digest-pinned official snapshot per task |
-| Inference | Existing remote worker execution, with the explicitly forwarded provider key | Model agents and orchestration run locally; coding tool operations run remotely in Daytona |
+| Inference | Existing remote worker execution, with the explicitly forwarded provider key | Model agents run on the invoking host, preferably the trusted cloud controller; coding tools run in separate Daytona sandboxes |
 | Sandbox credentials | Existing `create --provider-key DEEPSEEK_API_KEY`; Daytona key stays on launcher | **No model keys or Daytona keys in the coding sandbox** |
 
 Do not pass a precreated `--pool` to the SWE-bench workflow. The connector imports one explicit named snapshot per question, then creates independent method sandboxes from it instead of invoking an implicit image build for every attempt. The bounded cache holds at most `active_workers_per_method` snapshots, admits questions in cohort order, and permits two concurrent imports by default. A snapshot remains leased until all four methods finish; a fast method cannot evict an image still needed by a slower method or jump ahead of that method's pending questions.

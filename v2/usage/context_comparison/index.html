@@ -841,6 +841,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Develop before touching the held-out set">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#muse-spark-13-contributor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Muse Spark 1.3 Contributor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2739,6 +2756,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Develop before touching the held-out set">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#muse-spark-13-contributor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Muse Spark 1.3 Contributor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2862,14 +2896,20 @@
 <p>Detailed source-file provenance, transport/batching decisions and licenses ship in <code>pocketcontextagent/comparisons/upstream/SOURCES.md</code>. Copied prompts/schemas have offline hash-parity tests against the pinned originals. For the papers, see <a href="https://arxiv.org/html/2509.13313v3">ReSum</a>, <a href="https://arxiv.org/html/2607.23809v1">ACM</a>, and <a href="https://arxiv.org/html/2508.06600v1">BrowseComp-Plus</a>.</p>
 <h2 id="develop-before-touching-the-held-out-set">Develop before touching the held-out set</h2>
 <p>Follow <a href="../browsecomp_plus/">BrowseComp-Plus setup</a>, including Java 21, the pinned corpus and model credentials. Tune only on <code>development680</code>.</p>
+<p>The examples below use <code>browsecomp_plus_deepseek</code>: direct <code>deepseek/deepseek-flash</code> inference through LiteLLM at <code>https://api.deepseek.com</code>, using <code>DEEPSEEK_API_KEY</code> from your shell or ignored <code>.env</code>. No OpenRouter key is required. Thinking is enabled with high effort. The experimental cap remains 128,000 tokens even when the provider supports a larger window. The Qwen corpus tokenizer is deliberately retained for consistent preview/document caps; context estimates are not exact DeepSeek chat-template token counts, while measured usage comes from the provider.</p>
+<p>Use this profile <strong>instead of</strong>, not after, <code>browsecomp_plus_openrouter</code>; merging provider profiles can retain incompatible routing options. DeepSeek changes the policy model, not just its credentials. All four methods must use this same profile and fresh output directories, separate from any Qwen/OpenRouter results. DeepSeek's model alias can change its served checkpoint; retain raw responses and record the evaluation date rather than assuming immutable weights. See <a href="https://api-docs.deepseek.com/">DeepSeek's current model documentation</a> and <a href="https://api-docs.deepseek.com/guides/thinking_mode">thinking/tool-call requirements</a>.</p>
 <div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span>method<span class="w"> </span><span class="k">in</span><span class="w"> </span>pocket_context<span class="w"> </span>react<span class="w"> </span>resum<span class="w"> </span>acm<span class="p">;</span><span class="w"> </span><span class="k">do</span>
 <span class="w">  </span>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--method<span class="w"> </span><span class="s2">"</span><span class="nv">$method</span><span class="s2">"</span><span class="w"> </span>--split<span class="w"> </span>development680<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-c<span class="w"> </span>browsecomp_plus_openrouter<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--output<span class="w"> </span><span class="s2">"runs/browsecomp-plus/dev-comparison/</span><span class="nv">$method</span><span class="s2">"</span>
 <span class="k">done</span>
 </code></pre></div>
 <p>These commands incur model costs. The comparison/reporting command below makes no model calls. Alternatively pass identical <code>--model</code>, <code>--model-class</code> and common YAML overrides to each run.</p>
+<h3 id="muse-spark-13-contributor">Muse Spark 1.3 Contributor</h3>
+<p>Use <code>-c browsecomp_plus_muse_spark_1_3_contributor</code> <strong>instead of</strong> the DeepSeek profile to evaluate the exact <code>meta/muse-spark-1.3-contributor</code> model. It calls Meta directly at <code>https://api.meta.ai/v1</code>, loading <code>META_API_KEY</code> from your shell or ignored <code>.env</code>. It never substitutes <code>muse-spark-1.3</code> (Standard) or <code>muse-spark-1.2-contributor</code>. Keep separate output directories, for example <code>runs/browsecomp-plus/muse-1.3-contributor-dev/METHOD/</code>, and use the same profile for all four methods. Never layer provider profiles or mix their result directories.</p>
+<p>The profile uses stateless Responses API requests with <code>store: false</code> and <code>include: [reasoning.encrypted_content]</code>, preserving opaque reasoning items during active tool-turn replay. Reasoning effort is <code>high</code>, not <code>max</code>, which Contributor does not support. Human-readable reasoning summaries are requested with <code>summary: auto</code> but may be absent; summarizers cannot read the encrypted reasoning itself. The same 128,000-token experimental window, main-call/output allowances, corpus limits and cost/time thresholds apply. Provider-reported usage includes reasoning tokens; estimated context uses the fixed corpus tokenizer and retained-reasoning accounting.</p>
+<p><strong>Contributor is a data-contribution mode, not just a model name or discount.</strong> Meta's <a href="https://ai.developer.meta.com/docs/pricing-rate-limits">pricing and data-use documentation</a> says it may use your submitted prompts, code, files, context and returned responses to train future models. <code>store: false</code> disables server-managed response storage; it does not revoke Contributor training permission. Confirm that this is acceptable for your benchmark/data policy before submitting held-out tasks. Configuration and read-only model-catalog checks do not submit benchmark content. No automatic inference, account-mode changes or Standard-mode fallback are performed. See <a href="https://ai.developer.meta.com/docs/reasoning">Meta reasoning/replay behavior</a>.</p>
 <p><code>--method</code> is applied after YAML overrides. It selects the method's class, native research/memory schemas and, for baseline ports, canonical published policy/answer prompts. Literal prompt placeholders are preserved rather than accidentally interpreted as Jinja variables. Method-specific prompts are allowed to differ: forcing Pocket Context's prompt onto every baseline would change the methods being tested.</p>
 <p>ReSum-specific settings are <code>agent.resum_trigger_ratio</code> (0.9), <code>agent.resum_headroom_tokens</code> (1000), and <code>agent.resum_summary_token_limit</code> (4096 maximum). Freeze any development-set changes before evaluation. Shared model routing, reasoning effort, generation settings, retrieval configuration and worker count should stay fixed. Main policy and auxiliary model settings are recorded; independent summarizer-model selection is not yet supported by this runner.</p>
 <p>Cost and wall-time thresholds include auxiliary inference and are checked between calls, not hard billing caps. <code>agent.step_limit</code> counts main-agent calls; summaries/queries have separate counts and contribute fully to usage and cost. There is no additional hard cumulative-token cap. Repeat or interleave runs before interpreting small latency differences caused by provider load or local contention.</p>
@@ -2877,7 +2917,7 @@
 <div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span>method<span class="w"> </span><span class="k">in</span><span class="w"> </span>pocket_context<span class="w"> </span>react<span class="w"> </span>resum<span class="w"> </span>acm<span class="p">;</span><span class="w"> </span><span class="k">do</span>
 <span class="w">  </span>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--method<span class="w"> </span><span class="s2">"</span><span class="nv">$method</span><span class="s2">"</span><span class="w"> </span>--split<span class="w"> </span>eval150<span class="w"> </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-c<span class="w"> </span>browsecomp_plus_openrouter<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--output<span class="w"> </span><span class="s2">"runs/browsecomp-plus/eval-comparison/</span><span class="nv">$method</span><span class="s2">"</span>
 <span class="k">done</span>
 </code></pre></div>

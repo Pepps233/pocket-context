@@ -69,6 +69,7 @@ nav:
       - "ProgramBench": usage/programbench.md
       - "BrowseComp-Plus": usage/browsecomp_plus.md
       - "Context-method comparison": usage/context_comparison.md
+      - "Corpus and coding matrix": usage/context_benchmarks.md
       - "Inspector": usage/inspector.md
       - "Output files": usage/output_files.md
     - "Language models":

@@ -660,6 +660,9 @@ def run_matrix(
         1, min=1, max=30, help="Dedicated sandboxes per method; one task per sandbox."
     ),
     benchmark: str = typer.Option("browsecomp-plus", help="browsecomp-plus or swebench-verified."),
+    preflight: bool = typer.Option(
+        False, help="Provision coding sandboxes, verify all four methods, and delete; no model calls."
+    ),
 ) -> None:
     """Run matched questions with up to 30 parallel sandboxes per method."""
     from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
@@ -680,10 +683,13 @@ def run_matrix(
             output=Path("runs/swebench-verified/matrix") if output == Path("runs/browsecomp-plus/matrix") else output,
             dry_run=dry_run,
             workers_per_method=workers_per_method,
+            preflight=preflight,
         )
         return
     if benchmark != "browsecomp-plus":
         raise ValueError("Select browsecomp-plus or swebench-verified")
+    if preflight:
+        raise ValueError("Use the check command for a precreated corpus pool")
     split = split or "development680"
     instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_id, limit, seed)
     config = matrix_config(config_spec)
@@ -764,10 +770,17 @@ def run_matrix(
 def delete_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
     """Delete only the sandboxes recorded in this pool's local manifest."""
     api = client()
-    workers = {worker["id"] for worker in json.loads(pool.read_text())["sandboxes"]}
-    sandboxes = [sandbox for sandbox in api.list() if sandbox.id in workers]
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        list(executor.map(api.delete, sandboxes))
+    document = json.loads(pool.read_text())
+    if "snapshots" in document:
+        from pocketcontextagent.run.benchmarks.utils.swebench_daytona import delete_resources
+
+        delete_resources(api, document)
+    else:
+        workers = {worker["id"] for worker in document["sandboxes"] if worker.get("id")}
+        names = {worker["name"] for worker in document["sandboxes"] if worker.get("name")}
+        sandboxes = [sandbox for sandbox in api.list() if sandbox.id in workers or sandbox.name in names]
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            list(executor.map(lambda sandbox: api.delete(sandbox, wait=True, timeout=180), sandboxes))
     pool.unlink()
     typer.echo("Pool deleted")
 

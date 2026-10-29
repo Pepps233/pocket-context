@@ -3,7 +3,13 @@ agent:
   context_token_limit: 128000
   step_limit: 100
   cost_limit: 0.5
-  wall_time_limit_seconds: 1800
+  wall_time_limit_seconds: 7200
+sandbox:
+  cpu: 2
+  memory: 8
+  disk: 10
+  ttl_minutes: 240
+  snapshot_build_workers: 2
 environment:
   cwd: /testbed
   timeout: 120

@@ -11,6 +11,7 @@ import sys
 import tarfile
 import threading
 import time
+from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
@@ -34,6 +35,16 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
 )
 from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
 from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics
+from pocketcontextagent.run.benchmarks.utils.shared_snapshots import SharedSnapshots
+from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
+    PreparedSnapshot,
+    ResourceJournal,
+    RuntimeConfig,
+    create_snapshot,
+    delete_resources,
+    sandbox_metadata,
+    sandbox_params,
+)
 from pocketcontextagent.utils.serialize import recursive_merge
 
 
@@ -86,6 +97,12 @@ def benchmark_config(config_spec: list[str]) -> dict:
     allowed = {"cwd", "timeout", "research_tools", "context_tools"}
     if set(config.get("environment", {})) - allowed:
         raise ValueError("Use a coding provider profile, not a BrowseComp-Plus retrieval profile")
+    runtime = RuntimeConfig(**config.get("sandbox", {}))
+    config["sandbox"] = asdict(runtime)
+    if runtime.ttl_minutes and runtime.ttl_minutes * 60 <= config["agent"].get(
+        "wall_time_limit_seconds", 0
+    ) + runtime.preflight_timeout(config["environment"]["timeout"]):
+        raise ValueError("Sandbox TTL must exceed the task wall-time limit plus startup grace")
     matrix_provider_key(config)
     if "api_key" in config["model"].get("model_kwargs", {}):
         raise ValueError("Keep provider keys in the environment, not saved run configurations")
@@ -124,12 +141,26 @@ def run_manifest(config: dict, method: str, instances: list[dict], workers: int,
         "index": "",
         "index_files": [],
         "task_images": {row["query_id"]: row["image"] for row in instances},
-        "runtime": "local-agent/daytona-shell",
+        "runtime": "local-agent/daytona-shell/shared-immutable-snapshot",
         "harness_revision": swe.HARNESS_REVISION,
     }
 
 
-def run_instance(instance: dict, output: Path, config: dict, env: SWEBenchVerifiedEnvironment, manifest: dict) -> dict:
+def archive_trajectories(output: Path) -> None:
+    temporary = output / "trajectories.tar.gz.tmp"
+    with tarfile.open(temporary, "w:gz") as archive:
+        archive.add(output / "trajectories", arcname="trajectories")
+    temporary.replace(output / "trajectories.tar.gz")
+
+
+def run_instance(
+    instance: dict,
+    output: Path,
+    config: dict,
+    env: SWEBenchVerifiedEnvironment,
+    manifest: dict,
+    runtime_metadata: dict | None = None,
+) -> dict:
     """Capture the actual patch on every exit; submission is not official test success."""
     iid = instance["query_id"]
     trajectory = output / "trajectories" / iid
@@ -189,13 +220,13 @@ def run_instance(instance: dict, output: Path, config: dict, env: SWEBenchVerifi
                 "model": agent.model.config.model_name,
                 "method": manifest["method"],
                 "fingerprint": fingerprint,
+                **(runtime_metadata or {}),
             },
         }
         temporary = output / f"{iid}.json.tmp"
         temporary.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         temporary.replace(output / f"{iid}.json")
-        with tarfile.open(output / "trajectories.tar.gz", "w:gz") as archive:
-            archive.add(output / "trajectories", arcname="trajectories")
+        archive_trajectories(output)
         typer.echo(f"{manifest['method']} {iid}: {result['status']}; patch={len(patch)} characters")
     return result
 
@@ -204,23 +235,6 @@ def bounded_command(command: str, timeout: int) -> str:
     if timeout <= 0:
         raise ValueError("Command timeout must be positive")
     return f"timeout --signal=TERM --kill-after=5s {timeout}s {command}"
-
-
-def sandbox_params(instance: dict, method: str):
-    from daytona import CreateSandboxFromImageParams, Resources
-
-    return CreateSandboxFromImageParams(
-        image=instance["image"],
-        name=f"pca-swe-{method.replace('_', '-')}-{uuid4().hex[:12]}",
-        os_user="root",
-        public=False,
-        network_block_all=True,
-        env_vars={"BASH_ENV": "/root/.bashrc", "PAGER": "cat", "GIT_TERMINAL_PROMPT": "0"},
-        labels={"project": "pocket-context", "benchmark": "swebench-verified", "method": method},
-        resources=Resources(cpu=2, memory=8, disk=10),
-        auto_stop_interval=30,
-        auto_delete_interval=0,
-    )
 
 
 def run_matrix(
@@ -234,9 +248,11 @@ def run_matrix(
     output: Path,
     dry_run: bool,
     workers_per_method: int,
+    preflight: bool = False,
 ) -> None:
     instances = load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed, split=split)
     config = benchmark_config(config_spec)
+    runtime = RuntimeConfig(**config["sandbox"])
     active = min(workers_per_method, len(instances))
     if not 1 <= workers_per_method <= 30:
         raise ValueError("Select 1 to 30 workers per method")
@@ -247,8 +263,13 @@ def run_matrix(
         "workers_per_method": workers_per_method,
         "active_workers_per_method": active,
         "selected_query_ids": [row["query_id"] for row in instances],
-        "attempts": len(instances) * len(METHODS),
+        "attempts": 0 if preflight else len(instances) * len(METHODS),
+        "planned_method_tasks": len(instances) * len(METHODS),
+        "preflight_only": preflight,
         "maximum_active_sandboxes": active * len(METHODS),
+        "sandbox_idle_stop_minutes": 0,
+        "sandbox_ttl_minutes": runtime.ttl_minutes,
+        "task_wall_time_limit_seconds": config["agent"]["wall_time_limit_seconds"],
     }
     manifests = {
         method: run_manifest(config, method, instances, active, data_dir / "queries.jsonl", split) for method in METHODS
@@ -259,64 +280,158 @@ def run_matrix(
     if output.exists() and any(output.iterdir()):
         raise ValueError("Use a fresh output directory; failed attempts are never retried automatically")
     api = client()
-    provider_environment(matrix_provider_key(config))
-    for manifest in manifests.values():
-        model = get_model(config=manifest["config"]["model"])
-        if hasattr(model.config, "action_regex") or not callable(getattr(model, "get_tools", None)):
-            raise ValueError("The coding matrix requires a native-tool model")
+    if not preflight:
+        provider_environment(matrix_provider_key(config))
+        for manifest in manifests.values():
+            model = get_model(config=manifest["config"]["model"])
+            if hasattr(model.config, "action_regex") or not callable(getattr(model, "get_tools", None)):
+                raise ValueError("The coding matrix requires a native-tool model")
     output.mkdir(parents=True, exist_ok=True)
     (output / "selection.yaml").write_text(yaml.safe_dump(selection, sort_keys=False), encoding="utf-8")
     locks = {method: threading.Lock() for method in METHODS}
-    journal_lock = threading.Lock()
-    sandboxes = []
+    journal = ResourceJournal(output / "sandbox-cleanup.json")
+    builders = threading.Semaphore(runtime.snapshot_build_workers)
+    readiness = {row["query_id"]: threading.Barrier(len(METHODS)) for row in instances}
+    checks = {method: {} for method in METHODS}
     groups = {method: [{"id": f"{method}-{i}"} for i in range(active)] for method in METHODS}
 
+    def create(instance: dict) -> PreparedSnapshot:
+        with builders:
+            pool.raise_if_aborted()
+            return create_snapshot(api, runtime, journal, instance)
+
+    def destroy(snapshot: PreparedSnapshot) -> None:
+        if any(row.get("retain") and row.get("snapshot") == snapshot.name for row in journal.document()["sandboxes"]):
+            journal.record("snapshots", snapshot.name, phase="retained")
+            return
+        delete_resources(api, {"snapshots": [{"name": snapshot.name}]}, runtime.cleanup_timeout_seconds)
+        journal.record("snapshots", snapshot.name, phase="destroyed")
+
     def execute(method: str, worker: dict, instance: dict) -> None:
-        task = output / method / "tasks" / instance["query_id"]
-        sandbox = api.create(sandbox_params(instance, method), timeout=600)
-        prepared = False
+        iid = instance["query_id"]
+        task = output / method / "tasks" / iid
+        task.mkdir(parents=True)
+        name = f"pca-swe-{method.replace('_', '-')}-{uuid4().hex[:12]}"
+        record = {"name": name, "method": method, "query_id": iid, "slot": worker["id"]}
+
+        def phase(value: str, **fields) -> None:
+            record.update(phase=value, **fields)
+            journal.record("sandboxes", name, **{key: value for key, value in record.items() if key != "name"})
+            temporary = task / "worker.yaml.tmp"
+            temporary.write_text(yaml.safe_dump(record), encoding="utf-8")
+            temporary.replace(task / "worker.yaml")
+            typer.echo(f"{method} {iid}: {value}")
+
+        phase("waiting_for_shared_snapshot")
+        ended = False
         try:
-            task.mkdir(parents=True)
-            (task / "worker.yaml").write_text(
-                yaml.safe_dump({"sandbox_id": sandbox.id, "image": instance["image"], "slot": worker["id"]})
-            )
-            with journal_lock:
-                sandboxes.append({"id": sandbox.id, "method": method, "query_id": instance["query_id"]})
-                temporary = output / "sandbox-cleanup.json.tmp"
-                temporary.write_text(json.dumps({"sandboxes": sandboxes}, indent=2), encoding="utf-8")
-                temporary.replace(output / "sandbox-cleanup.json")
-            typer.echo(f"{method} {instance['query_id']}: sandbox {sandbox.id}")
+            with pool.lease(method, iid, instance) as snapshot:
+                phase("creating", snapshot=snapshot.name, image=snapshot.image)
+                sandbox = None
+                agent_started = False
+                try:
+                    sandbox = api.create(
+                        sandbox_params(snapshot, method, runtime, name=name), timeout=runtime.startup_timeout_seconds
+                    )
+                    phase(
+                        "repository_preflight",
+                        id=sandbox.id,
+                        sandbox_id=sandbox.id,
+                        lifecycle=sandbox_metadata(api.get(sandbox.id).model_dump(), runtime),
+                    )
 
-            def command_backend(command: str, *, cwd: str, timeout: int) -> dict:
-                result = sandbox.process.exec(bounded_command(command, timeout), cwd=cwd, timeout=timeout + 15)
-                return {"output": result.result, "returncode": result.exit_code}
+                    def command_backend(command: str, *, cwd: str, timeout: int) -> dict:
+                        result = sandbox.process.exec(bounded_command(command, timeout), cwd=cwd, timeout=timeout + 15)
+                        return {"output": result.result, "returncode": result.exit_code}
 
-            env = SWEBenchVerifiedEnvironment(
-                command_backend, **manifests[method]["config"]["environment"], base_commit=instance["base_commit"]
-            )
-            env.prepare(fresh_isolated=True)
-            sandbox.set_auto_delete_interval(-1)
-            prepared = True
-            try:
-                run_instance(instance, task, manifests[method]["config"], env, manifests[method])
-            finally:
-                if (task / f"{instance['query_id']}.json").exists():
-                    with locks[method]:
-                        publish_matrix_task(task, output / method, instance["query_id"], manifests[method])
+                    env = SWEBenchVerifiedEnvironment(
+                        command_backend,
+                        **manifests[method]["config"]["environment"],
+                        base_commit=instance["base_commit"],
+                    )
+                    env.prepare(fresh_isolated=True)
+                    if env.capture_patch().strip():
+                        raise RuntimeError("Instance image is not clean at the task base commit")
+                    if preflight:
+                        env._checked(f"printf '%s' {method} > /tmp/pca-infrastructure-isolation")
+                    phase("ready", base_commit=env.base_commit)
+                    readiness[iid].wait(timeout=runtime.preflight_timeout(env.config.timeout))
+                    pool.raise_if_aborted()
+                    if preflight:
+                        if env._checked("cat /tmp/pca-infrastructure-isolation") != method:
+                            raise RuntimeError("Method sandboxes do not have isolated filesystems")
+                        record["python_environment"] = env._checked(
+                            "set -e; python --version; command -v pytest"
+                        ).strip()
+                        phase("preflight_verified", model_calls=0, preflight_verified=True)
+                        with locks[method]:
+                            checks[method][iid] = record
+                    else:
+                        phase("running_agent")
+                        agent_started = True
+                        try:
+                            run_instance(
+                                instance,
+                                task,
+                                manifests[method]["config"],
+                                env,
+                                manifests[method],
+                                {"sandbox_id": sandbox.id, "snapshot": snapshot.name, "image": snapshot.image},
+                            )
+                        finally:
+                            if (task / f"{iid}.json").exists():
+                                with locks[method]:
+                                    publish_matrix_task(task, output / method, iid, manifests[method])
+                finally:
+                    error = sys.exc_info()[1]
+                    if error is not None:
+                        record.update(journal.failure("sandboxes", name, error))
+                        for barrier in readiness.values():
+                            barrier.abort()
+                    captured = (task / f"{iid}.json").is_file() and (task / "trajectories.tar.gz").is_file()
+                    if not agent_started or captured:
+                        delete_resources(api, {"sandboxes": [{"name": name}]}, runtime.cleanup_timeout_seconds)
+                        phase("destroyed", cleanup_confirmed=True)
+                    elif sandbox is not None:
+                        journal.record("sandboxes", name, retain=True)
+                        current = api.get(sandbox.id)
+                        if getattr(current.state, "value", current.state) in ("started", "starting"):
+                            api.stop(current)
+                        phase("retained_for_recovery", retain=True)
+            ended = True
         finally:
-            if not prepared or (
-                (task / f"{instance['query_id']}.json").exists() and (task / "trajectories.tar.gz").exists()
-            ):
-                api.delete(sandbox)
-            else:
-                typer.echo(
-                    f"Retaining sandbox {sandbox.id} for recovery; delete it afterward using {output / 'sandbox-cleanup.json'}"
-                )
-                current = api.get(sandbox.id)
-                if getattr(current.state, "value", current.state) in ("started", "starting"):
-                    api.stop(current)
+            if not ended and sys.exc_info()[1] is not None:
+                diagnostic = journal.failure("sandboxes", name, sys.exc_info()[1])
+                phase("failed", **diagnostic)
+                for barrier in readiness.values():
+                    barrier.abort()
 
-    run_matrix_workers(groups, instances, execute)
+    queue_factor = (active + runtime.snapshot_build_workers - 1) // runtime.snapshot_build_workers + 1
+    try:
+        with SharedSnapshots(
+            set(METHODS),
+            active,
+            create,
+            destroy,
+            timeout=runtime.snapshot_timeout_seconds * queue_factor + 30,
+            order=[row["query_id"] for row in instances],
+        ) as pool:
+            run_matrix_workers(groups, instances, execute)
+    finally:
+        delete_resources(api, journal.document(), runtime.cleanup_timeout_seconds, preserve_retained=True)
+        (output / "cleanup.yaml").write_text(
+            yaml.safe_dump({"confirmed": not any(row.get("retain") for row in journal.document()["sandboxes"])}),
+            encoding="utf-8",
+        )
+    if preflight:
+        (output / "preflight.yaml").write_text(
+            yaml.safe_dump({"methods": checks, "model_calls": 0, "cleanup_confirmed": True}, sort_keys=False),
+            encoding="utf-8",
+        )
+        typer.echo(
+            f"Verified {sum(map(len, checks.values()))} coding sandboxes across four methods; zero model calls; cleanup confirmed"
+        )
+        return
     report = export_predictions(output)
     (output / "comparison.yaml").write_text(yaml.safe_dump(report, sort_keys=False), encoding="utf-8")
     typer.echo(comparison_markdown(report))

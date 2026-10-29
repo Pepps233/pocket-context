@@ -36,11 +36,17 @@ The seed fixes selection, not model determinism. Selection happens once per benc
 | | BrowseComp-Plus | SWE-bench Verified |
 | --- | --- | --- |
 | Provisioning | Existing precreated `--pool` | Automatically create and delete one fresh sandbox per method/task attempt |
-| Runtime | Existing corpus worker application | Official instance image for that task |
+| Runtime | Existing corpus worker application | Four independent sandboxes from one shared digest-pinned official snapshot per task |
 | Inference | Existing remote worker execution, with the explicitly forwarded provider key | Model agents and orchestration run locally; coding tool operations run remotely in Daytona |
 | Sandbox credentials | Existing `create --provider-key DEEPSEEK_API_KEY`; Daytona key stays on launcher | **No model keys or Daytona keys in the coding sandbox** |
 
-Do not pass a precreated `--pool` to the SWE-bench workflow. Each fresh coding sandbox starts from the task's official instance image. Successful artifact capture is followed by deletion. Before agent execution, automatic deletion is disabled; if capture fails, the launcher prints the sandbox ID, stops the sandbox and retains its disk for recovery. Retained disks can incur storage charges. After recovery, remove remaining run sandboxes with `mini-extra benchmark-matrix delete --pool RUN_ROOT/sandbox-cleanup.json`; run that only after execution has stopped. Coding uses that image directly, **without nested Docker**, with outbound network access disabled. Official grading is a separate operation.
+Do not pass a precreated `--pool` to the SWE-bench workflow. The connector imports one explicit named snapshot per question, then creates independent method sandboxes from it instead of invoking an implicit image build for every attempt. The bounded cache holds at most `active_workers_per_method` snapshots, admits questions in cohort order, and permits two concurrent imports by default. A snapshot remains leased until all four methods finish; a fast method cannot evict an image still needed by a slower method or jump ahead of that method's pending questions.
+
+Coding sandboxes are **persistent at creation**, with **idle auto-stop and auto-pause disabled (`0`)**, stopped-state auto-delete disabled (`-1`), and an independent **four-hour absolute TTL** for orphan protection. Ephemeral sandboxes cannot be converted to persistent later. The connector verifies the server's actual resources, lifecycle settings and deadline. The agent's separate wall-time budget is **two hours**, replacing the former 30 minutes; the existing $0.50 model-cost and 100-step limits are unchanged. For longer tasks, override both limits, for example `-c agent.wall_time_limit_seconds=14400 -c sandbox.ttl_minutes=300`. A shorter organization-imposed lifetime fails preflight rather than being silently accepted. Explicit `sandbox.ttl_minutes=0` requires the organization to allow disabling the absolute safety limit.
+
+All four methods must pass a question's repository and lifecycle preflight before any starts inference. Each fresh checkout is restored to its immutable task base commit and must have an empty initial patch. Coding uses the official image directly, **without nested Docker**, with outbound networking blocked and `BASH_ENV` preserving conda activation. Shell commands have a process-level timeout as well as the SDK request timeout. Official grading is separate.
+
+Successful artifact capture is followed by confirmed deletion. If capture fails, the launcher stops the persistent sandbox and retains it and its snapshot for recovery before the absolute TTL expires; retained disks can incur storage charges. Resource names are journaled **before blocking create calls**, including creates that time out before returning an ID, and per-method stages/errors are printed immediately. Stop the controller before reconciling resources, then run `mini-extra benchmark-matrix delete --pool RUN_ROOT/sandbox-cleanup.json`. This deletes only journaled names/IDs, waits for sandbox destruction and polls snapshot removal to completion. An SDK creation timeout does **not** cancel server-side work; do not discard the journal or retry automatically while cleanup is unresolved.
 
 Both matrices support up to **30 active task slots per method, 120 total**, with one active task per sandbox. Effective concurrency is `min(workers_per_method, selected task count)` for each method. Thus a one-task smoke with `--workers-per-method 1` means four attempts, while requesting 30 workers for one task still gives only four active slots. Slots are concurrency limits, not the number of attempts in the cohort.
 
@@ -60,7 +66,7 @@ Each task uses the canonical Docker Hub image:
 docker.io/swebench/sweb.eval.x86_64.<normalized-instance-id>:latest
 ```
 
-Normalize the instance ID by replacing `__` with `_1776_` and lowercasing. For example, `django__django-11099` maps to `docker.io/swebench/sweb.eval.x86_64.django_1776_django-11099:latest`. Image names are derived from instance IDs, not arbitrary dataset-supplied image URLs. The official `:latest` tags are **mutable**, not immutable revision pins. Record the requested image and any resolved digest available from provisioning; a pinned dataset alone does not pin image contents.
+Normalize the instance ID by replacing `__` with `_1776_` and lowercasing. For example, `django__django-11099` maps to `docker.io/swebench/sweb.eval.x86_64.django_1776_django-11099:latest`. Image names are derived from instance IDs, not arbitrary dataset-supplied image URLs. The prepared dataset retains upstream `:latest` tags for provenance. Before importing a snapshot, the connector resolves the image to its **immutable Docker Hub digest**; all four methods use that same snapshot and digest. Requested tags are recorded in the resource journal; resolved digests are recorded there, in worker metadata and in attempt metadata. Tags can change between separate runs, so preserve these digests when reproducing or comparing runs; a pinned dataset alone does not pin image contents.
 
 The coding sandbox allocation is **2 CPU, 8 GB RAM and 10 GB disk per sandbox**. At 120 concurrent slots that is up to 240 CPUs, 960 GB RAM and 1,200 GB disk provisioned. Verify account quotas and image availability before a paid launch; lower concurrency when necessary without changing the selected cohort. The orchestrator also holds active model histories and performs token accounting, so monitor its RAM/CPU before scaling to 120 local agent threads.
 
@@ -88,7 +94,18 @@ mini-extra browsecomp-plus daytona matrix \
   --output runs/swebench-verified-smoke --dry-run
 ```
 
-After reviewing the selection, configuration and budget, **omit `--dry-run` from one of these commands** to authorize the paid one-task/four-method smoke. It automatically provisions fresh task sandboxes; do not run `daytona create` for SWE-bench Verified.
+Before inference, check the real infrastructure independently (this incurs Daytona charges, but no model charges):
+
+```bash
+mini-extra benchmark-matrix matrix \
+  --benchmark swebench-verified --data-dir data/swebench-verified \
+  --limit 1 --seed 42 --workers-per-method 1 -c context_benchmark_deepseek \
+  --preflight --output runs/swebench-infrastructure-check
+```
+
+`--preflight` creates all four method sandboxes from one shared snapshot, checks lifecycle settings, the clean base commit, Python environment and filesystem isolation, then deletes the sandboxes and snapshot with confirmation. It neither instantiates nor queries a model and needs only Daytona credentials. Inspect `preflight.yaml`, task `worker.yaml` files and `sandbox-cleanup.json`. It produces no benchmark results or grading inputs. Add `--dry-run` to this command for a no-API plan.
+
+After reviewing the selection, configuration and budget, and with explicit authorization for inference, **omit `--dry-run` from one of the earlier non-preflight commands** to launch the paid one-task/four-method smoke. It automatically provisions fresh task sandboxes; do not run `daytona create` for SWE-bench Verified.
 
 ### BrowseComp-Plus: retain the existing pool workflow
 
@@ -153,11 +170,14 @@ The matrix parent records shared selection and configuration. Inspect the root m
 ```text
 RUN_ROOT/
   selection.yaml
+  sandbox-cleanup.json      # SWE-bench: intended names, returned IDs and snapshot digests
+  cleanup.yaml              # SWE-bench: confirmed cleanup or retained recovery resources
   METHOD/
     run.yaml
     summary.yaml
     ID.json
     tasks/ID/
+      worker.yaml           # SWE-bench: stages, sandbox identity and verified lifecycle
       run.yaml
       ID.json
       trajectories...

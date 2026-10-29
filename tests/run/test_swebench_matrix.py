@@ -3,6 +3,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import threading
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEn
 from pocketcontextagent.models.test_models import make_toolcall_output
 from pocketcontextagent.run.benchmarks.benchmark_grading import export_evaluation, import_evaluation
 from pocketcontextagent.run.benchmarks.benchmark_matrix import (
+    archive_trajectories,
     benchmark_config,
     bounded_command,
     export_predictions,
@@ -26,6 +28,23 @@ from pocketcontextagent.run.benchmarks.benchmark_matrix import (
 )
 from pocketcontextagent.run.benchmarks.browsecomp_plus import app
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import publish_matrix_task, run_matrix_workers
+from pocketcontextagent.run.benchmarks.utils.swebench_daytona import PreparedSnapshot, RuntimeConfig
+
+
+def test_partial_trajectory_archive_is_not_treated_as_successful_collection(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        archive_trajectories(tmp_path)
+    assert not (tmp_path / "trajectories.tar.gz").exists()
+    assert (tmp_path / "trajectories.tar.gz.tmp").is_file()
+    source = tmp_path / "trajectories" / "instance"
+    source.mkdir(parents=True)
+    (source / "trajectory.json").write_text('{"complete": true}')
+    (source / "context.sqlite").write_bytes(b"context-state")
+    archive_trajectories(tmp_path)
+    with tarfile.open(tmp_path / "trajectories.tar.gz") as archive:
+        assert archive.extractfile("trajectories/instance/trajectory.json").read() == b'{"complete": true}'
+        assert archive.extractfile("trajectories/instance/context.sqlite").read() == b"context-state"
+    assert not (tmp_path / "trajectories.tar.gz.tmp").exists()
 
 
 def git(directory: Path, *arguments: str, input: str | None = None) -> str:
@@ -267,6 +286,26 @@ def test_coding_cli_dry_run_needs_no_sandbox_or_provider_credentials(repository:
     assert plan["attempts"] == plan["maximum_active_sandboxes"] == 4
     assert plan["active_workers_per_method"] == 1 and not (tmp_path / "output").exists()
     assert "SECRET_" not in result.output
+    preflight = CliRunner().invoke(
+        app,
+        [
+            "daytona",
+            "matrix",
+            "--benchmark",
+            "swebench-verified",
+            "--data-dir",
+            str(tmp_path),
+            "--limit",
+            "1",
+            "--preflight",
+            "--dry-run",
+        ],
+    )
+    assert preflight.exit_code == 0, preflight.output
+    infra = yaml.safe_load(preflight.output)
+    assert infra["preflight_only"] is True and infra["attempts"] == 0
+    assert infra["planned_method_tasks"] == 4 and infra["sandbox_idle_stop_minutes"] == 0
+    assert infra["sandbox_ttl_minutes"] == 240 and infra["task_wall_time_limit_seconds"] == 7200
     assert load_instances(tmp_path, query_ids=[], limit=1, seed=42) == load_instances(
         tmp_path, query_ids=[], limit=1, seed=42
     )
@@ -279,11 +318,17 @@ def test_coding_cli_dry_run_needs_no_sandbox_or_provider_credentials(repository:
 
 
 def test_sandbox_spec_uses_official_image_without_control_or_model_keys():
-    spec = sandbox_params({"image": "docker.io/swebench/sweb.eval.x86_64.fixture_1776_repo-1:latest"}, "pocket_context")
-    assert spec.image.startswith("docker.io/swebench/") and spec.os_user == "root"
+    spec = sandbox_params(
+        PreparedSnapshot("snapshot-name", "docker.io/swebench/fixture@sha256:" + "a" * 64),
+        "pocket_context",
+        RuntimeConfig(),
+    )
+    assert spec.snapshot == "snapshot-name" and spec.os_user == "root"
+    assert "image" not in spec.model_dump() and "resources" not in spec.model_dump()
     assert spec.network_block_all is True and spec.public is False
     assert set(spec.env_vars) == {"BASH_ENV", "PAGER", "GIT_TERMINAL_PROMPT"}
-    assert spec.resources.cpu == 2 and spec.resources.memory == 8 and spec.resources.disk == 10
+    assert spec.ephemeral is False and spec.auto_stop_interval == spec.auto_pause_interval == 0
+    assert spec.auto_delete_interval == -1 and spec.ttl_minutes == 240
     assert not any("API_KEY" in key for key in spec.env_vars)
     assert spec.volumes is None and spec.secrets is None
 

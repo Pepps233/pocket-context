@@ -4,12 +4,11 @@ from collections.abc import Callable
 
 import litellm
 
-from pocketcontextagent.comparisons.tools import corpus_tools
+from pocketcontextagent.comparisons.tools import research_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.litellm_model import LitellmModel, LitellmModelConfig
 from pocketcontextagent.models.utils.actions_toolcall_response import (
-    BASH_TOOL_RESPONSE_API,
     finish_reason_from_responses_api,
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
@@ -43,11 +42,7 @@ class LitellmResponseModel(LitellmModel):
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        research = (
-            corpus_tools(self.config.context_tools, responses_api=True)
-            if self.config.research_tools == "corpus"
-            else [BASH_TOOL_RESPONSE_API]
-        )
+        research = research_tools(self.config.research_tools, self.config.context_tools, responses_api=True)
         return [*research, *context_tools(self.config.context_tools, responses_api=True)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):

@@ -5,6 +5,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 
+from pocketcontextagent.comparisons.benchmark_prompts import RESEARCH_MODES, benchmark_prompt, benchmark_stop_prompt
 from pocketcontextagent.comparisons.methods.acm import ACM_PROVENANCE
 from pocketcontextagent.comparisons.methods.acm_prompts import BCP_STOP_PROMPT
 from pocketcontextagent.comparisons.methods.acm_prompts import build_system_prompt as acm_prompt
@@ -64,15 +65,24 @@ def configure_method(config: dict, method: str) -> dict:
     strategy = METHODS[method]
     agent = config.setdefault("agent", {})
     agent["agent_class"] = strategy.agent_class
+    benchmark = config.get("benchmark", "browsecomp-plus")
+    if benchmark not in RESEARCH_MODES:
+        raise ValueError(f"Unknown benchmark {benchmark!r}")
     config.setdefault("model", {})["context_tools"] = strategy.context_tools
-    config["model"]["research_tools"] = "corpus"
+    config["model"]["research_tools"] = RESEARCH_MODES[benchmark]
     config.setdefault("environment", {})["context_tools"] = strategy.context_tools
-    config["environment"]["research_tools"] = "corpus"
-    if method != "pocket_context":
+    config["environment"]["research_tools"] = RESEARCH_MODES[benchmark]
+    if benchmark != "browsecomp-plus":
         window = agent.get("context_token_limit", 128000)
-        agent["system_template"] = literal_template(acm_prompt(window) if method == "acm" else react_prompt(window))
+        agent["system_template"] = literal_template(benchmark_prompt(benchmark, method, window))
         agent["instance_template"] = "{{task}}"
-        agent["context_limit_template"] = literal_template(BCP_STOP_PROMPT)
+        agent["context_limit_template"] = literal_template(benchmark_stop_prompt(benchmark))
+    if method != "pocket_context":
+        if benchmark == "browsecomp-plus":
+            window = agent.get("context_token_limit", 128000)
+            agent["system_template"] = literal_template(acm_prompt(window) if method == "acm" else react_prompt(window))
+            agent["instance_template"] = "{{task}}"
+            agent["context_limit_template"] = literal_template(BCP_STOP_PROMPT)
         if agent.get("context_pressure_fraction", 0.95) != 0.95:
             raise ValueError("Published baseline ports use the original 95% current-history stop threshold")
         agent["context_pressure_fraction"] = 0.95
@@ -100,7 +110,11 @@ def method_provenance(config: dict, method: str) -> dict:
                 sort_keys=True,
             ).encode()
         ).hexdigest(),
-        "evaluation": "shared-corpus, same-policy-weight comparison; not reproduction of published scores",
+        "evaluation": (
+            "shared-corpus, same-policy-weight comparison; not reproduction of published scores"
+            if config.get("benchmark", "browsecomp-plus") == "browsecomp-plus"
+            else f"shared-{config['benchmark']}, domain-adapted prompts and tools; not reproduction of published scores"
+        ),
         "acm_boundary": "exclude issuing assistant; preserve native call/result pair" if method == "acm" else None,
         "auxiliary_model": "same model and endpoint as main policy",
     }

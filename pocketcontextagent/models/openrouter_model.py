@@ -7,11 +7,10 @@ from typing import Any, Literal
 import requests
 from pydantic import BaseModel, field_validator
 
-from pocketcontextagent.comparisons.tools import corpus_tools
+from pocketcontextagent.comparisons.tools import research_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.utils.actions_toolcall import (
-    BASH_TOOL,
     format_toolcall_observation_messages,
     parse_toolcall_actions,
 )
@@ -30,8 +29,8 @@ class OpenRouterModelConfig(BaseModel):
     model_kwargs: dict[str, Any] = {}
     context_tools: Literal["pocket_context", "none", "acm"] = "pocket_context"
     """Native memory tools exposed alongside the configured research tools."""
-    research_tools: Literal["bash", "corpus"] = "bash"
-    """Use bash by default or the native comparison corpus search tools."""
+    research_tools: Literal["bash", "corpus", "web"] = "bash"
+    """Native shell, fixed-corpus, or live-web tools."""
     set_cache_control: Literal["default_end"] | None = None
     """Set explicit cache control markers, for example for Anthropic models"""
     cost_tracking: Literal["default", "ignore_errors"] = os.getenv("MSWEA_COST_TRACKING", "default")
@@ -77,7 +76,7 @@ class OpenRouterModel:
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        research = corpus_tools(self.config.context_tools) if self.config.research_tools == "corpus" else [BASH_TOOL]
+        research = research_tools(self.config.research_tools, self.config.context_tools)
         return [*research, *context_tools(self.config.context_tools)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):

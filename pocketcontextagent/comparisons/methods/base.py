@@ -158,10 +158,12 @@ class ComparisonAgent(DefaultAgent):
                 f"{type(model.config).__name__}Comparison",
                 __base__=type(model.config),
                 context_tools=(Literal["pocket_context", "none", "acm"], self.context_tool_mode),
-                research_tools=(Literal["bash", "corpus"], "corpus"),
+                research_tools=(
+                    Literal["bash", "corpus", "web"],
+                    getattr(getattr(env, "config", None), "research_tools", "corpus"),
+                ),
             )(**model.config.model_dump())
         model.config.context_tools = self.context_tool_mode
-        model.config.research_tools = "corpus"
         super().__init__(model, env, config_class=config_class, **kwargs)
         self.context = ComparisonContext(self.config.context_db_path)
         self.memory_queries: list[dict] = []

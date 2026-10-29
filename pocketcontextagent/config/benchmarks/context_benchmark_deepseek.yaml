@@ -1,0 +1,13 @@
+# Shared provider profile; benchmark-specific tools and prompts come from the connector.
+model:
+  model_class: litellm
+  model_name: deepseek/deepseek-flash
+  cost_tracking: default
+  model_kwargs:
+    api_base: https://api.deepseek.com
+    max_tokens: 16384
+    tool_choice: auto
+    thinking:
+      type: enabled
+    extra_body:
+      reasoning_effort: high

@@ -9,10 +9,11 @@ from typing import Any, Literal
 import litellm
 from pydantic import BaseModel, field_validator
 
-from pocketcontextagent.comparisons.tools import research_tools
+from pocketcontextagent.comparisons.tools import corpus_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.utils.actions_toolcall import (
+    BASH_TOOL,
     format_toolcall_observation_messages,
     parse_toolcall_actions,
 )
@@ -33,8 +34,8 @@ class LitellmModelConfig(BaseModel):
     """Additional arguments passed to the API."""
     context_tools: Literal["pocket_context", "none", "acm"] = "pocket_context"
     """Native memory tools exposed alongside the configured research tools."""
-    research_tools: Literal["bash", "corpus", "web"] = "bash"
-    """Native shell, fixed-corpus, or live-web tools."""
+    research_tools: Literal["bash", "corpus"] = "bash"
+    """Use bash by default or the native comparison corpus search tools."""
     litellm_model_registry: Path | str | None = os.getenv("LITELLM_MODEL_REGISTRY_PATH")
     """Model registry for cost tracking and model metadata. See the local model guide (https://mini-swe-agent.com/latest/models/local_models/) for more details."""
     set_cache_control: Literal["default_end"] | None = None
@@ -77,7 +78,7 @@ class LitellmModel:
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        research = research_tools(self.config.research_tools, self.config.context_tools)
+        research = corpus_tools(self.config.context_tools) if self.config.research_tools == "corpus" else [BASH_TOOL]
         return [*research, *context_tools(self.config.context_tools)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):

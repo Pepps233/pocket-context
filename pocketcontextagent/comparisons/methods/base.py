@@ -159,7 +159,7 @@ class ComparisonAgent(DefaultAgent):
                 __base__=type(model.config),
                 context_tools=(Literal["pocket_context", "none", "acm"], self.context_tool_mode),
                 research_tools=(
-                    Literal["bash", "corpus", "web"],
+                    Literal["bash", "corpus"],
                     getattr(getattr(env, "config", None), "research_tools", "corpus"),
                 ),
             )(**model.config.model_dump())

@@ -1,0 +1,10 @@
+# Frozen task allocation; selection is shared across all four methods.
+seed: 42
+workers_per_method: 30
+benchmarks:
+  browsecomp-plus:
+    split: eval150
+    limit: 150
+  swebench-verified:
+    split: test
+    limit: 125

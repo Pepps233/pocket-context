@@ -1,0 +1,22 @@
+benchmark: swebench-verified
+agent:
+  context_token_limit: 128000
+  step_limit: 100
+  cost_limit: 0.5
+  wall_time_limit_seconds: 1800
+environment:
+  cwd: /testbed
+  timeout: 120
+model:
+  observation_template: |
+    <returncode>{{output.returncode}}</returncode>
+    {% if output.output | length > 16000 %}
+    <output_truncated original_characters="{{output.output | length}}">
+    {{output.output[:8000]}}
+    ... middle output omitted; use narrower commands or file redirection ...
+    {{output.output[-8000:]}}
+    </output_truncated>
+    {% else %}
+    <output>{{output.output}}</output>
+    {% endif %}
+    Model calls remaining: {{step_limit - n_model_calls}}.

@@ -4,7 +4,7 @@ import time
 
 import requests
 
-from pocketcontextagent.comparisons.tools import research_tools
+from pocketcontextagent.comparisons.tools import corpus_tools
 from pocketcontextagent.exceptions import FormatError
 from pocketcontextagent.models import GLOBAL_MODEL_STATS
 from pocketcontextagent.models.openrouter_model import (
@@ -15,6 +15,7 @@ from pocketcontextagent.models.openrouter_model import (
     OpenRouterRateLimitError,
 )
 from pocketcontextagent.models.utils.actions_toolcall_response import (
+    BASH_TOOL_RESPONSE_API,
     finish_reason_from_responses_api,
     format_toolcall_observation_messages,
     parse_toolcall_actions_response,
@@ -46,7 +47,11 @@ class OpenRouterResponseModel(OpenRouterModel):
     def get_tools(self) -> list[dict]:
         if hasattr(self.config, "action_regex"):
             return []
-        research = research_tools(self.config.research_tools, self.config.context_tools, responses_api=True)
+        research = (
+            corpus_tools(self.config.context_tools, responses_api=True)
+            if self.config.research_tools == "corpus"
+            else [BASH_TOOL_RESPONSE_API]
+        )
         return [*research, *context_tools(self.config.context_tools, responses_api=True)]
 
     def _query(self, messages: list[dict[str, str]], **kwargs):

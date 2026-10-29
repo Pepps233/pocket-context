@@ -123,11 +123,10 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
             "query_memory": ["summary_id", "query"],
             "search": ["query"],
             "get_document": ["docid"],
-            "browse": ["url"],
         }.get(name, ["command"])
         if name == "compact_block" and isinstance(args, dict) and set(args) == {"start_quote", "end_quote"}:
             required = ["start_quote", "end_quote"]
-        if name not in ("bash", "search", "get_document", "browse", *CONTEXT_TOOLS, *ACM_TOOLS):
+        if name not in ("bash", "search", "get_document", *CONTEXT_TOOLS, *ACM_TOOLS):
             error += f"Unknown tool '{name}'."
         if not isinstance(args, dict) or any(
             (
@@ -135,7 +134,7 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
                 if key == "summary_id"
                 else not isinstance(args.get(key), str)
                 or (name in CONTEXT_TOOLS and not args[key])
-                or (name in (*ACM_TOOLS, "search", "get_document", "browse") and not args[key].strip())
+                or (name in (*ACM_TOOLS, "search", "get_document") and not args[key].strip())
             )
             for key in required
         ):
@@ -144,12 +143,12 @@ def parse_native_calls(calls: list[dict]) -> list[dict]:
                 if name == "bash"
                 else f"Missing or invalid {', '.join(required)} argument in {name} tool call."
             )
-        if name in (*CONTEXT_TOOLS, *ACM_TOOLS, "search", "get_document", "browse"):
+        if name in (*CONTEXT_TOOLS, *ACM_TOOLS, "search", "get_document"):
             if isinstance(args, dict) and set(args) != set(required):
                 error += f"Use only {', '.join(required)} arguments."
             if name == "expand_block" and (not isinstance(args, dict) or not canonical_tag(args.get("tag"))):
                 error += "Use a canonical tag such as ctx-0001 from this run."
-            if name in ("search", "get_document", "browse"):
+            if name in ("search", "get_document"):
                 action = {"type": name, "tool_call_id": call["id"]}
                 if not error:
                     action["command"] = f"{name} {args[required[0]]}"

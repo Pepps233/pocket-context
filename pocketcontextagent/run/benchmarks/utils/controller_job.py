@@ -4,7 +4,7 @@ Run with ``python -m pocketcontextagent.run.benchmarks.utils.controller_job /abs
 ``launch`` detaches that runner and returns its PID, not the workload's exit code.
 Requests contain argv, cwd (job directory or an ancestor), secrets_path (outside
 that directory), and public env. Credential values must be single-line strings.
-Child output is merged and credential-redacted into a private, line-buffered log.
+Child output is merged and API-key-redacted into a private, line-buffered log.
 """
 
 import fcntl
@@ -86,10 +86,11 @@ def _environment(request: dict, jobdir: Path) -> tuple[dict[str, str], list[byte
         for key, value in secrets.items()
     ):
         raise ValueError("Invalid credentials")
-    if any(value in arg for value in secrets.values() for arg in request["argv"]):
-        raise ValueError("Credentials must not appear in argv")
+    sensitive = {value for key, value in secrets.items() if key.endswith("_API_KEY")}
+    if any(value in arg for value in sensitive for arg in request["argv"]):
+        raise ValueError("API keys must not appear in argv")
     environment = {key: value for key, value in os.environ.items() if not _secret_key(key)}
-    return environment | public | secrets, sorted({value.encode() for value in secrets.values()}, key=len, reverse=True)
+    return environment | public | secrets, sorted({value.encode() for value in sensitive}, key=len, reverse=True)
 
 
 def _process(pid: int | None) -> dict | None:

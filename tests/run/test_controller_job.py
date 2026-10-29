@@ -201,12 +201,38 @@ print(os.environ['DAYTONA_API_URL'], os.environ['DAYTONA_TARGET'], flush=True)
     runner = start(path, processes, env=dict(os.environ) | {"INHERITED_API_KEY": "must-not-be-inherited"})
     assert runner.wait(timeout=10) == 0
     assert read_status(path.parent)["state"] == "completed"
-    assert (path.parent / "run.log").read_text().count("[REDACTED]") == 4
+    assert (path.parent / "run.log").read_text().count("[REDACTED]") == 2
     assert "child_env_ok=True" in (path.parent / "run.log").read_text()
+    assert "https://private.invalid/api private-region" in (path.parent / "run.log").read_text()
     for artifact in path.parent.iterdir():
-        assert all(value.encode() not in artifact.read_bytes() for value in secrets.values())
+        assert secret.encode() not in artifact.read_bytes()
     assert stat.S_IMODE((path.parent / "run.log").stat().st_mode) == 0o600
     assert (tmp_path / "credentials.json").exists()
+
+
+def test_routing_values_do_not_reject_argv_or_mangle_logs(tmp_path, processes):
+    code = """
+import os
+import sys
+assert sys.argv[1] == '/usr/local/bin/python'
+assert os.environ['DAYTONA_TARGET'] == 'us'
+assert os.environ['DAYTONA_API_URL'] == sys.argv[2]
+print(sys.argv[1], os.environ['DAYTONA_TARGET'], os.environ['DAYTONA_API_URL'])
+print('key:' + os.environ['TEST_API_KEY'])
+"""
+    url = "https://app.daytona.io/api"
+    path = request(tmp_path, code, argv=[sys.executable, "-c", code, "/usr/local/bin/python", url])
+    secret = "private-test-value-92381"
+    (tmp_path / "credentials.json").write_text(
+        json.dumps({"TEST_API_KEY": secret, "DAYTONA_TARGET": "us", "DAYTONA_API_URL": url})
+    )
+    assert start(path, processes).wait(timeout=10) == 0
+    assert read_status(path.parent)["state"] == "completed"
+    assert (path.parent / "run.log").read_text().splitlines() == [
+        f"/usr/local/bin/python us {url}",
+        "key:[REDACTED]",
+    ]
+    assert secret not in (path.parent / "status.json").read_text()
 
 
 @pytest.mark.parametrize(

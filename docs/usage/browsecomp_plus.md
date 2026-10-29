@@ -21,7 +21,7 @@ mini-extra browsecomp-plus prepare
 Preparation streams only question IDs, questions, and reference answers from the pinned dataset revision, decrypts them locally, and downloads the official BM25 index (about 2.2 GB).
 The reference answers are for evaluation and are never included in the agent's task or observations.
 Hugging Face access is public; `HF_TOKEN` is optional for higher download rate limits.
-Model inference requires your provider's credentials, such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY`.
+Model inference requires your provider's credentials, such as `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENROUTER_API_KEY`.
 Export credentials in your shell, put them in the repository's ignored `.env`, or use the existing `mini-extra config` global configuration.
 Keep credentials out of YAML overrides because run configurations are saved.
 
@@ -82,6 +82,34 @@ Use `-c environment.k=10` or `-c environment.snippet_chars=4000` to change retri
 Snippet truncation uses characters; zero keeps full text.
 Document lookups return the full document unless a token cap is configured.
 The existing `compact_block` and `expand_block` tools remain available for context management.
+
+### Direct DeepSeek API
+
+Set `DEEPSEEK_API_KEY` in your shell or the ignored `.env`, then select the direct-provider profile:
+
+```bash
+mini-extra browsecomp-plus run --method pocket_context --limit 1 \
+  -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/deepseek-smoke/pocket_context
+```
+
+This uses `deepseek/deepseek-flash` through LiteLLM at `https://api.deepseek.com`, with thinking enabled and high effort. It does not use OpenRouter or serve the Qwen model. The profile keeps a 128,000-token experimental window, 100 main calls, 16,384 maximum output tokens, a $0.50 stopping threshold, and a 30-minute task timeout. It uses ten BM25 results, 512/128-token new/seen previews and an 8,192-token document cap. The Qwen corpus tokenizer remains fixed for retrieval consistency; context counts are estimates, not DeepSeek's exact chat-template tokenization.
+
+Apply the same profile to `react`, `resum` and `acm`; see [Context-method comparison](context_comparison.md). Do not layer this profile on top of the OpenRouter profile or reuse its output directories. API keys stay out of the YAML and saved manifests. The existing Daytona launcher is OpenRouter-specific and does not yet forward DeepSeek credentials; use the local runner for this profile. These commands incur DeepSeek model charges, but merely loading or validating the configuration does not call the API.
+
+### Muse Spark 1.3 Contributor (Meta direct)
+
+Set `META_API_KEY` in your shell or ignored `.env`, then select the exact Contributor profile:
+
+```bash
+mini-extra browsecomp-plus run --method pocket_context --split development680 --limit 1 \
+  -c browsecomp_plus_muse_spark_1_3_contributor \
+  --output runs/browsecomp-plus/muse-1.3-contributor-smoke/pocket_context
+```
+
+The model is explicitly **`meta/muse-spark-1.3-contributor`**, not Standard `muse-spark-1.3` or Contributor 1.2. The profile uses the direct endpoint `https://api.meta.ai/v1` and LiteLLM's native Responses interface, with encrypted reasoning replay, optional readable reasoning summaries, high effort, and no server-managed response storage. Contributor does not support `max` effort. It retains the shared 128,000-token experimental cap and corpus/budget settings, and requires no OpenRouter key. Use fresh output directories and the same profile for every method; do not merge it with another provider's profile. The Daytona launcher does not yet forward Meta credentials.
+
+**Contributor permits Meta to use prompts and responses for model training.** This includes submitted benchmark context; `store: false` does not opt out of Contributor data use. Check your benchmark/data policy before launching held-out tasks. See [Meta's Contributor terms](https://ai.developer.meta.com/docs/pricing-rate-limits) and the [comparison guide](context_comparison.md#muse-spark-13-contributor). No inference runs are launched by loading this profile.
 
 ### OpenRouter and the paper settings
 

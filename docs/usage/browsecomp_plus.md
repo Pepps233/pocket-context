@@ -146,7 +146,7 @@ The model decides whether context tools are useful; a short successful episode c
 ### Ten parallel Daytona workers
 
 Daytona is optional for local corpus retrieval.
-The legacy single-provider `daytona run` launcher remains OpenRouter-only. It uses one task per sandbox and shares a snapshot containing Java 21, CPU dependencies, the pinned BM25 index, and the Qwen tokenizer. For a four-method comparison with other providers, use the matrix workflow below.
+The legacy single-provider `daytona run` launcher remains OpenRouter-only and supports at most 10 workers. It uses one active task per sandbox and shares a snapshot containing Java 21, CPU dependencies, the pinned BM25 index, and the Qwen tokenizer. `daytona create --workers` supports pools of up to 120 workers, with at most 10 sandbox startups in flight; larger pools are for the matrix workflow below, not increased legacy `run` concurrency.
 
 ```bash
 uv pip install --python .venv/bin/python -e '.[browsecomp-plus,daytona]'
@@ -182,7 +182,7 @@ Create a fresh pool after application or credential changes or after idle deleti
 
 ### Matched Daytona matrix
 
-`daytona matrix` runs Pocket Context, ReAct, ReSum and ACM concurrently, one sandbox per method, with multiple selected questions processed sequentially per method. It requires at least four workers. Use a separate `--pool` manifest and a fresh pool containing the updated application:
+`daytona matrix` runs Pocket Context, ReAct, ReSum and ACM concurrently with dedicated sandboxes per method and one active question per sandbox. `--workers-per-method` defaults to `1`, preserving sequential processing within each method. Effective workers per method are `min(requested workers per method, selected question count)`; the pool needs **four times that many distinct workers**. Methods never share workers or oversubscribe sandboxes. Each method's dynamic queue assigns the next selected question to a free worker, retaining failed attempts without retries or dropping failures. Use a separate `--pool` manifest and a fresh pool containing the updated application:
 
 ```bash
 mini-extra browsecomp-plus daytona create \
@@ -199,7 +199,7 @@ mini-extra browsecomp-plus daytona matrix \
 
 `create --provider-key` forwards only the named key, defaulting to `OPENROUTER_API_KEY`. Any key name ending in `_API_KEY` is allowed except `DAYTONA_API_KEY`; the Daytona credential is never forwarded. Match the key to the matrix's provider profile and recreate the pool when changing it. Matrix uses the DeepSeek profile by default if no `-c` is supplied. Explicit configs replace the default provider profile; the base configuration is always applied. Do not merge provider profiles.
 
-Repeat `--query-id ID` for explicit selection; `--limit 0` selects the whole split. `--seed N` samples reproducibly without replacement; otherwise selection follows dataset order. All four methods receive the same selected questions. The parent `selection.yaml` records their IDs and seed. Matrix requires a new or empty output directory, with no hidden resampling or resume.
+Repeat `--query-id ID` for explicit selection (use `--limit 0` to run all specified IDs); `--limit 0` without IDs selects the whole split. `--seed N` samples reproducibly without replacement; otherwise selection follows dataset order. The shared cohort is randomized once, not separately per method or worker. The parent `selection.yaml` records the shared IDs, seed, requested `workers_per_method`, effective workers per method and per-method sandbox lists. Matrix requires a new or empty output directory, with no hidden resampling or resume.
 
 `--dry-run` validates selection/configuration without writing files or calling any API. Omit it to launch the paid run:
 
@@ -216,9 +216,29 @@ mini-extra browsecomp-plus compare \
   --output runs/browsecomp-plus/matched-smoke/comparison.yaml
 ```
 
-Use the existing `daytona status` command for worker tracking. Each method directory retains its original `run.yaml`, `summary.yaml`, query results and `trajectories.tar.gz`; shared selection metadata stays in the parent. `compare` accepts this matrix parent output. Without judge grades it reports resource usage only, not answer correctness; judge each method separately and supply `--grades` as described in [Context-method comparison](context_comparison.md#grade-and-compare).
+For a full 30-question cohort with up to 30 dedicated sandboxes per method (120 total):
 
-The DeepSeek profile's $0.50 threshold is per method per question, including auxiliary inference, and is checked between calls: it is not a hard billing cap. All four methods incur model charges, alongside Daytona and any judge costs. These examples are instructions, not claims that a run has occurred.
+```bash
+mini-extra browsecomp-plus daytona create \
+  --snapshot pocket-browsecomp-plus --workers 120 \
+  --provider-key DEEPSEEK_API_KEY \
+  --pool data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra browsecomp-plus daytona check \
+  --pool data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra browsecomp-plus daytona matrix \
+  --pool data/browsecomp-plus/daytona-matrix-120-pool.json \
+  --workers-per-method 30 --split eval150 --limit 30 --seed 42 \
+  -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/matched-30
+```
+
+The matrix command above launches a paid run; append `--dry-run` to validate without launching tasks. The 10-at-a-time pool startup limit is not a matrix task-concurrency limit. Fewer questions clamp concurrency: `--workers-per-method 30 --limit 10` uses only 10 workers per method, or 40 active task slots, even with a 120-worker pool. Extra sandboxes do not receive duplicate questions.
+
+Use the existing `daytona status` command for worker tracking. With one effective worker per method, each method directory keeps its original `run.yaml`, `summary.yaml`, root query results and `trajectories.tar.gz`. Multiworker runs keep each task's original artifacts under `METHOD/tasks/QUERY_ID/{run.yaml,QUERY_ID.json,trajectories.tar.gz}` and publish parent `METHOD/run.yaml`, root `METHOD/QUERY_ID.json` results and `METHOD/summary.yaml` with the common full-cohort manifest and fingerprint, without rewriting shard provenance. Shared selection metadata and sandbox lists stay in the matrix parent.
+
+`compare` still accepts the matrix parent output, and grading still uses the **root per-method directories**, not task shards. Without judge grades, comparison reports resource usage only, not answer correctness; judge each method separately and supply `--grades` as described in [Context-method comparison](context_comparison.md#grade-and-compare).
+
+The DeepSeek profile's $0.50 threshold is per method per question, including auxiliary inference, and is checked between calls: it is not a hard billing cap. Budget for all four methods' model charges, provider request/token rate limits, Daytona account quotas, infrastructure and any judge costs. The snapshot uses 1 CPU / 4 GB per worker: 120 provisioned sandboxes require 120 CPUs / 480 GB even if fewer tasks are active. Pool creation provisions billable infrastructure; `check` makes no model calls and matrix `--dry-run` calls no API. Editing these docs or validating with `--dry-run` starts no paid run. These examples are instructions, not claims that a run has occurred.
 
 ### Local selection and artifacts
 

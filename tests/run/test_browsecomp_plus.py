@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -5,7 +6,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, closing
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Lock
 
 import pytest
 import yaml
@@ -556,19 +557,31 @@ def test_answer_extraction(text: str, answer: str, confidence: int):
     assert BrowseCompPlusEnvironment.is_final_answer(text) == bool(answer)
 
 
-@pytest.mark.parametrize(("step_limit",), [(1,), (5,)])  # noqa: PT006
-def test_parallel_matrix_commands_preserve_remote_manifests(bm25_index: Path, tmp_path: Path, step_limit: int):
+@pytest.mark.parametrize(("step_limit", "workers"), [(1, 1), (5, 1), (1, 2), (5, 2)])
+def test_parallel_matrix_commands_preserve_remote_manifests(
+    bm25_index: Path, tmp_path: Path, step_limit: int, workers: int
+):
     import shutil
 
-    from pocketcontextagent.comparisons.registry import METHODS
+    from pocketcontextagent.comparisons.registry import METHODS, configure_method
     from pocketcontextagent.comparisons.report import compare_runs
-    from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import matrix_arguments, select_matrix_instances
+    from pocketcontextagent.config import get_config_from_spec
+    from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+        matrix_arguments,
+        matrix_worker_groups,
+        publish_matrix_task,
+        run_matrix_workers,
+        select_matrix_instances,
+    )
+    from pocketcontextagent.utils.serialize import recursive_merge
 
     queries = tmp_path / "queries.jsonl"
     queries.write_text(
         "".join(json.dumps({"query_id": str(i), "query": "Which city?", "answer": "SECRET"}) + "\n" for i in range(2))
     )
-    sanitized = "".join(json.dumps(row) + "\n" for row in select_matrix_instances(queries, "all", [], 2, 42))
+    instances = select_matrix_instances(queries, "all", [], 2, 42)
+    selected_ids = [row["query_id"] for row in instances]
+    sanitized = "".join(json.dumps(row) + "\n" for row in instances)
     configuration = {
         "model": {
             "model_name": "replay",
@@ -593,12 +606,25 @@ def test_parallel_matrix_commands_preserve_remote_manifests(bm25_index: Path, tm
     runs = tmp_path / "runs"
     runs.mkdir()
 
-    def run_method(method: str) -> None:
-        remote = tmp_path / method
-        remote.mkdir()
+    locks = {method: Lock() for method in METHODS}
+    expected = {
+        method: {
+            "method": method,
+            "config": configure_method(recursive_merge(get_config_from_spec("browsecomp_plus"), configuration), method),
+            "split": "all",
+            "workers": workers,
+            "selected_query_ids": selected_ids,
+            "queries_sha256": hashlib.sha256(sanitized.encode()).hexdigest(),
+        }
+        for method in METHODS
+    }
+
+    def run_method(method: str, query_id: str | None = None) -> None:
+        remote = tmp_path / "remote" / method / (query_id or "batch")
+        remote.mkdir(parents=True)
         (remote / "query.jsonl").write_text(sanitized)
         (remote / "config.yaml").write_text(yaml.safe_dump(configuration))
-        arguments = matrix_arguments(str(remote), method, "all")
+        arguments = matrix_arguments(str(remote), method, "all", query_id=query_id, workers=workers)
         arguments[arguments.index("--index") + 1] = str(bm25_index)
         result = subprocess.run(
             [sys.executable, "-m", "pocketcontextagent.run.utilities.mini_extra", *arguments[1:]],
@@ -608,15 +634,55 @@ def test_parallel_matrix_commands_preserve_remote_manifests(bm25_index: Path, tm
             env=os.environ | {"MSWEA_SILENT_STARTUP": "1", "MSWEA_GLOBAL_CONFIG_DIR": str(tmp_path / "global")},
         )
         assert result.returncode == (1 if step_limit == 1 else 0), result.stdout + result.stderr
-        shutil.move(str(remote / "output"), runs / method)
+        destination = runs / method if query_id is None else runs / method / "tasks" / query_id
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(remote / "output"), destination)
+        if query_id is not None:
+            assert len(list(destination.glob("*.json"))) == 1
+            with locks[method]:
+                publish_matrix_task(destination, runs / method, query_id, expected[method])
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        list(executor.map(run_method, METHODS))
+    if workers == 1:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            list(executor.map(run_method, METHODS))
+    else:
+        run_matrix_workers(
+            matrix_worker_groups({"sandboxes": [{"id": str(i)} for i in range(8)]}, workers, len(instances)),
+            instances,
+            lambda method, worker, instance: run_method(method, instance["query_id"]),
+        )
     report = compare_runs(runs)
     for method, row in report["methods"].items():
         assert row["tasks"] == 2 and row["completed"] == (0 if step_limit == 1 else 2)
-        assert "SECRET" not in (runs / method / "trajectories/0/trajectory.json").read_text()
-        assert yaml.safe_load((runs / method / "run.yaml").read_text())["retain_recorded_attempts"] is True
+        trajectory_root = runs / method if workers == 1 else runs / method / "tasks/0"
+        assert "SECRET" not in (trajectory_root / "trajectories/0/trajectory.json").read_text()
+        manifest = yaml.safe_load((runs / method / "run.yaml").read_text())
+        assert manifest["retain_recorded_attempts"] is True and manifest["workers"] == workers
+        assert manifest["selected_query_ids"] == selected_ids
+        if workers > 1:
+            task = runs / method / "tasks/0"
+            assert (task / "run.yaml").read_bytes() == (runs / method / "run.yaml").read_bytes()
+            assert (task / "0.json").read_bytes() == (runs / method / "0.json").read_bytes()
+            recorded = (runs / method / "0.json").read_bytes()
+            (task / "unexpected.json").write_bytes(recorded)
+            with pytest.raises(ValueError, match="exactly one result"):
+                publish_matrix_task(task, runs / method, "0", expected[method])
+            (task / "unexpected.json").unlink()
+            invalid = json.loads((task / "0.json").read_text())
+            invalid["metadata"]["fingerprint"] = "stale"
+            (task / "0.json").write_text(json.dumps(invalid))
+            with pytest.raises(ValueError, match="cohort manifest"):
+                publish_matrix_task(task, runs / method, "0", expected[method])
+            assert (runs / method / "0.json").read_bytes() == recorded
+            manifest["index_revision"] = "different"
+            (task / "run.yaml").write_text(yaml.safe_dump(manifest))
+            invalid["metadata"]["fingerprint"] = hashlib.sha256(
+                json.dumps(manifest, sort_keys=True).encode()
+            ).hexdigest()
+            (task / "0.json").write_text(json.dumps(invalid))
+            with pytest.raises(ValueError, match="worker settings"):
+                publish_matrix_task(task, runs / method, "0", expected[method])
+            assert (runs / method / "0.json").read_bytes() == recorded
 
 
 def test_four_method_cli_comparison_with_real_corpus(bm25_index: Path, tmp_path: Path):

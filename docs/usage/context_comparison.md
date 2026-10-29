@@ -98,7 +98,9 @@ The loops above use the local `run` command. For matched cloud runs, use `dayton
 
 ## Matched Daytona matrix
 
-`daytona matrix` runs all four methods concurrently, with **one sandbox per method** and selected questions processed sequentially within each method. It requires a pool with at least four workers. Prepare the snapshot as described in [BrowseComp-Plus setup](browsecomp_plus.md#ten-parallel-daytona-workers), then create a fresh pool after application or credential changes. A separate `--pool` path is recommended to avoid reusing the legacy launcher's pool.
+`daytona matrix` runs all four methods concurrently with dedicated sandboxes per method and **one active question per sandbox**. `--workers-per-method` defaults to `1`, preserving the original sequential-per-method behavior. Each method uses `min(requested workers per method, selected question count)` effective workers; the pool must contain at least **four times that many distinct workers**, with no sharing between methods or oversubscription. Each method has a dynamic queue: a free worker takes its next selected question. Failed attempts remain in the cohort, with no retries or dropped failures.
+
+`daytona create --workers` supports pools of up to **120 workers**, starting at most **10 concurrently**; this startup limit does not cap matrix task concurrency. The legacy `daytona run` still supports at most 10 workers. Prepare the snapshot as described in [BrowseComp-Plus setup](browsecomp_plus.md#ten-parallel-daytona-workers), then create a fresh pool after application or credential changes. A separate `--pool` path is recommended to avoid reusing the legacy launcher's pool.
 
 ```bash
 mini-extra browsecomp-plus daytona create \
@@ -117,7 +119,7 @@ mini-extra browsecomp-plus daytona matrix \
 
 The matrix defaults to `browsecomp_plus_deepseek` when no `-c` is supplied. Explicit configs replace that default provider profile; the base configuration is always applied. Do not layer provider profiles. The pool's forwarded credential must match the selected provider.
 
-Selection is shared across methods: repeat `--query-id ID` to select specific questions (add `--limit 0` to run all specified IDs), use `--limit 0` without IDs for the whole split, or use `--seed N` for reproducible random selection without replacement. Without a seed, selection follows dataset order. `selection.yaml` in the parent output records the shared selected IDs and seed. There is no hidden resampling or resume: matrix requires a new or empty output directory.
+Selection is shared across methods: repeat `--query-id ID` to select specific questions (add `--limit 0` to run all specified IDs), use `--limit 0` without IDs for the whole split, or use `--seed N` for reproducible random selection without replacement. The cohort is randomized **once**, not independently per method or worker; without a seed, selection follows dataset order. `selection.yaml` in the parent output records the shared selected IDs, seed, requested `workers_per_method`, effective workers per method and per-method sandbox lists. There is no hidden resampling or resume: matrix requires a new or empty output directory.
 
 `--dry-run` validates selection and configuration, writes nothing and calls no API. To launch the paid smoke run after validation, omit that flag:
 
@@ -128,7 +130,37 @@ mini-extra browsecomp-plus daytona matrix \
   --output runs/browsecomp-plus/matched-smoke
 ```
 
-Each method retains its original `run.yaml`, `summary.yaml`, query results and `trajectories.tar.gz` under `matched-smoke/METHOD/`; the parent retains `selection.yaml` with the method-to-sandbox mapping. Successful collection removes the remote workspace. On timeout, available partial artifacts are collected before raising; collection failures retain the remote workspace at the recovery path printed when launching. Recover it before the sandbox's idle deletion. With this profile, the $0.50 threshold applies per method per question, including auxiliary calls. It is a soft stopping threshold checked between calls, not a billing cap; four concurrent methods incur separate model costs, plus Daytona and any judging costs. These examples do not imply an evaluation has been run.
+### Thirty questions across 120 sandboxes
+
+To run all four methods with up to 30 dedicated sandboxes each on the same 30-question cohort:
+
+```bash
+mini-extra browsecomp-plus daytona create \
+  --snapshot pocket-browsecomp-plus --workers 120 \
+  --provider-key DEEPSEEK_API_KEY \
+  --pool data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra browsecomp-plus daytona check \
+  --pool data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra browsecomp-plus daytona matrix \
+  --pool data/browsecomp-plus/daytona-matrix-120-pool.json \
+  --workers-per-method 30 --split eval150 --limit 30 --seed 42 \
+  -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/matched-30
+```
+
+This launches a paid run; append `--dry-run` to the matrix command to validate without launching tasks. Fewer selected questions clamp the worker count: with `--workers-per-method 30 --limit 10`, only 10 workers per method (40 active task slots total) are used, even in a 120-worker pool. Unused workers do not receive duplicate questions.
+
+For a single effective worker per method, the original `METHOD/run.yaml`, `METHOD/summary.yaml`, root query results and `METHOD/trajectories.tar.gz` layout is unchanged. Multiworker runs retain task shards at:
+
+```text
+METHOD/tasks/QUERY_ID/run.yaml
+METHOD/tasks/QUERY_ID/QUERY_ID.json
+METHOD/tasks/QUERY_ID/trajectories.tar.gz
+```
+
+Each method also publishes its parent `METHOD/run.yaml`, root `METHOD/QUERY_ID.json` results and `METHOD/summary.yaml` using the common full-cohort manifest and fingerprint. Original shard provenance is preserved rather than rewritten during aggregation. Shared selection metadata and sandbox lists stay in the matrix parent's `selection.yaml`. Compare and grade the **root method directories**, not individual task shards; the comparison and grading interface is unchanged.
+
+Successful collection removes the remote workspace. On timeout, available partial artifacts are collected before raising; collection failures retain the remote workspace at the recovery path printed when launching. Recover it before the sandbox's idle deletion. With this profile, the $0.50 threshold applies per method per question, including auxiliary calls. It is a soft stopping threshold checked between calls, not a billing cap. Plan for model costs across all four methods, provider request/token rate limits, Daytona account quotas and infrastructure costs, plus any judging costs. At the snapshot's 1 CPU / 4 GB per worker, provisioning 120 sandboxes provisions 120 CPUs / 480 GB even if fewer task slots are active. Creating a pool provisions billable infrastructure; `check` makes no model calls, and matrix `--dry-run` calls no API. Editing these docs or validating with `--dry-run` starts no paid run. These examples do not imply an evaluation has been run.
 
 Inspect workers with the existing status command; after matrix completion, compare its parent output directly:
 

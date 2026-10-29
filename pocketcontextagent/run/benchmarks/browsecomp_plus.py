@@ -129,6 +129,7 @@ def run(
     workers: int = typer.Option(1, "-w", "--workers", min=1),
     split: str = typer.Option("development680", help="development680 (default), eval150, or all."),
     redo_existing: bool = typer.Option(False, help="Rerun completed queries too."),
+    execute_query_id: str | None = typer.Option(None, hidden=True, help="Execute one task from a distributed cohort."),
 ) -> None:
     """Run corpus-only research and export files accepted by the official evaluator."""
     queries = queries or data_dir / "queries.jsonl"
@@ -142,6 +143,10 @@ def run(
     if method is not None:
         config = configure_method(config, method)
     instances = load_instances(queries, split=split, query_ids=query_id, offset=offset, limit=limit)
+    if execute_query_id is not None and (
+        method is None or execute_query_id not in {str(instance["query_id"]) for instance in instances}
+    ):
+        raise ValueError("Distributed execution requires --method and an ID in the selected cohort")
     manifest = {
         "config": config,
         "split": split,
@@ -171,6 +176,8 @@ def run(
     if manifest_path.exists() and yaml.safe_load(manifest_path.read_text()) != manifest:
         raise ValueError("Run settings or data changed. Use a new --output directory to avoid mixing results.")
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    if execute_query_id is not None:
+        instances = [instance for instance in instances if str(instance["query_id"]) == execute_query_id]
     if not redo_existing:
         instances = [
             instance

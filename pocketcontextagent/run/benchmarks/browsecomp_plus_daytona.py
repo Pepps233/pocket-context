@@ -10,6 +10,7 @@ import shutil
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from pathlib import Path
@@ -20,9 +21,9 @@ import typer
 import yaml
 from dotenv import load_dotenv
 
-from pocketcontextagent.comparisons.registry import METHODS, configure_method
+from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
 from pocketcontextagent.config import get_config_from_spec
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import INDEX_REVISION, load_instances
+from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION, load_instances
 from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
 from pocketcontextagent.utils.serialize import recursive_merge
 
@@ -152,7 +153,7 @@ def check_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
             raise RuntimeError(f"Preflight failed for {worker['id']}: {response.result}")
         typer.echo(f"Worker ready: {worker['id']}")
 
-    with ThreadPoolExecutor(max_workers=len(workers)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(workers), 10)) as executor:
         list(executor.map(check, workers))
 
 
@@ -167,12 +168,12 @@ def provider_environment(key: str) -> dict[str, str]:
 @app.command("create")
 def create_pool(
     snapshot: str = typer.Option("pocket-browsecomp-plus"),
-    workers: int = typer.Option(10, min=1, max=10),
+    workers: int = typer.Option(10, min=1, max=120),
     pool: Path = typer.Option(DEFAULT_POOL),
     project: Path = typer.Option(Path(".")),
     provider_key: str = typer.Option("OPENROUTER_API_KEY", help="Name of the provider credential to forward."),
 ) -> None:
-    """Start up to ten isolated workers; rollback all new sandboxes if setup fails."""
+    """Start up to 120 isolated workers; rollback all new sandboxes if setup fails."""
     from daytona import CreateSandboxFromSnapshotParams
 
     api = client()
@@ -183,7 +184,7 @@ def create_pool(
     lock = threading.Lock()
     with tempfile.TemporaryDirectory(prefix="pocket-daytona-build-") as temporary:
         wheel = build_wheel(project, Path(temporary))
-        with ExitStack() as rollback, ThreadPoolExecutor(max_workers=workers) as executor:
+        with ExitStack() as rollback, ThreadPoolExecutor(max_workers=min(workers, 10)) as executor:
 
             def create_worker(index: int) -> dict:
                 sandbox = api.create(
@@ -433,6 +434,10 @@ def select_matrix_instances(
     return [{"query_id": str(instance["query_id"]), "query": instance["query"]} for instance in instances]
 
 
+def matrix_query_bytes(instances: list[dict]) -> bytes:
+    return "".join(json.dumps(instance, ensure_ascii=False) + "\n" for instance in instances).encode()
+
+
 def matrix_config(config_spec: list[str]) -> dict:
     return recursive_merge(
         get_config_from_spec("browsecomp_plus"),
@@ -454,7 +459,9 @@ def matrix_provider_key(config: dict) -> str:
     return keys[provider]
 
 
-def matrix_arguments(remote: str, method: str, split: str) -> list[str]:
+def matrix_arguments(
+    remote: str, method: str, split: str, *, query_id: str | None = None, workers: int = 1
+) -> list[str]:
     return [
         "mini-extra",
         "browsecomp-plus",
@@ -472,11 +479,21 @@ def matrix_arguments(remote: str, method: str, split: str) -> list[str]:
         "-c",
         f"{remote}/config.yaml",
         "--workers",
-        "1",
-    ]
+        str(workers),
+    ] + (["--execute-query-id", query_id] if query_id is not None else [])
 
 
-def run_remote_method(sandbox: Any, instances: list[dict], config: dict, output: Path, method: str, split: str) -> None:
+def run_remote_method(
+    sandbox: Any,
+    instances: list[dict],
+    config: dict,
+    output: Path,
+    method: str,
+    split: str,
+    *,
+    query_id: str | None = None,
+    workers: int = 1,
+) -> None:
     from daytona.common.process import SessionExecuteRequest
 
     from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
@@ -494,37 +511,44 @@ def run_remote_method(sandbox: Any, instances: list[dict], config: dict, output:
     )
     if check.exit_code:
         raise RuntimeError(f"{method}: worker package preflight failed: {check.result}")
+    expected = [instance for instance in instances if query_id is None or instance["query_id"] == query_id]
+    if not expected:
+        raise ValueError(f"Task {query_id} is outside the selected cohort")
     session = f"matrix-{uuid4().hex}"
     remote = f"/workspace/{session}"
     output.mkdir(parents=True)
+    (output / "worker.yaml").write_text(
+        yaml.safe_dump({"sandbox_id": sandbox.id, "query_ids": [instance["query_id"] for instance in expected]}),
+        encoding="utf-8",
+    )
     sandbox.fs.create_folder(remote, "700")
     typer.echo(f"{method}: recovery workspace on {sandbox.id}: {remote}")
     with ExitStack() as cleanup:
-        sandbox.fs.upload_file(
-            "".join(json.dumps(instance, ensure_ascii=False) + "\n" for instance in instances).encode(),
-            f"{remote}/query.jsonl",
-        )
+        sandbox.fs.upload_file(matrix_query_bytes(instances), f"{remote}/query.jsonl")
         sandbox.fs.upload_file(yaml.safe_dump(config).encode(), f"{remote}/config.yaml")
         sandbox.process.create_session(session)
         cleanup.callback(sandbox.process.delete_session, session)
         execution = sandbox.process.execute_session_command(
             session,
-            SessionExecuteRequest(command=worker_command(matrix_arguments(remote, method, split)), run_async=True),
+            SessionExecuteRequest(
+                command=worker_command(matrix_arguments(remote, method, split, query_id=query_id, workers=workers)),
+                run_async=True,
+            ),
         )
-        typer.echo(f"{method}: launched {len(instances)} questions on {sandbox.id}")
-        deadline = time.monotonic() + len(instances) * ((config["agent"].get("wall_time_limit_seconds") or 1800) + 180)
+        typer.echo(f"{method}: launched {len(expected)} questions on {sandbox.id}")
+        deadline = time.monotonic() + len(expected) * ((config["agent"].get("wall_time_limit_seconds") or 1800) + 180)
         timed_out = False
         while sandbox.process.get_session_command(session, execution.cmd_id).exit_code is None:
             if time.monotonic() >= deadline:
                 timed_out = True
                 break
-            time.sleep(5)
+            time.sleep(max(5, workers))
         detail = sandbox.process.get_session_command_logs(session, execution.cmd_id).output[-4000:]
     # Stop the session before collecting; retain its workspace if collection fails.
     files = []
     if any(file.name == "output" for file in sandbox.fs.list_files(remote)):
         files = [file.name for file in sandbox.fs.list_files(f"{remote}/output")]
-    for name in ["run.yaml", "summary.yaml", *[f"{instance['query_id']}.json" for instance in instances]]:
+    for name in ["run.yaml", "summary.yaml", *[f"{instance['query_id']}.json" for instance in expected]]:
         if name in files:
             temporary = output / f"{name}.tmp"
             sandbox.fs.download_file(f"{remote}/output/{name}", str(temporary))
@@ -538,18 +562,87 @@ def run_remote_method(sandbox: Any, instances: list[dict], config: dict, output:
             raise RuntimeError(f"{method}: failed to archive trajectories")
         sandbox.fs.download_file(archive, str(output / "trajectories.tar.gz.tmp"))
         (output / "trajectories.tar.gz.tmp").replace(output / "trajectories.tar.gz")
-    missing = [instance["query_id"] for instance in instances if f"{instance['query_id']}.json" not in files]
+    missing = [instance["query_id"] for instance in expected if f"{instance['query_id']}.json" not in files]
+    unexpected = {name for name in files if name.endswith(".json")} - {
+        f"{instance['query_id']}.json" for instance in expected
+    }
     if timed_out:
         raise TimeoutError(
             f"{method}: wall-time allowance exceeded; partial artifacts collected, workspace retained at {remote}"
         )
-    if missing or "run.yaml" not in files:
+    if missing or unexpected or "run.yaml" not in files:
         for key, value in os.environ.items():
             if key.endswith("_API_KEY") and value:
                 detail = detail.replace(value, "[REDACTED]")
-        raise RuntimeError(f"{method}: missing task artifacts for {missing}; workspace retained at {remote}; {detail}")
+        raise RuntimeError(
+            f"{method}: missing artifacts for {missing}, unexpected results {sorted(unexpected)}; "
+            f"workspace retained at {remote}; {detail}"
+        )
     sandbox.fs.delete_file(remote, recursive=True)
     typer.echo(f"{method}: artifacts collected in {output}")
+
+
+def matrix_worker_groups(manifest: dict, requested: int, tasks: int) -> dict[str, list[dict]]:
+    if not 1 <= requested <= 30 or tasks < 1:
+        raise ValueError("Select 1 to 30 workers per method and at least one task")
+    active = min(requested, tasks)
+    required = len(METHODS) * active
+    workers = manifest["sandboxes"][:required]
+    if len(workers) != required or len({worker["id"] for worker in workers}) != required:
+        raise ValueError(f"Matrix requires {required} distinct sandboxes; create a pool with --workers {required}")
+    return {method: workers[index * active : (index + 1) * active] for index, method in enumerate(METHODS)}
+
+
+def run_matrix_workers(
+    groups: dict[str, list[dict]],
+    instances: list[dict],
+    execute: Callable[[str, dict, dict], None],
+) -> None:
+    queues = {method: iter(instances) for method in groups}
+    locks = {method: threading.Lock() for method in groups}
+
+    def run_worker(item: tuple[str, dict]) -> None:
+        method, worker = item
+        while True:
+            with locks[method]:
+                instance = next(queues[method], None)
+            if instance is None:
+                return
+            execute(method, worker, instance)
+
+    with ThreadPoolExecutor(max_workers=sum(map(len, groups.values()))) as executor:
+        list(executor.map(run_worker, [(method, worker) for method, workers in groups.items() for worker in workers]))
+
+
+def publish_matrix_task(task: Path, output: Path, query_id: str, expected: dict) -> None:
+    """Publish an unchanged task result; callers serialize publication per method."""
+    if {path.name for path in task.glob("*.json")} != {f"{query_id}.json"}:
+        raise ValueError(f"{task}: expected exactly one result for the assigned query")
+    manifest = yaml.safe_load((task / "run.yaml").read_text())
+    result = json.loads((task / f"{query_id}.json").read_text())
+    fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    if (
+        manifest["method"] != output.name
+        or query_id not in manifest["selected_query_ids"]
+        or any(manifest.get(key) != value for key, value in expected.items())
+        or not manifest["retain_recorded_attempts"]
+        or str(result["query_id"]) != query_id
+        or result.get("metadata", {}).get("fingerprint") != fingerprint
+    ):
+        raise ValueError(f"{task}: task result does not match its distributed cohort manifest")
+    manifest_path = output / "run.yaml"
+    if manifest_path.exists() and yaml.safe_load(manifest_path.read_text()) != manifest:
+        raise ValueError(f"{task}: worker settings, implementation, or data differ from the method's other tasks")
+    output.mkdir(parents=True, exist_ok=True)
+    for source, destination in [
+        (task / "run.yaml", manifest_path),
+        (task / f"{query_id}.json", output / f"{query_id}.json"),
+    ]:
+        temporary = destination.with_suffix(destination.suffix + ".tmp")
+        shutil.copyfile(source, temporary)
+        temporary.replace(destination)
+    results = [json.loads(path.read_text()) for path in sorted(output.glob("*.json"))]
+    (output / "summary.yaml").write_text(yaml.safe_dump(summarize_results(results)), encoding="utf-8")
 
 
 @app.command("matrix")
@@ -563,9 +656,13 @@ def run_matrix(
     config_spec: list[str] = typer.Option([], "-c", "--config", help="Shared overrides; defaults to direct DeepSeek."),
     output: Path = typer.Option(Path("runs/browsecomp-plus/matrix")),
     dry_run: bool = typer.Option(False, help="Validate selection/config only; no API calls or writes."),
+    workers_per_method: int = typer.Option(
+        1, min=1, max=30, help="Dedicated sandboxes per method; one task per sandbox."
+    ),
 ) -> None:
-    """Run all four methods concurrently in four sandboxes, sharing one question selection."""
+    """Run matched questions with up to 30 parallel sandboxes per method."""
     from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
+    from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
 
     instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_id, limit, seed)
     config = matrix_config(config_spec)
@@ -576,6 +673,8 @@ def run_matrix(
         "split": split,
         "seed": seed,
         "model": config["model"]["model_name"],
+        "workers_per_method": workers_per_method,
+        "active_workers_per_method": min(workers_per_method, len(instances)),
         "selected_query_ids": [instance["query_id"] for instance in instances],
     }
     typer.echo(yaml.safe_dump(selection, sort_keys=False))
@@ -584,22 +683,55 @@ def run_matrix(
     if output.exists() and any(output.iterdir()):
         raise ValueError("Use a fresh --output directory; matrix never replaces or retries recorded attempts")
     manifest = json.loads(pool.read_text())
-    workers = manifest["sandboxes"][: len(METHODS)]
-    if len(workers) != len(METHODS) or len({worker["id"] for worker in workers}) != len(METHODS):
-        raise ValueError("Matrix requires four distinct sandboxes; create a pool with --workers 4")
+    groups = matrix_worker_groups(manifest, workers_per_method, len(instances))
+    active = selection["active_workers_per_method"]
     if manifest.get("provider_key", "OPENROUTER_API_KEY") != provider_key:
         raise ValueError("Pool credentials do not match the model; create a fresh pool with --provider-key NAME")
     api = client()
-    selection["sandboxes"] = {method: worker["id"] for method, worker in zip(METHODS, workers)}
+    selection["sandboxes"] = {method: [worker["id"] for worker in workers] for method, workers in groups.items()}
     output.mkdir(parents=True, exist_ok=True)
     (output / "selection.yaml").write_text(yaml.safe_dump(selection, sort_keys=False), encoding="utf-8")
 
-    def run_method(item: tuple[str, dict]) -> None:
-        method, worker = item
-        run_remote_method(api.get(worker["id"]), instances, config, output / method, method, split)
+    if active == 1:
 
-    with ThreadPoolExecutor(max_workers=len(METHODS)) as executor:
-        list(executor.map(run_method, zip(METHODS, workers)))
+        def run_method(method: str) -> None:
+            run_remote_method(api.get(groups[method][0]["id"]), instances, config, output / method, method, split)
+
+        with ThreadPoolExecutor(max_workers=len(METHODS)) as executor:
+            list(executor.map(run_method, METHODS))
+    else:
+        locks = {method: threading.Lock() for method in METHODS}
+        expected = {
+            "split": split,
+            "workers": active,
+            "selected_query_ids": selection["selected_query_ids"],
+            "retain_recorded_attempts": True,
+            "queries_sha256": hashlib.sha256(matrix_query_bytes(instances)).hexdigest(),
+            "implementation_sha256": implementation_hash(),
+            "dataset_revision": DATASET_REVISION,
+            "index_revision": INDEX_REVISION,
+        }
+        manifests = {
+            method: expected
+            | {
+                "method": method,
+                "config": configure_method(config, method),
+                "method_provenance": method_provenance(configure_method(config, method), method),
+            }
+            for method in METHODS
+        }
+
+        def execute(method: str, worker: dict, instance: dict) -> None:
+            query_id = instance["query_id"]
+            task = output / method / "tasks" / query_id
+            run_remote_method(
+                api.get(worker["id"]), instances, config, task, method, split, query_id=query_id, workers=active
+            )
+            with locks[method]:
+                publish_matrix_task(task, output / method, query_id, manifests[method])
+            typer.echo(f"{method}: recorded {query_id} from sandbox {worker['id']}")
+
+        run_matrix_workers(groups, instances, execute)
     report = compare_runs(output)
     (output / "comparison.yaml").write_text(yaml.safe_dump(report, sort_keys=False), encoding="utf-8")
     typer.echo(comparison_markdown(report))
@@ -611,8 +743,9 @@ def run_matrix(
 def delete_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
     """Delete only the sandboxes recorded in this pool's local manifest."""
     api = client()
-    workers = json.loads(pool.read_text())["sandboxes"]
-    with ThreadPoolExecutor(max_workers=len(workers)) as executor:
-        list(executor.map(lambda worker: api.delete(api.get(worker["id"])), workers))
+    workers = {worker["id"] for worker in json.loads(pool.read_text())["sandboxes"]}
+    sandboxes = [sandbox for sandbox in api.list() if sandbox.id in workers]
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        list(executor.map(api.delete, sandboxes))
     pool.unlink()
     typer.echo("Pool deleted")

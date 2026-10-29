@@ -2,6 +2,9 @@ import json
 import os
 import random
 import shlex
+import threading
+import time
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -14,7 +17,9 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     matrix_arguments,
     matrix_config,
     matrix_provider_key,
+    matrix_worker_groups,
     provider_environment,
+    run_matrix_workers,
     select_matrix_instances,
     worker_command,
 )
@@ -76,6 +81,7 @@ def test_matrix_dry_run_needs_no_pool_and_writes_nothing(queries: Path, tmp_path
     assert selection["split"] == "eval150" and selection["seed"] == 42
     assert len(selection["selected_query_ids"]) == 2
     assert not output.exists() and "SECRET" not in result.output
+    assert selection["workers_per_method"] == selection["active_workers_per_method"] == 1
 
 
 def test_matrix_config_replaces_provider_default_instead_of_layering():
@@ -128,8 +134,8 @@ def test_matrix_worker_command_preserves_method_split_and_safe_paths():
 @pytest.mark.parametrize(
     ("invalid_pool", "message"),
     [
-        ([], "four distinct"),
-        ([{"id": "same"}] * 4, "four distinct"),
+        ([], "4 distinct"),
+        ([{"id": "same"}] * 4, "4 distinct"),
         ([{"id": str(i)} for i in range(4)], "credentials do not match"),
     ],
 )
@@ -154,4 +160,134 @@ def test_matrix_rejects_bad_pools_before_any_remote_call(
         ],
     )
     assert isinstance(result.exception, ValueError) and message in str(result.exception)
+    assert not (tmp_path / "output").exists()
+
+
+def test_matrix_allocates_disjoint_workers_and_caps_to_selected_tasks():
+    manifest = {"sandboxes": [{"id": str(i)} for i in range(120)]}
+    groups = matrix_worker_groups(manifest, 30, 150)
+    assert len(groups) == 4 and all(len(workers) == 30 for workers in groups.values())
+    assert len({worker["id"] for workers in groups.values() for worker in workers}) == 120
+    assert all(len(workers) == 3 for workers in matrix_worker_groups(manifest, 30, 3).values())
+    with pytest.raises(ValueError, match="12 distinct"):
+        matrix_worker_groups({"sandboxes": manifest["sandboxes"][:11]}, 30, 3)
+    with pytest.raises(ValueError, match="120 distinct"):
+        matrix_worker_groups({"sandboxes": [{"id": "same"}] * 120}, 30, 150)
+    for requested, tasks in [(0, 1), (31, 1), (30, 0)]:
+        with pytest.raises(ValueError, match="1 to 30"):
+            matrix_worker_groups(manifest, requested, tasks)
+
+
+@pytest.mark.parametrize(("workers_per_method",), [(1,), (2,), (30,)])  # noqa: PT006
+def test_matrix_scheduler_runs_once_per_task_with_one_active_task_per_sandbox(workers_per_method: int):
+    groups = matrix_worker_groups(
+        {"sandboxes": [{"id": str(i)} for i in range(4 * workers_per_method)]},
+        workers_per_method,
+        workers_per_method + 2,
+    )
+    instances = [{"query_id": str(i)} for i in range(workers_per_method + 2)]
+    lock = threading.Lock()
+    barrier = threading.Barrier(4 * workers_per_method)
+    active_workers = set()
+    seen_workers = set()
+    active = Counter()
+    peak = Counter()
+    records = []
+
+    def execute(method: str, worker: dict, instance: dict) -> None:
+        with lock:
+            assert worker["id"] not in active_workers
+            active_workers.add(worker["id"])
+            active[method] += 1
+            peak[method] = max(peak[method], active[method])
+            first = worker["id"] not in seen_workers
+            seen_workers.add(worker["id"])
+        if first:
+            barrier.wait(timeout=30)
+        time.sleep(0.001)
+        with lock:
+            records.append((method, instance["query_id"]))
+            active_workers.remove(worker["id"])
+            active[method] -= 1
+
+    run_matrix_workers(groups, instances, execute)
+    assert Counter(records) == Counter((method, instance["query_id"]) for method in groups for instance in instances)
+    assert all(count == workers_per_method for count in peak.values())
+    assert len(seen_workers) == 4 * workers_per_method and not active_workers
+
+
+def test_matrix_free_worker_claims_next_task_without_waiting_for_a_slow_worker():
+    blocked = threading.Event()
+    next_task = threading.Event()
+    assignments = {}
+
+    def execute(method: str, worker: dict, instance: dict) -> None:
+        assignments[instance["query_id"]] = worker["id"]
+        if instance["query_id"] == "0":
+            blocked.set()
+            assert next_task.wait(timeout=10)
+        elif instance["query_id"] == "1":
+            assert blocked.wait(timeout=10)
+        else:
+            next_task.set()
+
+    run_matrix_workers({"react": [{"id": "slow"}, {"id": "fast"}]}, [{"query_id": str(i)} for i in range(3)], execute)
+    assert set(assignments) == {"0", "1", "2"}
+    assert assignments["0"] != assignments["1"] == assignments["2"]
+
+
+def test_parallel_matrix_dry_run_reports_effective_concurrency_without_a_pool(queries: Path, tmp_path: Path):
+    result = CliRunner().invoke(
+        app,
+        [
+            "daytona",
+            "matrix",
+            "--data-dir",
+            str(tmp_path),
+            "--split",
+            "eval150",
+            "--limit",
+            "2",
+            "--workers-per-method",
+            "30",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    selection = yaml.safe_load(result.output)
+    assert selection["workers_per_method"] == 30 and selection["active_workers_per_method"] == 2
+    arguments = matrix_arguments("/workspace/task", "acm", "eval150", query_id="1055", workers=30)
+    assert arguments[arguments.index("--execute-query-id") + 1] == "1055"
+    assert arguments[arguments.index("--workers") + 1] == "30"
+    assert "--query-id" not in arguments
+    for count in ("0", "31"):
+        invalid = CliRunner().invoke(app, ["daytona", "matrix", "--workers-per-method", count, "--dry-run"])
+        assert invalid.exit_code == 2
+    assert CliRunner().invoke(app, ["daytona", "create", "--workers", "121"]).exit_code == 2
+
+
+@pytest.mark.parametrize(("explicit_method",), [(False,), (True,)])  # noqa: PT006
+def test_distributed_execution_requires_a_valid_method_and_selected_id(
+    queries: Path, tmp_path: Path, explicit_method: bool
+):
+    selected = select_matrix_instances(queries, "eval150", [], 1, None)[0]["query_id"]
+    arguments = [
+        "run",
+        "--queries",
+        str(queries),
+        "--index",
+        str(tmp_path / "missing-index"),
+        "--output",
+        str(tmp_path / "output"),
+        "--model",
+        "replay",
+        "--split",
+        "eval150",
+        "--execute-query-id",
+        "missing" if explicit_method else selected,
+    ]
+    if explicit_method:
+        arguments += ["--method", "react"]
+    result = CliRunner().invoke(app, arguments)
+    assert isinstance(result.exception, ValueError) and "Distributed execution requires" in str(result.exception)
     assert not (tmp_path / "output").exists()

@@ -556,6 +556,69 @@ def test_answer_extraction(text: str, answer: str, confidence: int):
     assert BrowseCompPlusEnvironment.is_final_answer(text) == bool(answer)
 
 
+@pytest.mark.parametrize(("step_limit",), [(1,), (5,)])  # noqa: PT006
+def test_parallel_matrix_commands_preserve_remote_manifests(bm25_index: Path, tmp_path: Path, step_limit: int):
+    import shutil
+
+    from pocketcontextagent.comparisons.registry import METHODS
+    from pocketcontextagent.comparisons.report import compare_runs
+    from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import matrix_arguments, select_matrix_instances
+
+    queries = tmp_path / "queries.jsonl"
+    queries.write_text(
+        "".join(json.dumps({"query_id": str(i), "query": "Which city?", "answer": "SECRET"}) + "\n" for i in range(2))
+    )
+    sanitized = "".join(json.dumps(row) + "\n" for row in select_matrix_instances(queries, "all", [], 2, 42))
+    configuration = {
+        "model": {
+            "model_name": "replay",
+            "model_class": "pocketcontextagent.models.test_models.DeterministicToolcallModel",
+            "outputs": [
+                make_toolcall_output(
+                    "Search first.",
+                    [
+                        {
+                            "id": "search-1",
+                            "type": "function",
+                            "function": {"name": "search", "arguments": '{"query":"jazz festival"}'},
+                        }
+                    ],
+                    [{"command": "search jazz festival", "tool_call_id": "search-1"}],
+                ),
+                make_output("Exact Answer: Montréal\nConfidence: 100%", []),
+            ],
+        },
+        "agent": {"step_limit": step_limit, "cost_limit": 0},
+    }
+    runs = tmp_path / "runs"
+    runs.mkdir()
+
+    def run_method(method: str) -> None:
+        remote = tmp_path / method
+        remote.mkdir()
+        (remote / "query.jsonl").write_text(sanitized)
+        (remote / "config.yaml").write_text(yaml.safe_dump(configuration))
+        arguments = matrix_arguments(str(remote), method, "all")
+        arguments[arguments.index("--index") + 1] = str(bm25_index)
+        result = subprocess.run(
+            [sys.executable, "-m", "pocketcontextagent.run.utilities.mini_extra", *arguments[1:]],
+            capture_output=True,
+            text=True,
+            timeout=90,
+            env=os.environ | {"MSWEA_SILENT_STARTUP": "1", "MSWEA_GLOBAL_CONFIG_DIR": str(tmp_path / "global")},
+        )
+        assert result.returncode == (1 if step_limit == 1 else 0), result.stdout + result.stderr
+        shutil.move(str(remote / "output"), runs / method)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(run_method, METHODS))
+    report = compare_runs(runs)
+    for method, row in report["methods"].items():
+        assert row["tasks"] == 2 and row["completed"] == (0 if step_limit == 1 else 2)
+        assert "SECRET" not in (runs / method / "trajectories/0/trajectory.json").read_text()
+        assert yaml.safe_load((runs / method / "run.yaml").read_text())["retain_recorded_attempts"] is True
+
+
 def test_four_method_cli_comparison_with_real_corpus(bm25_index: Path, tmp_path: Path):
     from pocketcontextagent.comparisons.registry import METHODS
 

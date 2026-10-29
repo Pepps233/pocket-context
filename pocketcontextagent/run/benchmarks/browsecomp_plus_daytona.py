@@ -3,6 +3,8 @@
 import hashlib
 import json
 import os
+import random
+import re
 import shlex
 import shutil
 import tempfile
@@ -18,6 +20,7 @@ import typer
 import yaml
 from dotenv import load_dotenv
 
+from pocketcontextagent.comparisons.registry import METHODS, configure_method
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import INDEX_REVISION, load_instances
 from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
@@ -153,19 +156,27 @@ def check_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
         list(executor.map(check, workers))
 
 
+def provider_environment(key: str) -> dict[str, str]:
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]*_API_KEY", key) or key == "DAYTONA_API_KEY":
+        raise ValueError("Select a model provider's *_API_KEY, not the Daytona control-plane key")
+    if not os.getenv(key):
+        raise ValueError(f"Set {key} in the ignored .env file or your shell")
+    return {key: os.environ[key]}
+
+
 @app.command("create")
 def create_pool(
     snapshot: str = typer.Option("pocket-browsecomp-plus"),
     workers: int = typer.Option(10, min=1, max=10),
     pool: Path = typer.Option(DEFAULT_POOL),
     project: Path = typer.Option(Path(".")),
+    provider_key: str = typer.Option("OPENROUTER_API_KEY", help="Name of the provider credential to forward."),
 ) -> None:
     """Start up to ten isolated workers; rollback all new sandboxes if setup fails."""
     from daytona import CreateSandboxFromSnapshotParams
 
     api = client()
-    if not os.getenv("OPENROUTER_API_KEY"):
-        raise ValueError("Set OPENROUTER_API_KEY in the ignored .env file or your shell")
+    environment = provider_environment(provider_key)
     if pool.exists():
         raise ValueError(f"Pool manifest already exists: {pool}. Reuse it or delete its workers first.")
     identifier = uuid4().hex[:12]
@@ -180,7 +191,7 @@ def create_pool(
                         snapshot=snapshot,
                         name=f"pocket-bcp-{identifier}-{index}",
                         os_user="daytona",
-                        env_vars={"OPENROUTER_API_KEY": os.environ["OPENROUTER_API_KEY"]},
+                        env_vars=environment,
                         labels={"project": "pocket-context", "benchmark": "browsecomp-plus", "pool": identifier},
                         public=False,
                         auto_stop_interval=30,
@@ -198,6 +209,7 @@ def create_pool(
             manifest = {
                 "pool_id": identifier,
                 "snapshot": snapshot,
+                "provider_key": provider_key,
                 "package_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
                 "sandboxes": sandboxes,
             }
@@ -403,6 +415,195 @@ def run_pool(
     if cleanup:
         typer.echo("Local smoke artifacts deleted; remote task workspaces removed")
     if summary["completed"] < (success_limit or summary["tasks"]):
+        raise typer.Exit(1)
+
+
+def select_matrix_instances(
+    queries: Path, split: str, query_ids: list[str], limit: int, seed: int | None
+) -> list[dict]:
+    instances = load_instances(queries, split=split, query_ids=query_ids)
+    if set(query_ids) - {str(instance["query_id"]) for instance in instances}:
+        raise ValueError("Some requested query IDs are outside the selected split")
+    if limit < 0 or limit > len(instances):
+        raise ValueError(f"Select between 0 and {len(instances)} questions; 0 selects all")
+    if seed is not None:
+        instances = random.Random(seed).sample(instances, limit or len(instances))
+    elif limit:
+        instances = instances[:limit]
+    return [{"query_id": str(instance["query_id"]), "query": instance["query"]} for instance in instances]
+
+
+def matrix_config(config_spec: list[str]) -> dict:
+    return recursive_merge(
+        get_config_from_spec("browsecomp_plus"),
+        *[get_config_from_spec(spec) for spec in (config_spec or ["browsecomp_plus_deepseek"])],
+    )
+
+
+def matrix_provider_key(config: dict) -> str:
+    if not config["model"].get("model_name"):
+        raise ValueError("Include a provider profile, e.g. -c browsecomp_plus_deepseek, before other overrides")
+    provider = (
+        "openrouter"
+        if config["model"].get("model_class") == "openrouter"
+        else config["model"]["model_name"].split("/")[0]
+    )
+    keys = {"deepseek": "DEEPSEEK_API_KEY", "meta": "META_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+    if provider not in keys:
+        raise ValueError("Matrix supports the DeepSeek, Meta, and OpenRouter provider profiles")
+    return keys[provider]
+
+
+def matrix_arguments(remote: str, method: str, split: str) -> list[str]:
+    return [
+        "mini-extra",
+        "browsecomp-plus",
+        "run",
+        "--queries",
+        f"{remote}/query.jsonl",
+        "--index",
+        REMOTE_INDEX,
+        "--output",
+        f"{remote}/output",
+        "--split",
+        split,
+        "--method",
+        method,
+        "-c",
+        f"{remote}/config.yaml",
+        "--workers",
+        "1",
+    ]
+
+
+def run_remote_method(sandbox: Any, instances: list[dict], config: dict, output: Path, method: str, split: str) -> None:
+    from daytona.common.process import SessionExecuteRequest
+
+    from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
+
+    check = sandbox.process.exec(
+        worker_command(
+            [
+                "python",
+                "-c",
+                "from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash; "
+                f"assert implementation_hash() == {implementation_hash()!r}, 'Stale worker package; create a fresh pool'",
+            ]
+        ),
+        timeout=120,
+    )
+    if check.exit_code:
+        raise RuntimeError(f"{method}: worker package preflight failed: {check.result}")
+    session = f"matrix-{uuid4().hex}"
+    remote = f"/workspace/{session}"
+    output.mkdir(parents=True)
+    sandbox.fs.create_folder(remote, "700")
+    typer.echo(f"{method}: recovery workspace on {sandbox.id}: {remote}")
+    with ExitStack() as cleanup:
+        sandbox.fs.upload_file(
+            "".join(json.dumps(instance, ensure_ascii=False) + "\n" for instance in instances).encode(),
+            f"{remote}/query.jsonl",
+        )
+        sandbox.fs.upload_file(yaml.safe_dump(config).encode(), f"{remote}/config.yaml")
+        sandbox.process.create_session(session)
+        cleanup.callback(sandbox.process.delete_session, session)
+        execution = sandbox.process.execute_session_command(
+            session,
+            SessionExecuteRequest(command=worker_command(matrix_arguments(remote, method, split)), run_async=True),
+        )
+        typer.echo(f"{method}: launched {len(instances)} questions on {sandbox.id}")
+        deadline = time.monotonic() + len(instances) * ((config["agent"].get("wall_time_limit_seconds") or 1800) + 180)
+        timed_out = False
+        while sandbox.process.get_session_command(session, execution.cmd_id).exit_code is None:
+            if time.monotonic() >= deadline:
+                timed_out = True
+                break
+            time.sleep(5)
+        detail = sandbox.process.get_session_command_logs(session, execution.cmd_id).output[-4000:]
+    # Stop the session before collecting; retain its workspace if collection fails.
+    files = []
+    if any(file.name == "output" for file in sandbox.fs.list_files(remote)):
+        files = [file.name for file in sandbox.fs.list_files(f"{remote}/output")]
+    for name in ["run.yaml", "summary.yaml", *[f"{instance['query_id']}.json" for instance in instances]]:
+        if name in files:
+            temporary = output / f"{name}.tmp"
+            sandbox.fs.download_file(f"{remote}/output/{name}", str(temporary))
+            temporary.replace(output / name)
+    if "trajectories" in files:
+        archive = f"{remote}/trajectories.tar.gz"
+        response = sandbox.process.exec(
+            shlex.join(["tar", "-czf", archive, "-C", f"{remote}/output", "trajectories"]), timeout=120
+        )
+        if response.exit_code:
+            raise RuntimeError(f"{method}: failed to archive trajectories")
+        sandbox.fs.download_file(archive, str(output / "trajectories.tar.gz.tmp"))
+        (output / "trajectories.tar.gz.tmp").replace(output / "trajectories.tar.gz")
+    missing = [instance["query_id"] for instance in instances if f"{instance['query_id']}.json" not in files]
+    if timed_out:
+        raise TimeoutError(
+            f"{method}: wall-time allowance exceeded; partial artifacts collected, workspace retained at {remote}"
+        )
+    if missing or "run.yaml" not in files:
+        for key, value in os.environ.items():
+            if key.endswith("_API_KEY") and value:
+                detail = detail.replace(value, "[REDACTED]")
+        raise RuntimeError(f"{method}: missing task artifacts for {missing}; workspace retained at {remote}; {detail}")
+    sandbox.fs.delete_file(remote, recursive=True)
+    typer.echo(f"{method}: artifacts collected in {output}")
+
+
+@app.command("matrix")
+def run_matrix(
+    pool: Path = typer.Option(DEFAULT_POOL),
+    data_dir: Path = typer.Option(Path("data/browsecomp-plus")),
+    split: str = typer.Option("development680"),
+    query_id: list[str] = typer.Option([], help="Select specific IDs (repeatable)."),
+    limit: int = typer.Option(1, min=0, help="Questions per method; 0 selects the entire split."),
+    seed: int | None = typer.Option(None, help="Sample once without replacement using this random seed."),
+    config_spec: list[str] = typer.Option([], "-c", "--config", help="Shared overrides; defaults to direct DeepSeek."),
+    output: Path = typer.Option(Path("runs/browsecomp-plus/matrix")),
+    dry_run: bool = typer.Option(False, help="Validate selection/config only; no API calls or writes."),
+) -> None:
+    """Run all four methods concurrently in four sandboxes, sharing one question selection."""
+    from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
+
+    instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_id, limit, seed)
+    config = matrix_config(config_spec)
+    for method in METHODS:
+        configure_method(config, method)
+    provider_key = matrix_provider_key(config)
+    selection = {
+        "split": split,
+        "seed": seed,
+        "model": config["model"]["model_name"],
+        "selected_query_ids": [instance["query_id"] for instance in instances],
+    }
+    typer.echo(yaml.safe_dump(selection, sort_keys=False))
+    if dry_run:
+        return
+    if output.exists() and any(output.iterdir()):
+        raise ValueError("Use a fresh --output directory; matrix never replaces or retries recorded attempts")
+    manifest = json.loads(pool.read_text())
+    workers = manifest["sandboxes"][: len(METHODS)]
+    if len(workers) != len(METHODS) or len({worker["id"] for worker in workers}) != len(METHODS):
+        raise ValueError("Matrix requires four distinct sandboxes; create a pool with --workers 4")
+    if manifest.get("provider_key", "OPENROUTER_API_KEY") != provider_key:
+        raise ValueError("Pool credentials do not match the model; create a fresh pool with --provider-key NAME")
+    api = client()
+    selection["sandboxes"] = {method: worker["id"] for method, worker in zip(METHODS, workers)}
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "selection.yaml").write_text(yaml.safe_dump(selection, sort_keys=False), encoding="utf-8")
+
+    def run_method(item: tuple[str, dict]) -> None:
+        method, worker = item
+        run_remote_method(api.get(worker["id"]), instances, config, output / method, method, split)
+
+    with ThreadPoolExecutor(max_workers=len(METHODS)) as executor:
+        list(executor.map(run_method, zip(METHODS, workers)))
+    report = compare_runs(output)
+    (output / "comparison.yaml").write_text(yaml.safe_dump(report, sort_keys=False), encoding="utf-8")
+    typer.echo(comparison_markdown(report))
+    if any(row["completed"] < row["tasks"] for row in report["methods"].values()):
         raise typer.Exit(1)
 
 

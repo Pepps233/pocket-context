@@ -95,7 +95,7 @@ mini-extra browsecomp-plus run --method pocket_context --limit 1 \
 
 This uses `deepseek/deepseek-flash` through LiteLLM at `https://api.deepseek.com`, with thinking enabled and high effort. It does not use OpenRouter or serve the Qwen model. The profile keeps a 128,000-token experimental window, 100 main calls, 16,384 maximum output tokens, a $0.50 stopping threshold, and a 30-minute task timeout. It uses ten BM25 results, 512/128-token new/seen previews and an 8,192-token document cap. The Qwen corpus tokenizer remains fixed for retrieval consistency; context counts are estimates, not DeepSeek's exact chat-template tokenization.
 
-Apply the same profile to `react`, `resum` and `acm`; see [Context-method comparison](context_comparison.md). Do not layer this profile on top of the OpenRouter profile or reuse its output directories. API keys stay out of the YAML and saved manifests. The existing Daytona launcher is OpenRouter-specific and does not yet forward DeepSeek credentials; use the local runner for this profile. These commands incur DeepSeek model charges, but merely loading or validating the configuration does not call the API.
+Apply the same profile to `react`, `resum` and `acm`; see [Context-method comparison](context_comparison.md). Do not layer this profile on top of the OpenRouter profile or reuse its output directories. API keys stay out of the YAML and saved manifests. For Daytona, use `create --provider-key DEEPSEEK_API_KEY` with the matched `daytona matrix` workflow below; the legacy single-provider `daytona run` remains OpenRouter-only. These commands incur DeepSeek model charges, but merely loading or validating the configuration does not call the API.
 
 ### Muse Spark 1.3 Contributor (Meta direct)
 
@@ -107,7 +107,7 @@ mini-extra browsecomp-plus run --method pocket_context --split development680 --
   --output runs/browsecomp-plus/muse-1.3-contributor-smoke/pocket_context
 ```
 
-The model is explicitly **`meta/muse-spark-1.3-contributor`**, not Standard `muse-spark-1.3` or Contributor 1.2. The profile uses the direct endpoint `https://api.meta.ai/v1` and LiteLLM's native Responses interface, with encrypted reasoning replay, optional readable reasoning summaries, high effort, and no server-managed response storage. Contributor does not support `max` effort. It retains the shared 128,000-token experimental cap and corpus/budget settings, and requires no OpenRouter key. Use fresh output directories and the same profile for every method; do not merge it with another provider's profile. The Daytona launcher does not yet forward Meta credentials.
+The model is explicitly **`meta/muse-spark-1.3-contributor`**, not Standard `muse-spark-1.3` or Contributor 1.2. The profile uses the direct endpoint `https://api.meta.ai/v1` and LiteLLM's native Responses interface, with encrypted reasoning replay, optional readable reasoning summaries, high effort, and no server-managed response storage. Contributor does not support `max` effort. It retains the shared 128,000-token experimental cap and corpus/budget settings, and requires no OpenRouter key. Use fresh output directories and the same profile for every method; do not merge it with another provider's profile. For Daytona, create a fresh pool with `--provider-key META_API_KEY` and use `daytona matrix -c browsecomp_plus_muse_spark_1_3_contributor`. The legacy single-provider `daytona run` does not support Meta credentials.
 
 **Contributor permits Meta to use prompts and responses for model training.** This includes submitted benchmark context; `store: false` does not opt out of Contributor data use. Check your benchmark/data policy before launching held-out tasks. See [Meta's Contributor terms](https://ai.developer.meta.com/docs/pricing-rate-limits) and the [comparison guide](context_comparison.md#muse-spark-13-contributor). No inference runs are launched by loading this profile.
 
@@ -146,7 +146,7 @@ The model decides whether context tools are useful; a short successful episode c
 ### Ten parallel Daytona workers
 
 Daytona is optional for local corpus retrieval.
-The cloud runner uses one task per sandbox and shares a snapshot containing Java 21, CPU dependencies, the pinned BM25 index, and the Qwen tokenizer:
+The legacy single-provider `daytona run` launcher remains OpenRouter-only. It uses one task per sandbox and shares a snapshot containing Java 21, CPU dependencies, the pinned BM25 index, and the Qwen tokenizer. For a four-method comparison with other providers, use the matrix workflow below.
 
 ```bash
 uv pip install --python .venv/bin/python -e '.[browsecomp-plus,daytona]'
@@ -178,9 +178,51 @@ mini-extra browsecomp-plus daytona run --workers 10 --split eval150 --limit 150 
 ```
 
 The pool manifest is ignored at `data/browsecomp-plus/daytona-pool.json`.
-Create a fresh pool after application changes or after idle deletion.
+Create a fresh pool after application or credential changes or after idle deletion.
 
-Use repeated `--query-id ID`, `--offset N`, and `--limit N` to select queries in dataset order.
+### Matched Daytona matrix
+
+`daytona matrix` runs Pocket Context, ReAct, ReSum and ACM concurrently, one sandbox per method, with multiple selected questions processed sequentially per method. It requires at least four workers. Use a separate `--pool` manifest and a fresh pool containing the updated application:
+
+```bash
+mini-extra browsecomp-plus daytona create \
+  --snapshot pocket-browsecomp-plus --workers 4 \
+  --provider-key DEEPSEEK_API_KEY \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra browsecomp-plus daytona check \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra browsecomp-plus daytona matrix \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json \
+  --split eval150 --limit 1 --seed 42 -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/matched-smoke --dry-run
+```
+
+`create --provider-key` forwards only the named key, defaulting to `OPENROUTER_API_KEY`. Any key name ending in `_API_KEY` is allowed except `DAYTONA_API_KEY`; the Daytona credential is never forwarded. Match the key to the matrix's provider profile and recreate the pool when changing it. Matrix uses the DeepSeek profile by default if no `-c` is supplied. Explicit configs replace the default provider profile; the base configuration is always applied. Do not merge provider profiles.
+
+Repeat `--query-id ID` for explicit selection; `--limit 0` selects the whole split. `--seed N` samples reproducibly without replacement; otherwise selection follows dataset order. All four methods receive the same selected questions. The parent `selection.yaml` records their IDs and seed. Matrix requires a new or empty output directory, with no hidden resampling or resume.
+
+`--dry-run` validates selection/configuration without writing files or calling any API. Omit it to launch the paid run:
+
+```bash
+mini-extra browsecomp-plus daytona matrix \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json \
+  --split eval150 --limit 1 --seed 42 -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/matched-smoke
+mini-extra browsecomp-plus daytona status \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json
+# After matrix completion:
+mini-extra browsecomp-plus compare \
+  --runs runs/browsecomp-plus/matched-smoke \
+  --output runs/browsecomp-plus/matched-smoke/comparison.yaml
+```
+
+Use the existing `daytona status` command for worker tracking. Each method directory retains its original `run.yaml`, `summary.yaml`, query results and `trajectories.tar.gz`; shared selection metadata stays in the parent. `compare` accepts this matrix parent output. Without judge grades it reports resource usage only, not answer correctness; judge each method separately and supply `--grades` as described in [Context-method comparison](context_comparison.md#grade-and-compare).
+
+The DeepSeek profile's $0.50 threshold is per method per question, including auxiliary inference, and is checked between calls: it is not a hard billing cap. All four methods incur model charges, alongside Daytona and any judge costs. These examples are instructions, not claims that a run has occurred.
+
+### Local selection and artifacts
+
+Use repeated `--query-id ID`, `--offset N`, and `--limit N` to select queries in dataset order for the local `run` command.
 `--queries FILE` accepts an alternative decrypted JSONL with `query_id` and `query` fields, and `--index DIR` accepts an alternative Lucene index.
 Local development runs without `--method` skip completed queries and retry incomplete queries. Explicit method runs and local `eval150` runs retain all recorded attempts, including failures, to avoid retry-until-success bias. Runs reject changed settings in an existing output directory.
 Use `--redo-existing` to explicitly replace recorded attempts with the same settings; use fresh directories for independent evaluation repeats.

@@ -94,7 +94,53 @@ Explicit method runs and all local `eval150` runs retain **all** attempts on res
 
 Manifests record selected IDs, source/index revisions, inventory, workers, attempt policy, implementation hash, and **per-method upstream revision, prompt hash and method settings**. Changing code, selection, configuration or data requires fresh output directories. Old local “X-style” runs lack the new method provenance and are intentionally rejected by the comparison importer.
 
-This workflow uses the local `run` command. The Daytona parent launcher does not yet support the method matrix/provenance contract; do not use its parent output as `compare` input.
+The loops above use the local `run` command. For matched cloud runs, use `daytona matrix` below, not the legacy OpenRouter-only `daytona run` launcher; its parent output is not a matched comparison input.
+
+## Matched Daytona matrix
+
+`daytona matrix` runs all four methods concurrently, with **one sandbox per method** and selected questions processed sequentially within each method. It requires a pool with at least four workers. Prepare the snapshot as described in [BrowseComp-Plus setup](browsecomp_plus.md#ten-parallel-daytona-workers), then create a fresh pool after application or credential changes. A separate `--pool` path is recommended to avoid reusing the legacy launcher's pool.
+
+```bash
+mini-extra browsecomp-plus daytona create \
+  --snapshot pocket-browsecomp-plus --workers 4 \
+  --provider-key DEEPSEEK_API_KEY \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra browsecomp-plus daytona check \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra browsecomp-plus daytona matrix \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json \
+  --split eval150 --limit 1 --seed 42 -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/matched-smoke --dry-run
+```
+
+`create --provider-key` forwards only the named provider credential; its default is `OPENROUTER_API_KEY`. Any name ending in `_API_KEY` is accepted except `DAYTONA_API_KEY`, which stays on the launcher. Use `DEEPSEEK_API_KEY` for DeepSeek or `META_API_KEY` with the Meta profile; the old single-provider `daytona run` remains OpenRouter-only. `check` performs corpus/tokenizer checks without model calls.
+
+The matrix defaults to `browsecomp_plus_deepseek` when no `-c` is supplied. Explicit configs replace that default provider profile; the base configuration is always applied. Do not layer provider profiles. The pool's forwarded credential must match the selected provider.
+
+Selection is shared across methods: repeat `--query-id ID` to select specific questions (add `--limit 0` to run all specified IDs), use `--limit 0` without IDs for the whole split, or use `--seed N` for reproducible random selection without replacement. Without a seed, selection follows dataset order. `selection.yaml` in the parent output records the shared selected IDs and seed. There is no hidden resampling or resume: matrix requires a new or empty output directory.
+
+`--dry-run` validates selection and configuration, writes nothing and calls no API. To launch the paid smoke run after validation, omit that flag:
+
+```bash
+mini-extra browsecomp-plus daytona matrix \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json \
+  --split eval150 --limit 1 --seed 42 -c browsecomp_plus_deepseek \
+  --output runs/browsecomp-plus/matched-smoke
+```
+
+Each method retains its original `run.yaml`, `summary.yaml`, query results and `trajectories.tar.gz` under `matched-smoke/METHOD/`; the parent retains `selection.yaml` with the method-to-sandbox mapping. Successful collection removes the remote workspace. On timeout, available partial artifacts are collected before raising; collection failures retain the remote workspace at the recovery path printed when launching. Recover it before the sandbox's idle deletion. With this profile, the $0.50 threshold applies per method per question, including auxiliary calls. It is a soft stopping threshold checked between calls, not a billing cap; four concurrent methods incur separate model costs, plus Daytona and any judging costs. These examples do not imply an evaluation has been run.
+
+Inspect workers with the existing status command; after matrix completion, compare its parent output directly:
+
+```bash
+mini-extra browsecomp-plus daytona status \
+  --pool data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra browsecomp-plus compare \
+  --runs runs/browsecomp-plus/matched-smoke \
+  --output runs/browsecomp-plus/matched-smoke/comparison.yaml
+```
+
+This ungraded comparison reports resources, not correctness. Run the judge separately for each method directory, as below, and pass the corresponding grade parent with `--grades` to report success rates.
 
 ## Grade and compare
 

@@ -99,7 +99,7 @@ def test_job_path_rejects_traversal_and_invalid_identifiers(tmp_path: Path, iden
 
 def test_view_status_and_maintenance_use_live_runner_and_disabled_gate(controller: Path, processes: list) -> None:
     staged = request(controller, "staged")
-    assert action("view", str(controller)) == {"jobs": {"staged": {"state": "staged"}}}
+    assert action("view", str(controller)) == {"disabled": False, "jobs": {"staged": {"state": "staged"}}}
     path = request(controller, "active", GATED)
     runner = start(path, processes)
     try:
@@ -123,6 +123,7 @@ def test_view_status_and_maintenance_use_live_runner_and_disabled_gate(controlle
     assert not completed["runner_alive"] and not completed["child_alive"]
     persisted = (path.parent / "status.json").read_bytes()
     assert action("maintenance", str(controller)) == {"disabled": True}
+    assert action("view", str(controller))["disabled"] is True
     assert (controller / "jobs" / "disabled").exists()
     assert start(staged, processes).wait(timeout=10) == SETUP_FAILED
     disabled = action("status", str(controller), {"job": "staged"})

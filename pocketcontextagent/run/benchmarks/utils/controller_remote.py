@@ -15,6 +15,7 @@ from pathlib import Path
 import requests
 
 from pocketcontextagent.run.benchmarks.utils.controller_job import launch, read_status
+from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
 from pocketcontextagent.run.benchmarks.utils.controller_setup import provider_endpoint, write_private_json
 
 
@@ -80,12 +81,18 @@ def action(name: str, root_path: str, arguments: dict | None = None) -> dict:
         raise ValueError("Controller root must be absolute")
     jobs = root / "jobs"
     if name == "view":
-        return {"jobs": {path.name: _status(path) for path in sorted(jobs.iterdir()) if path.is_dir()}}
+        return {
+            "disabled": (jobs / "disabled").exists(),
+            "jobs": {path.name: _status(path) for path in sorted(jobs.iterdir()) if path.is_dir()},
+        }
+    if name == "adapters":
+        return check_runtime()
     if name == "check":
         key = args["provider_key"]
         if key not in {"DEEPSEEK_API_KEY", "META_API_KEY", "OPENROUTER_API_KEY"}:
             raise ValueError("Select a model provider credential")
         endpoint = provider_endpoint(args["model"])
+        readiness = check_runtime()
         response = requests.get(
             endpoint,
             headers={"Authorization": "Bearer " + _credentials(root)[key]},
@@ -100,6 +107,7 @@ def action(name: str, root_path: str, arguments: dict | None = None) -> dict:
             "http_status": 200,
             "checked_at": datetime.now(timezone.utc).isoformat(),
             "inference_calls": 0,
+            "adapter_readiness": readiness,
         }
     if name == "maintenance":
         with (jobs / "active.lock").open("a") as lock:

@@ -20,6 +20,7 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     matrix_provider_key,
     provider_environment,
 )
+from pocketcontextagent.run.benchmarks.utils.controller_runtime import RUNTIME_REQUIREMENTS
 from pocketcontextagent.run.benchmarks.utils.controller_setup import (
     ControllerConfig,
     extract_artifacts,
@@ -109,6 +110,7 @@ def _runtime_image(project: Path):
             "apt-get update && apt-get install -y --no-install-recommends git curl openssh-client tmux procps && rm -rf /var/lib/apt/lists/*"
         )
         .pip_install_from_pyproject(str(project / "pyproject.toml"), ["daytona"], extra_options="--no-cache-dir")
+        .pip_install(*RUNTIME_REQUIREMENTS, extra_options="--no-cache-dir")
         .workdir(ROOT)
     )
 
@@ -181,6 +183,7 @@ def create(
             )
             sandbox.fs.delete_file(remote_wheel)
             _upload(sandbox, json.dumps(credentials).encode(), ROOT + "/credentials.json")
+            document["runtime_readiness"] = _remote(sandbox, "adapters")
             document["dependencies"] = json.loads(
                 _exec(
                     sandbox,
@@ -219,6 +222,88 @@ def check(
     key = matrix_provider_key(config)
     _upload(sandbox, json.dumps(_credentials(key)).encode(), ROOT + "/credentials.json")
     typer.echo(json.dumps(_remote(sandbox, "check", model=config["model"], provider_key=key), indent=2))
+
+
+@app.command("upgrade")
+def upgrade(
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    project: Path = typer.Option(Path(".")),
+) -> None:
+    """Repair/update an idle controller's frozen code and pinned inference runtime; never rerun jobs."""
+    _, sandbox, document = _load(manifest, start=True)
+    _remote(sandbox, "maintenance")
+    document["maintenance"] = True
+    write_private_json(manifest, document)
+    complete = False
+    try:
+        with tempfile.TemporaryDirectory(prefix="pca-controller-upgrade-") as temporary:
+            wheel = build_wheel(project, Path(temporary))
+            remote_wheel = ROOT + "/" + wheel.name
+            _upload(sandbox, wheel.read_bytes(), remote_wheel)
+            _exec(
+                sandbox,
+                [
+                    PYTHON,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "--no-cache-dir",
+                    *RUNTIME_REQUIREMENTS,
+                ],
+                timeout=300,
+            )
+            _exec(
+                sandbox,
+                [
+                    PYTHON,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "--force-reinstall",
+                    "--no-deps",
+                    remote_wheel,
+                ],
+                timeout=180,
+            )
+            sandbox.fs.delete_file(remote_wheel)
+            readiness = _remote(sandbox, "adapters")
+            dependencies = json.loads(
+                _exec(
+                    sandbox,
+                    [
+                        PYTHON,
+                        "-c",
+                        "import json,importlib.metadata; print(json.dumps({d.metadata['Name']:d.version for d in importlib.metadata.distributions()}))",
+                    ],
+                )
+            )
+            document.setdefault("upgrades", []).append(
+                {
+                    "previous_implementation_sha256": document["implementation_sha256"],
+                    "previous_dependencies": document["dependencies"],
+                }
+            )
+            document.update(
+                implementation_sha256=implementation_hash(),
+                wheel_sha256=digest(wheel),
+                runtime_readiness=readiness,
+                dependencies=dependencies,
+                maintenance=False,
+                runtime_snapshot_updated=False,
+            )
+        _upload(sandbox, json.dumps(document).encode(), ROOT + "/controller.json")
+        write_private_json(manifest, document)
+        _remote(sandbox, "enable")
+        complete = True
+    finally:
+        if not complete:
+            document["maintenance"] = True
+            write_private_json(manifest, document)
+    typer.echo(
+        "Controller runtime and frozen code upgraded; adapter imports verified. Existing jobs/results unchanged; no jobs rerun."
+    )
 
 
 def submission_plan(
@@ -267,7 +352,10 @@ def submit(
     _, sandbox, document = _load(manifest, start=True)
     if document["implementation_sha256"] != plan["implementation_sha256"]:
         raise ValueError("Controller code differs from this checkout; create a new frozen controller before submitting")
-    if any(row.get("runner_alive") or row.get("child_alive") for row in _remote(sandbox, "view")["jobs"].values()):
+    view = _remote(sandbox, "view")
+    if view.get("disabled"):
+        raise ValueError("Controller is in maintenance mode; finish its upgrade before submitting")
+    if any(row.get("runner_alive") or row.get("child_alive") for row in view["jobs"].values()):
         raise ValueError("Controller already has an active job")
     key = matrix_provider_key(config)
     _upload(sandbox, json.dumps(_credentials(key)).encode(), ROOT + "/credentials.json")
@@ -327,6 +415,7 @@ def submit(
                     "MSWEA_CONTROLLER_ID": sandbox.id,
                     "MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT": "2",
                     "PYTHONUNBUFFERED": "1",
+                    "LITELLM_LOCAL_MODEL_COST_MAP": "True",
                 },
             }
         ).encode(),

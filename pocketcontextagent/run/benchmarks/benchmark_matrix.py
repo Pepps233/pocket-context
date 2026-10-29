@@ -35,6 +35,7 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     run_matrix_workers,
 )
 from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
+from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
 from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics
 from pocketcontextagent.run.benchmarks.utils.shared_snapshots import SharedSnapshots
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
@@ -288,6 +289,8 @@ def run_matrix(
     api = client()
     if not preflight:
         provider_environment(matrix_provider_key(config))
+        if os.getenv("MSWEA_CONTROLLER_ID"):
+            check_runtime()
         for manifest in manifests.values():
             model = get_model(config=manifest["config"]["model"])
             if hasattr(model.config, "action_regex") or not callable(getattr(model, "get_tools", None)):

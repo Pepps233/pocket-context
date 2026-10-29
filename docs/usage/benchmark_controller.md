@@ -110,8 +110,14 @@ mini-extra benchmark-controller submit \
   --workers-per-method 1 -c context_benchmark_deepseek --preflight
 ```
 
-`check` and non-dry submissions refresh the private controller credentials and verify an
-allowlisted official provider metadata endpoint. Even managed preflight therefore needs
+Controller images pin the tested inference SDK versions, including LiteLLM's MCP extra.
+Creation and `check` validate the actual MCP/DeepSeek/OpenAI adapter imports without
+requesting inference. The matrix also warms these imports in its own process before
+starting concurrent agents or allocating coding workers. A successful metadata request
+alone does not establish that the inference adapter is installed correctly.
+
+`check` and non-dry submissions refresh the private controller credentials, validate the
+pinned adapter runtime, and verify an allowlisted official provider metadata endpoint. Even managed preflight therefore needs
 provider credentials, unlike a direct matrix infrastructure-only preflight. `--dry-run`
 can be combined with `--preflight`; it stays local. Submission verifies the prepared
 public/private file hashes, frozen implementation and remote selection before acceptance.
@@ -177,6 +183,22 @@ Cancellation retains uncollected worker state; it does not invent patches or dis
 recovery data. Inspect `output/sandbox-cleanup.json` and worker artifacts on the trusted
 controller before cleanup. Cleanup refuses active jobs and uncollected work unless
 `--discard-uncollected` is explicit. Worker safety TTLs still apply during recovery.
+
+## Repair or update an idle controller
+
+```bash
+mini-extra benchmark-controller upgrade --project .
+mini-extra benchmark-controller check -c context_benchmark_deepseek
+```
+
+`upgrade` refuses active jobs and temporarily disables new submissions. It installs the
+pinned inference dependencies and frozen project wheel, validates adapter imports, and
+updates the controller's code/dependency record. Existing jobs, original results,
+fingerprints and credentials are preserved; **no task is retried**. A failed upgrade
+leaves maintenance mode enabled for inspection/recovery rather than launching work with
+partially updated dependencies. The original clean runtime snapshot is not a snapshot of
+the credential-bearing upgraded filesystem; new controllers build the updated image recipe.
+Only submit a fresh job after reviewing a failed attempt and authorizing another run.
 
 ## Stop, start or delete explicitly
 

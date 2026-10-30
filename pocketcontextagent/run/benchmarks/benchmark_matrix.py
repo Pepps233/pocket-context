@@ -35,7 +35,9 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     run_matrix_workers,
 )
 from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
+from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
 from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
+from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount
 from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics
 from pocketcontextagent.run.benchmarks.utils.shared_snapshots import SharedSnapshots
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
@@ -147,6 +149,7 @@ def run_manifest(config: dict, method: str, instances: list[dict], workers: int,
         if os.getenv("MSWEA_CONTROLLER_ID")
         else "local-agent/daytona-shell/shared-immutable-snapshot",
         "controller_id": os.getenv("MSWEA_CONTROLLER_ID"),
+        "artifact_volume_id": os.getenv("MSWEA_ARTIFACT_VOLUME_ID"),
         "transport_retry_limit": int(os.getenv("MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT", "10")),
         "harness_revision": swe.HARNESS_REVISION,
     }
@@ -286,6 +289,15 @@ def run_matrix(
         return
     if output.exists() and any(output.iterdir()):
         raise ValueError("Use a fresh output directory; failed attempts are never retried automatically")
+    store = None
+    archive_job = os.getenv("MSWEA_ARTIFACT_JOB_ID", "")
+    min_free = int(os.getenv("MSWEA_ARTIFACT_MIN_FREE_BYTES", str(1024**3)))
+    if archive_root := os.getenv("MSWEA_ARTIFACT_STORE_ROOT"):
+        if not archive_job:
+            raise ValueError("Volume archival requires a job identifier")
+        verify_volume_mount(Path(archive_root).parent)
+        require_free_space(output.parent, min_free)
+        store = ArtifactStore(Path(archive_root))
     api = client()
     if not preflight:
         provider_environment(matrix_provider_key(config))
@@ -298,6 +310,7 @@ def run_matrix(
     output.mkdir(parents=True, exist_ok=True)
     (output / "selection.yaml").write_text(yaml.safe_dump(selection, sort_keys=False), encoding="utf-8")
     locks = {method: threading.Lock() for method in METHODS}
+    archive_lock = threading.Lock()
     journal = ResourceJournal(output / "sandbox-cleanup.json")
     builders = threading.Semaphore(runtime.snapshot_build_workers)
     readiness = {row["query_id"]: threading.Barrier(len(METHODS)) for row in instances}
@@ -307,6 +320,9 @@ def run_matrix(
     def create(instance: dict) -> PreparedSnapshot:
         with builders:
             pool.raise_if_aborted()
+            if store is not None:
+                verify_volume_mount(store.root.parent)
+                require_free_space(output.parent, min_free)
             return create_snapshot(api, runtime, journal, instance)
 
     def destroy(snapshot: PreparedSnapshot) -> None:
@@ -338,6 +354,7 @@ def run_matrix(
                 phase("creating", snapshot=snapshot.name, image=snapshot.image)
                 sandbox = None
                 agent_started = False
+                archived = False
                 try:
                     sandbox = api.create(
                         sandbox_params(snapshot, method, runtime, name=name), timeout=runtime.startup_timeout_seconds
@@ -376,7 +393,7 @@ def run_matrix(
                         with locks[method]:
                             checks[method][iid] = record
                     else:
-                        phase("running_agent")
+                        phase("running_agent", retain=True)
                         agent_started = True
                         try:
                             run_instance(
@@ -391,22 +408,33 @@ def run_matrix(
                             if (task / f"{iid}.json").exists():
                                 with locks[method]:
                                     publish_matrix_task(task, output / method, iid, manifests[method])
+                            if (
+                                store is not None
+                                and (task / f"{iid}.json").is_file()
+                                and (task / "trajectories.tar.gz").is_file()
+                            ):
+                                with archive_lock:
+                                    verify_volume_mount(store.root.parent)
+                                    store.archive_task(task, archive_job, method, iid, prune=True)
+                                    archived = True
                 finally:
                     error = sys.exc_info()[1]
-                    if error is not None:
-                        record.update(journal.failure("sandboxes", name, error))
-                        for barrier in readiness.values():
-                            barrier.abort()
-                    captured = (task / f"{iid}.json").is_file() and (task / "trajectories.tar.gz").is_file()
-                    if not agent_started or captured:
-                        delete_resources(api, {"sandboxes": [{"name": name}]}, runtime.cleanup_timeout_seconds)
-                        phase("destroyed", cleanup_confirmed=True)
-                    elif sandbox is not None:
-                        journal.record("sandboxes", name, retain=True)
+                    captured = (task / f"{iid}.json").is_file() and (
+                        archived if store is not None else (task / "trajectories.tar.gz").is_file()
+                    )
+                    if agent_started and not captured and sandbox is not None:
                         current = api.get(sandbox.id)
                         if getattr(current.state, "value", current.state) in ("started", "starting"):
                             api.stop(current)
                         phase("retained_for_recovery", retain=True)
+                    if error is not None:
+                        record.update(journal.failure("sandboxes", name, error))
+                        for barrier in readiness.values():
+                            barrier.abort()
+                    if not agent_started or captured:
+                        phase("captured", retain=False)
+                        delete_resources(api, {"sandboxes": [{"name": name}]}, runtime.cleanup_timeout_seconds)
+                        phase("destroyed", cleanup_confirmed=True)
             ended = True
         finally:
             if not ended and sys.exc_info()[1] is not None:

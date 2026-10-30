@@ -6,6 +6,7 @@ import os
 import shlex
 import subprocess
 import tempfile
+import time
 from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
@@ -27,6 +28,11 @@ from pocketcontextagent.run.benchmarks.utils.controller_setup import (
     provider_endpoint,
     sandbox_params,
     write_private_json,
+)
+from pocketcontextagent.run.benchmarks.utils.controller_volumes import (
+    archive_environment,
+    resolve_volume,
+    validate_volume_name,
 )
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import RuntimeConfig, delete_resources, sandbox_metadata
 
@@ -61,7 +67,7 @@ def _remote(sandbox, operation: str, **arguments) -> dict:
         _exec(
             sandbox,
             [PYTHON, "-c", code, json.dumps([operation, ROOT, arguments])],
-            timeout=240 if operation in {"pack", "cleanup"} else 60,
+            timeout=600 if operation in {"pack", "cleanup", "archive", "import-controller"} else 60,
         )
     )
 
@@ -98,6 +104,13 @@ def _load(manifest: Path, *, start: bool = False):
         _remote(sandbox, "enable")
     if start and getattr(sandbox.state, "value", sandbox.state) == "started":
         sandbox_metadata(sandbox.model_dump(), RuntimeConfig(**document["settings"]))
+        if volume := document.get("artifact_volume"):
+            if not any(
+                item.volume_id == volume["id"] and item.mount_path == volume["mount_path"]
+                for item in sandbox.volumes or []
+            ):
+                raise ValueError("Controller volume differs from its saved identity")
+            _remote(sandbox, "volume-info")
     return api, sandbox, document
 
 
@@ -126,6 +139,9 @@ def create(
         0, min=0, help="0 requests no absolute destruction deadline; actual server policy is verified."
     ),
     provider_key: str = typer.Option("DEEPSEEK_API_KEY"),
+    volume_name: str | None = typer.Option(
+        None, help="Create/reuse a persistent controller-only artifact volume; never deleted with the controller."
+    ),
 ) -> None:
     """Create a persistent trusted controller; no benchmark inference is launched."""
     from daytona import CreateSnapshotParams, Resources
@@ -133,6 +149,8 @@ def create(
     if manifest.exists():
         raise ValueError("Controller manifest already exists; reuse it or explicitly delete its resources")
     config = ControllerConfig(cpu=cpu, memory=memory, disk=disk, ttl_minutes=ttl_minutes)
+    if volume_name is not None:
+        validate_volume_name(volume_name)
     api = client()
     credentials = _credentials(provider_key)
     identifier = uuid4().hex[:12]
@@ -146,10 +164,15 @@ def create(
         "sandboxes": [{"name": f"pca-trusted-controller-{identifier}"}],
         "snapshots": [{"name": f"pca-controller-runtime-{identifier}"}],
         "jobs": [],
+        "volume_requested_name": volume_name,
+        "artifact_volume": None,
     }
     write_private_json(manifest, document)
     complete = False
     try:
+        if volume_name is not None:
+            document["artifact_volume"] = resolve_volume(api, volume_name, create=True)
+            write_private_json(manifest, document)
         with tempfile.TemporaryDirectory(prefix="pca-controller-build-") as temporary:
             wheel = build_wheel(project, Path(temporary))
             document["wheel_sha256"] = digest(wheel)
@@ -162,7 +185,12 @@ def create(
                 ),
                 timeout=1800,
             )
-            sandbox = api.create(sandbox_params(snapshot.name, document["sandboxes"][0]["name"], config), timeout=180)
+            sandbox = api.create(
+                sandbox_params(
+                    snapshot.name, document["sandboxes"][0]["name"], config, volume=document["artifact_volume"]
+                ),
+                timeout=180,
+            )
             document["sandboxes"][0]["id"] = sandbox.id
             document["organization_id"] = sandbox.organization_id
             document["lifecycle"] = sandbox_metadata(
@@ -183,6 +211,9 @@ def create(
             )
             sandbox.fs.delete_file(remote_wheel)
             _upload(sandbox, json.dumps(credentials).encode(), ROOT + "/credentials.json")
+            if document["artifact_volume"] is not None:
+                _upload(sandbox, json.dumps(document["artifact_volume"]).encode(), ROOT + "/volume.json")
+                _remote(sandbox, "volume-info")
             document["runtime_readiness"] = _remote(sandbox, "adapters")
             document["dependencies"] = json.loads(
                 _exec(
@@ -340,12 +371,19 @@ def submit(
     workers_per_method: int = typer.Option(1, min=1, max=30),
     query_ids: list[str] = typer.Option([], "--query-id"),
     config_spec: list[str] = typer.Option([], "-c", "--config"),
+    min_free_bytes: int = typer.Option(
+        1024**3, min=1, help="Minimum free controller-disk bytes before new volume-backed work."
+    ),
     preflight: bool = typer.Option(False, help="Infrastructure-only four-method check; no model inference."),
     dry_run: bool = typer.Option(False, help="Print a local plan; no API calls, uploads or inference."),
 ) -> None:
     """Accept one detached matched SWE job; it continues after laptop/SSH disconnect."""
     config, plan = submission_plan(data_dir, config_spec, limit, seed, workers_per_method, query_ids)
-    plan.update(preflight_only=preflight, attempts=0 if preflight else plan["planned_attempts"])
+    plan.update(
+        preflight_only=preflight,
+        attempts=0 if preflight else plan["planned_attempts"],
+        volume_min_free_bytes=min_free_bytes,
+    )
     if dry_run:
         typer.echo(yaml.safe_dump(plan, sort_keys=False))
         return
@@ -416,6 +454,12 @@ def submit(
                     "MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT": "2",
                     "PYTHONUNBUFFERED": "1",
                     "LITELLM_LOCAL_MODEL_COST_MAP": "True",
+                    **(
+                        archive_environment(document["artifact_volume"], identifier, min_free_bytes)
+                        | {"MSWEA_ARTIFACT_VOLUME_ID": document["artifact_volume"]["id"]}
+                        if document.get("artifact_volume")
+                        else {}
+                    ),
                 },
             }
         ).encode(),
@@ -526,6 +570,60 @@ def cleanup(
     typer.echo(json.dumps(_remote(sandbox, "cleanup", job=job, discard=discard_uncollected), indent=2))
 
 
+@app.command("volume-info")
+def volume_info(manifest: Path = typer.Option(DEFAULT_MANIFEST)) -> None:
+    """Verify the actual controller-only FUSE mount without reading private data."""
+    _, sandbox, _ = _load(manifest, start=True)
+    typer.echo(json.dumps(_remote(sandbox, "volume-info"), indent=2))
+
+
+@app.command("archive")
+def archive_job(manifest: Path = typer.Option(DEFAULT_MANIFEST), job: str = typer.Option(...)) -> None:
+    """Archive an inactive legacy/recovered job; never rerun its agent tasks."""
+    _, sandbox, _ = _load(manifest, start=True)
+    typer.echo(json.dumps(_remote(sandbox, "archive", job=job), indent=2))
+
+
+@app.command("import-results")
+def import_results(
+    source_controller: str = typer.Option(...),
+    job: str = typer.Option(...),
+    manifest: Path = typer.Option(DEFAULT_MANIFEST),
+    max_bytes: int = typer.Option(2_000_000_000, min=1),
+) -> None:
+    """Copy completed public results cloud-to-cloud into the volume; no laptop data relay or inference."""
+    api, sandbox, document = _load(manifest, start=True)
+    if not document.get("artifact_volume"):
+        raise ValueError("Create a volume-backed target controller first")
+    source = api.get(source_controller)
+    if source.labels.get("role") != "trusted-controller" or source.organization_id != sandbox.organization_id:
+        raise ValueError("Source must be a trusted controller in the same organization")
+    if getattr(source.state, "value", source.state) in {"stopped", "archived", "paused"}:
+        api.start(source, timeout=180)
+    typer.echo(
+        json.dumps(
+            _remote(sandbox, "import-controller", source_controller=source.id, job=job, max_bytes=max_bytes), indent=2
+        )
+    )
+
+
+@app.command("volume-delete")
+def volume_delete(name: str = typer.Option(...), confirm_destroy_data: bool = typer.Option(False)) -> None:
+    """Explicit, irreversible deletion of an unmounted volume; never part of controller cleanup."""
+    if not confirm_destroy_data:
+        raise ValueError("Volume data is independent: explicitly pass --confirm-destroy-data after backup")
+    validate_volume_name(name)
+    api = client()
+    volume = api.volume.get(name, create=False)
+    api.volume.delete(volume)
+    deadline = time.monotonic() + 180
+    while any(row.id == volume.id for row in api.volume.list()):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("Volume deletion was not confirmed")
+        time.sleep(1)
+    typer.echo("Volume deletion confirmed; archived data cannot be recovered")
+
+
 @app.command("start")
 def start(manifest: Path = typer.Option(DEFAULT_MANIFEST)) -> None:
     """Start the existing filesystem; interrupted jobs are never automatically rerun."""
@@ -553,13 +651,19 @@ def delete(manifest: Path = typer.Option(DEFAULT_MANIFEST), discard_uncollected:
     if document["state"] == "ready":
         api, sandbox, _ = _load(manifest, start=True)
         _remote(sandbox, "maintenance")
-        for job in _remote(sandbox, "view")["jobs"]:
+        for job, state in _remote(sandbox, "view")["jobs"].items():
+            if state.get("archived_only"):
+                continue
             journal = _remote(sandbox, "journal", job=job)
             write_private_json(manifest.parent / "controller-recovery" / job / "sandbox-cleanup.json", journal)
+            if document.get("artifact_volume"):
+                _remote(sandbox, "archive", job=job, allow_maintenance=True)
             _remote(sandbox, "cleanup", job=job, discard=discard_uncollected)
     else:
         api = client()
     delete_resources(api, document)
     document["state"] = "deleted_cleanup_confirmed"
     write_private_json(manifest, document)
-    typer.echo("Controller and owned runtime snapshot deletion confirmed; public recovery manifest retained.")
+    typer.echo(
+        "Controller and owned runtime snapshot deletion confirmed; public recovery manifest retained. Any artifact volume is preserved."
+    )

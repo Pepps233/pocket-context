@@ -507,6 +507,20 @@ class ArtifactStore:
             self._validate_task_references(receipt)
         return receipt
 
+    def verify_job(self, job_id: str, *, local: Path | None = None) -> None:
+        """Verify every payload and optional local-output coverage before cleanup."""
+        receipt = self._job_receipt(job_id)
+        if receipt is None:
+            raise ValueError("Job has no committed archive")
+        self.verify(receipt)
+        if local is not None and (local / "output").exists():
+            members = self._export_members(receipt)
+            for name, path in _walk(local / "output", private=True).items():
+                if members.get(f"output/{name}") != _fingerprint(path):
+                    raise ValueError(
+                        "Local output differs from its immutable archive; preserve recovery in a fresh job namespace before cleanup"
+                    )
+
     def job_status(self, job_id: str) -> dict | None:
         """Read verified final metadata, without re-reading task payload objects."""
         receipt = self._job_receipt(job_id)

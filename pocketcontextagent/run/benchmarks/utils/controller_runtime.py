@@ -13,6 +13,9 @@ RUNTIME_REQUIREMENTS = (
     "pydantic==2.14.1",
     "httpx==0.28.1",
     "tenacity==9.2.1",
+    "transformers==5.20.2",
+    "tokenizers==0.23.3",
+    "huggingface-hub==1.33.0",
 )
 _RUNTIME_IMPORTS = (
     ("litellm.responses.mcp.chat_completions_handler", "acompletion_with_mcp"),
@@ -22,6 +25,7 @@ _RUNTIME_IMPORTS = (
     ("litellm.llms.openai.openai", "OpenAIChatCompletion"),
     ("openai", "OpenAI"),
     ("openai", "AsyncOpenAI"),
+    ("transformers", "AutoTokenizer"),
 )
 
 

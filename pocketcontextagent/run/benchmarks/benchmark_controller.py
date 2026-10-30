@@ -338,14 +338,35 @@ def upgrade(
 
 
 def submission_plan(
-    data_dir: Path, config_spec: list[str], limit: int, seed: int, workers: int, query_ids: list[str]
+    data_dir: Path,
+    config_spec: list[str],
+    limit: int,
+    seed: int,
+    workers: int,
+    query_ids: list[str],
+    *,
+    benchmark: str = "swebench-verified",
+    split: str | None = None,
 ) -> tuple[dict, dict]:
-    from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config, load_instances, run_manifest
+    if benchmark == "browsecomp-plus":
+        from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import plan
+
+        return plan(data_dir, config_spec, limit, seed, workers, query_ids, split=split or "eval150")
+    if benchmark != "swebench-verified" or split not in (None, "test"):
+        raise ValueError("Select browsecomp-plus/eval150 or swebench-verified/test")
+    from pocketcontextagent.run.benchmarks.benchmark_matrix import (
+        benchmark_config,
+        load_instances,
+        pin_instances,
+        run_manifest,
+    )
 
     config = benchmark_config(config_spec)
     if not 1 <= workers <= 30:
         raise ValueError("Select 1 to 30 workers per method")
-    instances = load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed)
+    instances = pin_instances(
+        load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed), config.get("task_images")
+    )
     run_manifest(config, "react", instances, min(workers, len(instances)), data_dir / "queries.jsonl", "test")
     provider_endpoint(config["model"])
     return config, {
@@ -365,7 +386,12 @@ def submission_plan(
 @app.command("submit")
 def submit(
     manifest: Path = typer.Option(DEFAULT_MANIFEST),
-    data_dir: Path = typer.Option(Path("data/swebench-verified")),
+    data_dir: Path | None = typer.Option(None, help="Prepared data; defaults to data/BENCHMARK."),
+    benchmark: str = typer.Option("swebench-verified", help="swebench-verified or browsecomp-plus."),
+    split: str | None = typer.Option(None, help="Defaults to test for SWE or eval150 for BrowseComp."),
+    corpus_snapshot: str = typer.Option(
+        "pocket-browsecomp-plus-20261022", help="Credential-free corpus runtime snapshot for BrowseComp only."
+    ),
     limit: int = typer.Option(1, min=0),
     seed: int = typer.Option(42),
     workers_per_method: int = typer.Option(1, min=1, max=30),
@@ -377,8 +403,15 @@ def submit(
     preflight: bool = typer.Option(False, help="Infrastructure-only four-method check; no model inference."),
     dry_run: bool = typer.Option(False, help="Print a local plan; no API calls, uploads or inference."),
 ) -> None:
-    """Accept one detached matched SWE job; it continues after laptop/SSH disconnect."""
-    config, plan = submission_plan(data_dir, config_spec, limit, seed, workers_per_method, query_ids)
+    """Accept one detached matched benchmark job; execution stays on the cloud controller."""
+    data_dir = data_dir or Path("data") / benchmark
+    config, plan = submission_plan(
+        data_dir, config_spec, limit, seed, workers_per_method, query_ids, benchmark=benchmark, split=split
+    )
+    if benchmark == "browsecomp-plus":
+        if config.get("corpus_snapshot") and config["corpus_snapshot"]["name"] != corpus_snapshot:
+            raise ValueError("Corpus snapshot name differs from its frozen preparation")
+        plan["corpus_snapshot"] = config.get("corpus_snapshot") or {"name": corpus_snapshot}
     plan.update(
         preflight_only=preflight,
         attempts=0 if preflight else plan["planned_attempts"],
@@ -408,10 +441,22 @@ def submit(
     sandbox.fs.create_folder(remote + "/input/data", "700")
     job_credentials = f"{ROOT}/credentials/{identifier}.json"
     _upload(sandbox, json.dumps(_credentials(key)).encode(), job_credentials)
-    for filename in ("queries.jsonl", "manifest.json", "grading_dataset.jsonl"):
-        path = data_dir / filename
-        if path.exists():
-            _upload(sandbox, path.read_bytes(), remote + "/input/data/" + filename)
+    if benchmark == "browsecomp-plus":
+        from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+            matrix_query_bytes,
+            select_matrix_instances,
+        )
+
+        _upload(
+            sandbox,
+            matrix_query_bytes(select_matrix_instances(data_dir / "queries.jsonl", "all", [], 0, None)),
+            remote + "/input/data/queries.jsonl",
+        )
+    else:
+        for filename in ("queries.jsonl", "manifest.json", "grading_dataset.jsonl"):
+            path = data_dir / filename
+            if path.exists():
+                _upload(sandbox, path.read_bytes(), remote + "/input/data/" + filename)
     _upload(sandbox, yaml.safe_dump(config).encode(), remote + "/input/config.yaml")
     arguments = [
         PYTHON,
@@ -434,6 +479,35 @@ def submit(
         "--output",
         remote + "/output",
     ]
+    if benchmark == "browsecomp-plus":
+        with tempfile.TemporaryDirectory(prefix="pca-corpus-worker-package-") as temporary:
+            wheel = build_wheel(Path("."), Path(temporary))
+            remote_wheel = remote + "/input/" + wheel.name
+            _upload(sandbox, wheel.read_bytes(), remote_wheel)
+            record["corpus_worker_wheel_sha256"] = digest(wheel)
+        arguments = [
+            PYTHON,
+            "-m",
+            "pocketcontextagent.run.benchmarks.utils.controller_browsecomp",
+            "--data-dir",
+            remote + "/input/data",
+            "--limit",
+            str(limit),
+            "--seed",
+            str(seed),
+            "--workers-per-method",
+            str(workers_per_method),
+            "--split",
+            split or "eval150",
+            "--snapshot",
+            corpus_snapshot,
+            "--wheel",
+            remote_wheel,
+            "-c",
+            remote + "/input/config.yaml",
+            "--output",
+            remote + "/output",
+        ]
     for identifier_value in query_ids:
         arguments.extend(["--query-id", identifier_value])
     if preflight:
@@ -454,6 +528,7 @@ def submit(
                     "MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT": "2",
                     "PYTHONUNBUFFERED": "1",
                     "LITELLM_LOCAL_MODEL_COST_MAP": "True",
+                    **({"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"} if benchmark == "browsecomp-plus" else {}),
                     **(
                         archive_environment(document["artifact_volume"], identifier, min_free_bytes)
                         | {"MSWEA_ARTIFACT_VOLUME_ID": document["artifact_volume"]["id"]}

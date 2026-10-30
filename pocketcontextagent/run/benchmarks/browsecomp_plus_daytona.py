@@ -116,7 +116,7 @@ def build_wheel(project: Path, destination: Path) -> Path:
 def install_worker(sandbox: Any, wheel: Path) -> None:
     remote = f"/tmp/{wheel.name}"
     sandbox.fs.upload_file(wheel.read_bytes(), remote)
-    command = shlex.join(["python", "-m", "pip", "install", "--no-deps", "--user", remote])
+    command = shlex.join(["python", "-m", "pip", "install", "--no-deps", "--force-reinstall", "--user", remote])
     result = sandbox.process.exec(command, timeout=120)
     if result.exit_code:
         raise RuntimeError(f"Worker package installation failed in sandbox {sandbox.id}: {result.result}")

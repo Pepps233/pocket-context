@@ -157,6 +157,12 @@ def plan(
     for method in METHODS:
         configure_method(config, method)
     active = min(workers, len(instances))
+    ttl = max(
+        240, math.ceil(len(instances) / active) * math.ceil(config["agent"]["wall_time_limit_seconds"] / 60) + 120
+    )
+    configured_ttl = config.get("corpus_ttl_minutes", ttl)
+    if type(configured_ttl) is not int or configured_ttl < ttl:
+        raise ValueError("Corpus pool TTL must cover all task waves and collection grace")
     return config, {
         "benchmark": "browsecomp-plus",
         "split": split,
@@ -173,10 +179,7 @@ def plan(
         "queries_sha256": hashlib.sha256(matrix_query_bytes(instances)).hexdigest(),
         "attempts": len(instances) * len(METHODS),
         "planned_attempts": len(instances) * len(METHODS),
-        "sandbox_ttl_minutes": max(
-            240,
-            math.ceil(len(instances) / active) * math.ceil(config["agent"]["wall_time_limit_seconds"] / 60) + 120,
-        ),
+        "sandbox_ttl_minutes": configured_ttl,
         "retrieval_protocol": PROTOCOL,
     }
 
@@ -210,6 +213,7 @@ def run_manifest(config: dict, selection: dict, method: str, snapshot: dict) -> 
         "index_revision": INDEX_REVISION,
         "index": REMOTE_INDEX,
         "index_files": [],
+        "index_sha256": config.get("corpus_index_sha256"),
         "version": __version__,
         "snapshot": snapshot,
         "runtime": "trusted-controller/daytona-corpus",
@@ -238,7 +242,9 @@ def worker_params(name: str, snapshot: str, method: str, runtime: RuntimeConfig)
     )
 
 
-def check_worker(sandbox, expected_hash: str, tokenizer_revision: str | None = None) -> RemoteRetriever:
+def check_worker(
+    sandbox, expected_hash: str, tokenizer_revision: str | None = None, index_hashes: dict[str, str] | None = None
+) -> RemoteRetriever:
     code = (
         "import os,json; from pathlib import Path; "
         "from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash; "
@@ -249,6 +255,19 @@ def check_worker(sandbox, expected_hash: str, tokenizer_revision: str | None = N
         f"assert AutoTokenizer.from_pretrained({TOKENIZER!r}, revision={tokenizer_revision!r}, local_files_only=True).encode('ready'); "
         "print(json.dumps({'ready': True}))"
     )
+    if index_hashes:
+        if any(Path(name).name != name for name in index_hashes):
+            raise ValueError("Index hashes must name direct index files")
+        verify_code = (
+            "import hashlib,json; from pathlib import Path; expected=json.loads(__import__('sys').argv[1]); root=Path("
+            + repr(REMOTE_INDEX)
+            + "); actual={p.name:hashlib.file_digest(p.open('rb'),'sha256').hexdigest() for p in root.iterdir() if p.is_file()}; assert actual==expected, 'Corpus index differs from its frozen hashes'"
+        )
+        response = sandbox.process.exec(
+            worker_command(["python", "-c", verify_code, json.dumps(index_hashes)]), timeout=180
+        )
+        if response.exit_code:
+            raise ValueError("Corpus index checksum preflight failed")
     response = sandbox.process.exec(worker_command(["python", "-c", code]), timeout=120)
     if response.exit_code or json.loads(response.result) != {"ready": True}:
         raise RuntimeError("Corpus worker package/index/tokenizer preflight failed")
@@ -323,6 +342,8 @@ def run_matrix(
                 raise ValueError("Corpus matrix requires a native-tool model")
     api = client()
     selection["snapshot"] = resolve_snapshot(api, snapshot)
+    if config.get("corpus_snapshot") is not None and config["corpus_snapshot"] != selection["snapshot"]:
+        raise ValueError("Corpus snapshot identity differs from its frozen preparation")
     runtime = RuntimeConfig(cpu=1, memory=4, disk=10, ttl_minutes=selection["sandbox_ttl_minutes"])
     selection["sandbox"] = asdict(runtime)
     output.mkdir(parents=True, exist_ok=True)
@@ -383,7 +404,8 @@ def run_matrix(
                 name = f"pca-bcp-{method.replace('_', '-')}-{uuid4().hex[:12]}"
                 journal.record("sandboxes", name, phase="creating", method=method, slot=slot, snapshot=snapshot)
                 sandbox = api.create(
-                    worker_params(name, snapshot, method, runtime), timeout=runtime.startup_timeout_seconds
+                    worker_params(name, selection["snapshot"]["id"], method, runtime),
+                    timeout=runtime.startup_timeout_seconds,
                 )
                 journal.record(
                     "sandboxes",
@@ -394,7 +416,10 @@ def run_matrix(
                 )
                 install_worker(sandbox, wheel)
                 retriever = check_worker(
-                    sandbox, manifests[method]["implementation_sha256"], config["environment"].get("tokenizer_revision")
+                    sandbox,
+                    manifests[method]["implementation_sha256"],
+                    config["environment"].get("tokenizer_revision"),
+                    config.get("corpus_index_sha256") if preflight else None,
                 )
                 groups[method].append({"name": name, "id": sandbox.id, "retriever": retriever})
                 journal.record("sandboxes", name, phase="ready", model_calls=0)
@@ -402,6 +427,9 @@ def run_matrix(
             run_matrix_workers(groups, selection["instances"], execute)
     finally:
         delete_resources(api, journal.document(), runtime.cleanup_timeout_seconds, preserve_retained=True)
+        for row in journal.document()["sandboxes"]:
+            if not row.get("retain"):
+                journal.record("sandboxes", row["name"], phase="destroyed", cleanup_confirmed=True)
         confirmed = not any(row.get("retain") for row in journal.document()["sandboxes"])
         (output / "cleanup.yaml").write_text(yaml.safe_dump({"confirmed": confirmed}))
     if preflight:

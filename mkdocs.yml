@@ -72,6 +72,7 @@ nav:
       - "Corpus and coding matrix": usage/context_benchmarks.md
       - "Trusted cloud controller": usage/benchmark_controller.md
       - "Controller artifact volumes": usage/controller_volumes.md
+      - "Full context evaluation": usage/full_context_evaluation.md
       - "Inspector": usage/inspector.md
       - "Output files": usage/output_files.md
     - "Language models":

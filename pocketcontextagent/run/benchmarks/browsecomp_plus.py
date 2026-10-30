@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -68,8 +69,6 @@ def implementation_hash() -> str:
 
 
 def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retriever, fingerprint: str) -> bool:
-    import sys
-
     query_id = str(instance["query_id"])
     trajectory_dir = output / "trajectories" / query_id
     env = BrowseCompPlusEnvironment(retriever, **config.get("environment", {}))

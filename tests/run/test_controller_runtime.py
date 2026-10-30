@@ -9,9 +9,9 @@ import pytest
 
 from pocketcontextagent.run.benchmarks.utils.controller_runtime import RUNTIME_PYTHON, RUNTIME_REQUIREMENTS
 
-_INSTALLED = {item.metadata["Name"].lower(): item.version for item in distributions()}
+_INSTALLED = {item.metadata["Name"].lower().replace("_", "-"): item.version for item in distributions()}
 _PINNED_RUNTIME_AVAILABLE = all(
-    _INSTALLED.get(requirement.split("==")[0].split("[")[0]) == requirement.split("==")[1]
+    _INSTALLED.get(requirement.split("==")[0].split("[")[0].replace("_", "-")) == requirement.split("==")[1]
     for requirement in RUNTIME_REQUIREMENTS
 )
 
@@ -27,6 +27,9 @@ def test_runtime_real_imports_and_pinned_versions_without_network() -> None:
         "pydantic==2.14.1",
         "httpx==0.28.1",
         "tenacity==9.2.1",
+        "transformers==5.20.2",
+        "tokenizers==0.23.3",
+        "huggingface-hub==1.33.0",
     )
     result = subprocess.run(
         [
@@ -78,6 +81,7 @@ print(json.dumps(result))
         "litellm.llms.openai.openai.OpenAIChatCompletion",
         "openai.OpenAI",
         "openai.AsyncOpenAI",
+        "transformers.AutoTokenizer",
     }
 
 

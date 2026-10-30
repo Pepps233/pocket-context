@@ -1,0 +1,21 @@
+# Layer after browsecomp_plus_deepseek; all four methods share these full-run budgets.
+corpus_ttl_minutes: 510
+agent:
+  step_limit: 0
+  cost_limit: 1.0
+  wall_time_limit_seconds: 1800
+environment:
+  tokenizer_revision: c202236235762e1c871ad0ccb60c8ee5ba337b9a
+model:
+  model_kwargs:
+    timeout: 180
+    num_retries: 0
+  observation_template: |
+    {{output.output}}
+    Main model calls used: {{n_model_calls}}.
+    {% if step_limit > 0 %}
+    Model calls remaining: {{step_limit - n_model_calls}}.
+    Submit your best supported answer before the call limit is exhausted.
+    {% else %}
+    No fixed main-step cap; cost and wall-time limits still apply.
+    {% endif %}

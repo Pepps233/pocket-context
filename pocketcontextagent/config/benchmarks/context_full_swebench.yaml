@@ -1,0 +1,26 @@
+# Layer after context_benchmark_deepseek; all four methods share these full-run budgets.
+agent:
+  step_limit: 0
+  cost_limit: 1.0
+  wall_time_limit_seconds: 7200
+model:
+  model_kwargs:
+    timeout: 180
+    num_retries: 0
+  observation_template: |
+    <returncode>{{output.returncode}}</returncode>
+    {% if output.output | length > 16000 %}
+    <output_truncated original_characters="{{output.output | length}}">
+    {{output.output[:8000]}}
+    ... middle output omitted; use narrower commands or file redirection ...
+    {{output.output[-8000:]}}
+    </output_truncated>
+    {% else %}
+    <output>{{output.output}}</output>
+    {% endif %}
+    Main model calls used: {{n_model_calls}}.
+    {% if step_limit > 0 %}
+    Model calls remaining: {{step_limit - n_model_calls}}.
+    {% else %}
+    No fixed main-step cap; cost and wall-time limits still apply.
+    {% endif %}

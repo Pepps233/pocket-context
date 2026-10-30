@@ -91,6 +91,27 @@ def load_instances(
     return random.Random(seed).sample(rows, limit or len(rows)) if seed is not None else rows[: limit or None]
 
 
+def pin_instances(instances: list[dict], images: dict[str, str] | None) -> list[dict]:
+    """Bind selected instances to a preflight-resolved official image map, if supplied."""
+    if images is None:
+        return instances
+    if not isinstance(images, dict):
+        raise ValueError("Pinned task images must be a mapping")
+    from pocketcontextagent.run.benchmarks.utils.swebench_daytona import immutable_image
+
+    result = []
+    for row in instances:
+        image = images.get(row["query_id"])
+        if (
+            not isinstance(image, str)
+            or not image.startswith(row["image"].removesuffix(":latest") + "@sha256:")
+            or immutable_image(image) != image
+        ):
+            raise ValueError("Pinned image must match the task's canonical official repository")
+        result.append(row | {"image": image})
+    return result
+
+
 def benchmark_config(config_spec: list[str]) -> dict:
     config = recursive_merge(
         get_config_from_spec("swebench_verified_context"),
@@ -195,14 +216,13 @@ def run_instance(
         info = agent.save(trajectory / "trajectory.json")["info"]
         error = type(sys.exc_info()[1]).__name__ if not ended and sys.exc_info()[1] is not None else None
         patch = env.capture_patch()
-        metrics = episode_metrics(
+        messages = (
             agent.messages
             + [call["response"] for call in agent.compactions]
-            + [call["response"] for call in getattr(agent, "memory_queries", [])],
-            model_stats=info["model_stats"],
-            latency_seconds=elapsed,
+            + [call["response"] for call in getattr(agent, "memory_queries", [])]
         )
-        if error and metrics["model_calls"] < info["model_stats"]["api_calls"]:
+        metrics = episode_metrics(messages, model_stats=info["model_stats"], latency_seconds=elapsed)
+        if error and episode_metrics(messages)["model_calls"] < info["model_stats"]["api_calls"]:
             info["model_stats"]["cost_available"] = False
             metrics["cost_usd"] = None
         if error:
@@ -259,8 +279,10 @@ def run_matrix(
     workers_per_method: int,
     preflight: bool = False,
 ) -> None:
-    instances = load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed, split=split)
     config = benchmark_config(config_spec)
+    instances = pin_instances(
+        load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed, split=split), config.get("task_images")
+    )
     runtime = RuntimeConfig(**config["sandbox"])
     active = min(workers_per_method, len(instances))
     if not 1 <= workers_per_method <= 30:

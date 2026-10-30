@@ -71,6 +71,7 @@ nav:
       - "Context-method comparison": usage/context_comparison.md
       - "Corpus and coding matrix": usage/context_benchmarks.md
       - "Trusted cloud controller": usage/benchmark_controller.md
+      - "One controller per method": usage/method_controllers.md
       - "Controller artifact volumes": usage/controller_volumes.md
       - "Full context evaluation": usage/full_context_evaluation.md
       - "Inspector": usage/inspector.md

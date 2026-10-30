@@ -10,9 +10,12 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from pocketcontextagent.run.benchmarks.benchmark_controller import app
+from pocketcontextagent.comparisons.registry import METHODS
+from pocketcontextagent.config import builtin_config_dir
+from pocketcontextagent.run.benchmarks.benchmark_controller import app, validate_remote_plan
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import app as matrix_app
 from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
+from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import app as corpus_app
 
 PRIVATE = "PRIVATE_GRADING_MARKER_92831"
 
@@ -54,6 +57,98 @@ def prepared(tmp_path: Path) -> Path:
 
 def credential_free_env() -> dict:
     return {key: None for key in os.environ if key.endswith("_API_KEY")} | {"MSWEA_SILENT_STARTUP": "1"}
+
+
+@pytest.fixture
+def prepared_corpus(tmp_path: Path) -> Path:
+    ids = json.loads((builtin_config_dir / "benchmarks/browsecomp_plus_eval150.json").read_text())["query_ids"][:8]
+    (tmp_path / "queries.jsonl").write_text(
+        "".join(json.dumps({"query_id": iid, "query": "Which city?", "answer": PRIVATE}) + "\n" for iid in ids)
+    )
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    ("method", "preflight"), [(method, preflight) for method in METHODS for preflight in (True, False)]
+)
+def test_single_method_submission_matches_cloud_cli_without_resources(
+    prepared_corpus: Path, method: str, preflight: bool
+):
+    arguments = [
+        "--data-dir",
+        str(prepared_corpus),
+        "--limit",
+        "0",
+        "--seed",
+        "42",
+        "--method",
+        method,
+        "--dry-run",
+        *(["--preflight"] if preflight else []),
+    ]
+    submitted = CliRunner().invoke(
+        app,
+        ["submit", "--benchmark", "browsecomp-plus", "--manifest", str(prepared_corpus / "missing.json"), *arguments],
+        env=credential_free_env(),
+    )
+    remote = CliRunner().invoke(
+        corpus_app, ["--output", str(prepared_corpus / "output"), *arguments], env=credential_free_env()
+    )
+    assert submitted.exit_code == remote.exit_code == 0, submitted.output + remote.output
+    local_plan, remote_plan = yaml.safe_load(submitted.stdout), yaml.safe_load(remote.stdout)
+    validate_remote_plan(local_plan, remote_plan)
+    assert local_plan["methods"] == [method]
+    assert local_plan["workers_per_method"] == local_plan["active_workers_per_method"] == 6
+    assert local_plan["maximum_active_sandboxes"] == 6
+    assert local_plan["planned_attempts"] == 8 and local_plan["attempts"] == (0 if preflight else 8)
+    assert PRIVATE not in submitted.stdout + remote.stdout
+    assert [path.name for path in prepared_corpus.iterdir()] == ["queries.jsonl"]
+    for key in ("methods", "workers_per_method", "maximum_active_sandboxes", "queries_sha256", "implementation_sha256"):
+        with pytest.raises(ValueError, match=key):
+            validate_remote_plan(local_plan, remote_plan | {key: None})
+
+
+def test_corpus_submission_default_and_override_preserve_existing_matrix(prepared_corpus: Path):
+    arguments = [
+        "submit",
+        "--benchmark",
+        "browsecomp-plus",
+        "--data-dir",
+        str(prepared_corpus),
+        "--limit",
+        "0",
+        "--dry-run",
+    ]
+    all_methods = CliRunner().invoke(app, arguments)
+    single = CliRunner().invoke(app, [*arguments, "--method", "react", "--workers-per-method", "2"])
+    assert all_methods.exit_code == single.exit_code == 0, all_methods.output + single.output
+    matrix, isolated = yaml.safe_load(all_methods.stdout), yaml.safe_load(single.stdout)
+    assert matrix["methods"] == list(METHODS) and matrix["workers_per_method"] == 1
+    assert matrix["maximum_active_sandboxes"] == 4 and matrix["planned_attempts"] == 32
+    assert isolated["methods"] == ["react"] and isolated["maximum_active_sandboxes"] == 2
+    assert isolated["planned_attempts"] == 8
+    assert matrix["selected_query_ids"] == isolated["selected_query_ids"]
+    with pytest.raises(ValueError, match="methods"):
+        validate_remote_plan(isolated, matrix)
+
+
+@pytest.mark.parametrize(
+    ("benchmark", "method", "error"),
+    [
+        ("browsecomp-plus", "typo", "Unknown method"),
+        ("swebench-verified", "react", "require --benchmark browsecomp-plus"),
+    ],
+)
+def test_invalid_method_submission_fails_before_data_or_cloud_access(
+    tmp_path: Path, benchmark: str, method: str, error: str
+):
+    result = CliRunner().invoke(
+        app,
+        ["submit", "--benchmark", benchmark, "--method", method, "--data-dir", str(tmp_path / "missing")],
+        env=credential_free_env(),
+    )
+    assert isinstance(result.exception, ValueError) and error in str(result.exception)
+    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.parametrize(("preflight", "workers"), [(False, 30), (True, 2)])

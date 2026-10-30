@@ -1,4 +1,4 @@
-"""Durable, SSH-accessible Daytona controllers for isolated SWE-bench workers."""
+"""Durable Daytona controllers for isolated coding and corpus workers."""
 
 import hashlib
 import json
@@ -357,11 +357,14 @@ def submission_plan(
     *,
     benchmark: str = "swebench-verified",
     split: str | None = None,
+    method: str | None = None,
 ) -> tuple[dict, dict]:
     if benchmark == "browsecomp-plus":
         from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import plan
 
-        return plan(data_dir, config_spec, limit, seed, workers, query_ids, split=split or "eval150")
+        return plan(data_dir, config_spec, limit, seed, workers, query_ids, split=split or "eval150", method=method)
+    if method is not None:
+        raise ValueError("Single-method controllers currently require --benchmark browsecomp-plus")
     if benchmark != "swebench-verified" or split not in (None, "test"):
         raise ValueError("Select browsecomp-plus/eval150 or swebench-verified/test")
     from pocketcontextagent.run.benchmarks.benchmark_matrix import (
@@ -393,6 +396,27 @@ def submission_plan(
     }
 
 
+def validate_remote_plan(plan: dict, remote: dict) -> None:
+    keys = ["selected_query_ids"]
+    if plan["benchmark"] == "browsecomp-plus":
+        keys += [
+            "methods",
+            "workers_per_method",
+            "active_workers_per_method",
+            "maximum_active_sandboxes",
+            "planned_attempts",
+            "attempts",
+            "implementation_sha256",
+            "queries_sha256",
+            "split",
+            "model",
+            "sandbox_ttl_minutes",
+            "preflight_only",
+        ]
+    if mismatches := [key for key in keys if remote.get(key) != plan[key]]:
+        raise ValueError(f"Remote plan differs from the frozen local plan: {', '.join(mismatches)}")
+
+
 @app.command("submit")
 def submit(
     manifest: Path = typer.Option(DEFAULT_MANIFEST),
@@ -404,19 +428,31 @@ def submit(
     ),
     limit: int = typer.Option(1, min=0),
     seed: int = typer.Option(42),
-    workers_per_method: int = typer.Option(1, min=1, max=30),
+    workers_per_method: int | None = typer.Option(
+        None, min=1, max=30, help="Defaults to 6 with --method, otherwise 1."
+    ),
+    method: str | None = typer.Option(None, help="BrowseComp only: isolate one method on this controller."),
     query_ids: list[str] = typer.Option([], "--query-id"),
     config_spec: list[str] = typer.Option([], "-c", "--config"),
     min_free_bytes: int = typer.Option(
         1024**3, min=1, help="Minimum free controller-disk bytes before new volume-backed work."
     ),
-    preflight: bool = typer.Option(False, help="Infrastructure-only four-method check; no model inference."),
+    preflight: bool = typer.Option(False, help="Infrastructure-only check of selected methods; no model inference."),
     dry_run: bool = typer.Option(False, help="Print a local plan; no API calls, uploads or inference."),
 ) -> None:
     """Accept one detached matched benchmark job; execution stays on the cloud controller."""
     data_dir = data_dir or Path("data") / benchmark
+    workers_per_method = workers_per_method if workers_per_method is not None else (6 if method is not None else 1)
     config, plan = submission_plan(
-        data_dir, config_spec, limit, seed, workers_per_method, query_ids, benchmark=benchmark, split=split
+        data_dir,
+        config_spec,
+        limit,
+        seed,
+        workers_per_method,
+        query_ids,
+        benchmark=benchmark,
+        split=split,
+        method=method,
     )
     if benchmark == "browsecomp-plus":
         if config.get("corpus_snapshot") and config["corpus_snapshot"]["name"] != corpus_snapshot:
@@ -518,13 +554,14 @@ def submit(
             "--output",
             remote + "/output",
         ]
+        if method is not None:
+            arguments.extend(["--method", method])
     for identifier_value in query_ids:
         arguments.extend(["--query-id", identifier_value])
     if preflight:
         arguments.append("--preflight")
     remote_plan = yaml.safe_load(_exec(sandbox, [*arguments, "--dry-run"]))
-    if remote_plan["selected_query_ids"] != plan["selected_query_ids"]:
-        raise ValueError("Remote selection differs from the frozen local cohort")
+    validate_remote_plan(plan, remote_plan)
     _upload(sandbox, json.dumps(plan).encode(), remote + "/plan.json")
     _upload(
         sandbox,

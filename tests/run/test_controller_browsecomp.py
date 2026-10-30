@@ -146,6 +146,45 @@ def test_plan_ttl_uses_wall_time_and_preserves_requested_ids_and_tokenizer_revis
     assert config["environment"]["tokenizer_revision"] == "c202fixture"
 
 
+@pytest.mark.parametrize(("method",), [(method,) for method in METHODS])  # noqa: PT006
+def test_single_method_cli_defaults_to_six_workers_and_keeps_matched_cohort(public_data: Path, method: str):
+    ids = json.loads((builtin_config_dir / "benchmarks/browsecomp_plus_eval150.json").read_text())["query_ids"][:8]
+    (public_data / "queries.jsonl").write_text(
+        "".join(json.dumps({"query_id": iid, "query": "Which city?"}) + "\n" for iid in ids)
+    )
+    arguments = [
+        "--data-dir",
+        str(public_data),
+        "--output",
+        str(public_data / "output"),
+        "--method",
+        method,
+        "--dry-run",
+    ]
+    result = CliRunner().invoke(app, arguments)
+    assert result.exit_code == 0, result.output
+    selection = yaml.safe_load(result.stdout)
+    assert selection["methods"] == [method]
+    assert selection["workers_per_method"] == selection["active_workers_per_method"] == 6
+    assert selection["maximum_active_sandboxes"] == 6
+    assert selection["attempts"] == selection["planned_attempts"] == 8
+    matched = plan(public_data, [], 0, 42, 6, [])[1]
+    assert selection["instances"] == matched["instances"]
+    assert selection["queries_sha256"] == matched["queries_sha256"]
+    preflight = CliRunner().invoke(app, [*arguments, "--preflight", "--workers-per-method", "2"])
+    assert preflight.exit_code == 0, preflight.output
+    assert yaml.safe_load(preflight.stdout)["attempts"] == 0
+    assert yaml.safe_load(preflight.stdout)["planned_attempts"] == 8
+    assert yaml.safe_load(preflight.stdout)["maximum_active_sandboxes"] == 2
+    assert not (public_data / "output").exists()
+
+
+def test_unknown_method_is_rejected_before_data_or_cloud_access(tmp_path: Path):
+    with pytest.raises(ValueError, match="Unknown method"):
+        plan(tmp_path / "missing", [], 0, 42, 6, [], method="typo")
+    assert not list(tmp_path.iterdir())
+
+
 def test_corpus_params_use_only_public_environment_and_no_mounts():
     pytest.importorskip("daytona")
     params = worker_params("worker", "existing", "react", RuntimeConfig(cpu=1, memory=4, disk=10, ttl_minutes=600))
@@ -224,7 +263,7 @@ def deterministic_config() -> dict:
     }
 
 
-def test_real_bm25_transport_safe_quoting_and_four_method_publication(bm25_index: Path, public_data: Path):
+def test_real_bm25_transport_and_separate_method_archives_combine(bm25_index: Path, public_data: Path):
     def corpus_backend(command: str, *, timeout: int) -> dict:
         response = subprocess_backend(command, timeout=timeout)
         assert response["returncode"] == 0, response["output"]
@@ -247,10 +286,13 @@ def test_real_bm25_transport_safe_quoting_and_four_method_publication(bm25_index
     config, selection = plan(public_data, [str(replay)], 1, 42, 1, [])
     iid = selection["selected_query_ids"][0]
     root = public_data / "runs"
+    root.mkdir()
     store = ArtifactStore(public_data / "store")
     for method in METHODS:
+        config, selection = plan(public_data, [str(replay)], 1, 42, 6, [], method=method)
         manifest = run_manifest(config, selection, method, {"name": "public-index", "id": "immutable-id"})
-        task = root / method / "tasks" / iid
+        controller = public_data / f"controller-{method}"
+        task = controller / method / "tasks" / iid
         task.mkdir(parents=True)
         (task / "run.yaml").write_text(yaml.safe_dump(manifest))
         fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
@@ -259,10 +301,14 @@ def test_real_bm25_transport_safe_quoting_and_four_method_publication(bm25_index
         assert result["tool_call_counts"] == {"search": 1, "get_document": 1}
         assert result["retrieved_docids"] == ["city"] and result["execution_error"] is None
         archive_trajectories(task)
-        publish_matrix_task(task, root / method, iid, manifest)
-        store.archive_task(task, "fixture", method, iid, prune=True)
-        assert store.task_receipt("fixture", method, iid)
+        publish_matrix_task(task, controller / method, iid, manifest)
+        store.archive_task(task, f"job-{method}", method, iid, prune=True)
+        assert store.task_receipt(f"job-{method}", method, iid)
         assert not (task / "trajectories").exists() and (task / f"{iid}.json").exists()
+        report = compare_runs(controller, methods=selection["methods"])
+        assert list(report["methods"]) == list(report["method_provenance"]) == [method]
+        assert report["methods"][method]["completed"] == 1
+        (root / method).symlink_to(controller / method, target_is_directory=True)
     report = compare_runs(root)
     assert all(row["tasks"] == row["completed"] == 1 for row in report["methods"].values())
     assert "PRIVATE_GOLD" not in "".join(path.read_text() for path in root.glob("*/run.yaml"))

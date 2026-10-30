@@ -45,13 +45,16 @@ def shared_settings(manifest: dict) -> dict:
     }
 
 
-def compare_runs(runs: Path, grades: Path | None = None) -> dict:
+def compare_runs(runs: Path, grades: Path | None = None, *, methods: list[str] | None = None) -> dict:
+    methods = list(METHODS) if methods is None else methods
+    if not methods or len(set(methods)) != len(methods) or any(method not in METHODS for method in methods):
+        raise ValueError("Select distinct registered methods for the report")
     if grades is not None and not grades.is_dir():
         raise ValueError(f"Judge directory does not exist: {grades}")
     rows = {}
     reference = None
     judge_settings = None
-    for method in METHODS:
+    for method in methods:
         directory = runs / method
         manifest = yaml.safe_load((directory / "run.yaml").read_text())
         if manifest.get("method") != method:
@@ -115,7 +118,7 @@ def compare_runs(runs: Path, grades: Path | None = None) -> dict:
         "judge": judge_settings,
         "methods": rows,
         "method_provenance": {
-            name: yaml.safe_load((runs / name / "run.yaml").read_text())["method_provenance"] for name in METHODS
+            name: yaml.safe_load((runs / name / "run.yaml").read_text())["method_provenance"] for name in methods
         },
     }
 

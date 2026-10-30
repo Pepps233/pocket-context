@@ -90,6 +90,12 @@ def test_matched_report_requires_grading_and_counts_failed_tasks(tmp_path: Path)
     assert not (runs / "pocket_context" / "comparison.yaml").exists()
 
 
+@pytest.mark.parametrize(("methods",), [([],), (["react", "react"],), (["unknown"],)])  # noqa: PT006
+def test_report_rejects_invalid_method_selection_before_reading_files(tmp_path: Path, methods: list[str]):
+    with pytest.raises(ValueError, match="distinct registered methods"):
+        compare_runs(tmp_path, methods=methods)
+
+
 @pytest.mark.parametrize(
     ("mutation",),  # noqa: PT006
     [

@@ -147,15 +147,19 @@ def plan(
     workers: int,
     query_ids: list[str],
     split: str = "eval150",
+    method: str | None = None,
 ) -> tuple[dict, dict]:
     if not 1 <= workers <= 30:
         raise ValueError("Select 1 to 30 workers per method")
+    if method is not None and method not in METHODS:
+        raise ValueError(f"Unknown method: {method}; select one of {', '.join(METHODS)}")
+    methods = [method] if method is not None else list(METHODS)
     instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_ids, limit, seed)
     config = matrix_config(config_spec)
     matrix_provider_key(config)
     if "api_key" in config["model"].get("model_kwargs", {}):
         raise ValueError("Keep provider keys outside saved configurations")
-    for method in METHODS:
+    for method in methods:
         configure_method(config, method)
     active = min(workers, len(instances))
     ttl = max(
@@ -174,12 +178,13 @@ def plan(
         "model": config["model"]["model_name"],
         "workers_per_method": workers,
         "active_workers_per_method": active,
-        "maximum_active_sandboxes": active * len(METHODS),
+        "methods": methods,
+        "maximum_active_sandboxes": active * len(methods),
         "selected_query_ids": [row["query_id"] for row in instances],
         "instances": instances,
         "queries_sha256": hashlib.sha256(matrix_query_bytes(instances)).hexdigest(),
-        "attempts": len(instances) * len(METHODS),
-        "planned_attempts": len(instances) * len(METHODS),
+        "attempts": len(instances) * len(methods),
+        "planned_attempts": len(instances) * len(methods),
         "sandbox_ttl_minutes": configured_ttl,
         "retrieval_protocol": PROTOCOL,
     }
@@ -292,6 +297,7 @@ def run_matrix(
     limit: int,
     seed: int | None,
     workers_per_method: int,
+    method: str | None = None,
     split: str = "eval150",
     query_ids: list[str] | None = None,
     snapshot: str = DEFAULT_SNAPSHOT,
@@ -299,7 +305,8 @@ def run_matrix(
     dry_run: bool = False,
     preflight: bool = False,
 ) -> None:
-    config, selection = plan(data_dir, config_spec, limit, seed, workers_per_method, query_ids or [], split)
+    config, selection = plan(data_dir, config_spec, limit, seed, workers_per_method, query_ids or [], split, method)
+    methods = selection["methods"]
     selection.update(snapshot={"name": snapshot}, preflight_only=preflight)
     if preflight:
         selection["attempts"] = 0
@@ -337,7 +344,7 @@ def run_matrix(
         provider_environment(matrix_provider_key(config))
         if os.getenv("MSWEA_CONTROLLER_ID"):
             check_runtime()
-        for method in METHODS:
+        for method in methods:
             model = get_model(config=configure_method(config, method)["model"])
             if hasattr(model.config, "action_regex") or not callable(getattr(model, "get_tools", None)):
                 raise ValueError("Corpus matrix requires a native-tool model")
@@ -349,14 +356,14 @@ def run_matrix(
     selection["sandbox"] = asdict(runtime)
     output.mkdir(parents=True, exist_ok=True)
     (output / "selection.yaml").write_text(yaml.safe_dump(selection, sort_keys=False))
-    manifests = {method: run_manifest(config, selection, method, selection["snapshot"]) for method in METHODS}
+    manifests = {method: run_manifest(config, selection, method, selection["snapshot"]) for method in methods}
     if not preflight:
         for method, manifest in manifests.items():
             (output / method).mkdir()
             (output / method / "run.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
     journal = ResourceJournal(output / "sandbox-cleanup.json")
-    groups = {method: [] for method in METHODS}
-    locks = {method: threading.Lock() for method in METHODS}
+    groups = {method: [] for method in methods}
+    locks = {method: threading.Lock() for method in methods}
     archive_lock = threading.Lock()
     aborted = threading.Event()
 
@@ -399,7 +406,7 @@ def run_matrix(
                 journal.failure("sandboxes", name, error)
 
     try:
-        for method in METHODS:
+        for method in methods:
             for slot in range(selection["active_workers_per_method"]):
                 admission()
                 name = f"pca-bcp-{method.replace('_', '-')}-{uuid4().hex[:12]}"
@@ -440,7 +447,7 @@ def run_matrix(
             )
         )
         return
-    report = compare_runs(output)
+    report = compare_runs(output, methods=methods)
     (output / "comparison.yaml").write_text(yaml.safe_dump(report, sort_keys=False))
     typer.echo(comparison_markdown(report))
     if any(row["completed"] < row["tasks"] for row in report["methods"].values()):
@@ -457,7 +464,10 @@ def main(
     config_spec: list[str] = typer.Option([], "-c", "--config"),
     limit: int = 0,
     seed: int = 42,
-    workers_per_method: int = 10,
+    workers_per_method: int | None = typer.Option(
+        None, min=1, max=30, help="Defaults to 6 with --method, otherwise 10."
+    ),
+    method: str | None = typer.Option(None, help="Run only this method; omitted runs all four methods."),
     split: str = "eval150",
     snapshot: str = DEFAULT_SNAPSHOT,
     wheel: Path | None = None,
@@ -471,7 +481,8 @@ def main(
         config_spec=config_spec,
         limit=limit,
         seed=seed,
-        workers_per_method=workers_per_method,
+        workers_per_method=workers_per_method if workers_per_method is not None else (6 if method is not None else 10),
+        method=method,
         split=split,
         query_ids=query_id,
         snapshot=snapshot,

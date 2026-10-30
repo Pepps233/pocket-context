@@ -298,16 +298,17 @@ Copy the prepared questions and run outputs to the GPU machine and adjust paths 
 The judge loads `Qwen/Qwen3-32B`; it does not need a paid model API key.
 Upstream requests Qwen3-32B judging for leaderboard submissions.
 
-For an API-based check using the upstream alternate GPT-4.1 judge, export `OPENAI_API_KEY` and run:
+For an API-based check using GPT-6 Luna, export `OPENAI_API_KEY` and run our launcher for the upstream alternate judge:
 
 ```bash
-python data/browsecomp-plus/upstream/scripts_evaluation/evaluate_with_openai.py \
-  --input_dir runs/browsecomp-plus/my-model \
-  --ground_truth data/browsecomp-plus/queries.jsonl \
-  --qrel_evidence data/browsecomp-plus/upstream/topics-qrels/qrel_evidence.txt \
-  --eval_dir runs/browsecomp-plus/evals-openai
+python -m pocketcontextagent.run.benchmarks.browsecomp_plus_judge \
+  --input-dir runs/browsecomp-plus/my-model \
+  --eval-dir runs/browsecomp-plus/evals-gpt-6-luna
 ```
 
+The launcher defaults to `gpt-6-luna` with an 8,192-token output budget for reasoning and the answer, using the Responses API and the model's default reasoning effort.
+It preserves the pinned upstream grading prompt and judgment format, including judge model metadata used by `compare --grades`.
+Use the same settings for all four methods and a fresh evaluation root when changing judge models or settings: the upstream script otherwise reuses existing judgments.
 This alternate judge incurs API charges and should be identified separately from the official Qwen judge in reported results.
 
 ## Validate the integration

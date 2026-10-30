@@ -36,6 +36,7 @@ class BrowseCompPlusConfig:
     document_tokens: int = 0
     context_tools: str = "pocket_context"
     research_tools: str = "bash"
+    tokenizer_revision: str | None = None
 
 
 class BrowseCompPlusEnvironment:
@@ -51,6 +52,7 @@ class BrowseCompPlusEnvironment:
         document_tokens: int = 0,
         context_tools: str = "pocket_context",
         research_tools: str = "bash",
+        tokenizer_revision: str | None = None,
     ):
         if context_tools not in ("pocket_context", "none", "acm"):
             raise ValueError("context_tools must be pocket_context, none, or acm")
@@ -65,6 +67,7 @@ class BrowseCompPlusEnvironment:
             document_tokens,
             context_tools,
             research_tools,
+            tokenizer_revision,
         )
         if k < 1 or min(snippet_chars, snippet_tokens, seen_snippet_tokens, document_tokens) < 0:
             raise ValueError("k must be positive and text limits must be nonnegative")
@@ -74,7 +77,7 @@ class BrowseCompPlusEnvironment:
         if tokenizer_name:
             from transformers import AutoTokenizer
 
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, revision=tokenizer_revision)
         self.retriever = retriever
         self.reset()
 

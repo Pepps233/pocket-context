@@ -68,6 +68,8 @@ def implementation_hash() -> str:
 
 
 def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retriever, fingerprint: str) -> bool:
+    import sys
+
     query_id = str(instance["query_id"])
     trajectory_dir = output / "trajectories" / query_id
     env = BrowseCompPlusEnvironment(retriever, **config.get("environment", {}))
@@ -79,14 +81,33 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
         default_type="default",
     )
     started = time.monotonic()
+    ended = False
     try:
         agent.run(instance["query"])
+        ended = True
     finally:
         latency_seconds = time.monotonic() - started
         info = agent.save(trajectory_dir / "trajectory.json")["info"]
+        error = type(sys.exc_info()[1]).__name__ if not ended and sys.exc_info()[1] is not None else None
+        messages = (
+            agent.messages
+            + [call["response"] for call in agent.compactions]
+            + [call["response"] for call in getattr(agent, "memory_queries", [])]
+        )
+        if error and episode_metrics(messages)["model_calls"] < info["model_stats"]["api_calls"]:
+            info["model_stats"]["cost_available"] = False
+        metrics = episode_metrics(messages, model_stats=info["model_stats"], latency_seconds=latency_seconds)
+        if error:
+            agent.save(
+                trajectory_dir / "trajectory.json",
+                {"info": {"execution_error": error, "model_stats": info["model_stats"]}},
+            )
         result = {
             "query_id": query_id,
-            "status": "completed" if info["exit_status"] == "Submitted" else info["exit_status"] or "interrupted",
+            "status": "completed"
+            if info["exit_status"] == "Submitted"
+            else info["exit_status"] or error or "interrupted",
+            "execution_error": error,
             "tool_call_counts": env.tool_call_counts,
             "retrieved_docids": sorted(env.retrieved_docids),
             "result": [{"type": "output_text", "output": info["submission"]}],
@@ -98,13 +119,7 @@ def run_instance(instance: dict, output: Path, config: dict, retriever: BM25Retr
                 "fingerprint": fingerprint,
             },
             "model_stats": info["model_stats"],
-            "metrics": episode_metrics(
-                agent.messages
-                + [call["response"] for call in agent.compactions]
-                + [call["response"] for call in getattr(agent, "memory_queries", [])],
-                model_stats=info["model_stats"],
-                latency_seconds=latency_seconds,
-            ),
+            "metrics": metrics,
         }
         temporary = output / f"{query_id}.json.tmp"
         temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

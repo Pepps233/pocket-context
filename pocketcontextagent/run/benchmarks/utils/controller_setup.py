@@ -28,12 +28,17 @@ class ControllerConfig:
             raise ValueError("ttl_minutes must be a nonnegative integer; 0 disables the absolute safety limit")
 
 
-def sandbox_params(snapshot: str, name: str, config: ControllerConfig) -> "CreateSandboxFromSnapshotParams":
+def sandbox_params(
+    snapshot: str, name: str, config: ControllerConfig, *, volume: dict | None = None
+) -> "CreateSandboxFromSnapshotParams":
     from daytona import CreateSandboxFromSnapshotParams
+
+    from pocketcontextagent.run.benchmarks.utils.controller_volumes import volume_mount
 
     return CreateSandboxFromSnapshotParams(
         snapshot=snapshot,
         name=name,
+        volumes=[volume_mount(volume)] if volume is not None else None,
         os_user="root",
         public=False,
         network_block_all=False,

@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO
 
+from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
+from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount
+
 MODULE = "pocketcontextagent.run.benchmarks.utils.controller_job"
 SETUP_FAILED = 125
 DUPLICATE = 73
@@ -93,6 +96,47 @@ def _environment(request: dict, jobdir: Path) -> tuple[dict[str, str], list[byte
     return environment | public | secrets, sorted({value.encode() for value in sensitive}, key=len, reverse=True)
 
 
+def _artifact_store(public: dict[str, str], jobdir: Path) -> ArtifactStore | None:
+    keys = {"MSWEA_ARTIFACT_STORE_ROOT", "MSWEA_ARTIFACT_JOB_ID", "MSWEA_ARTIFACT_MIN_FREE_BYTES"}
+    if not keys.intersection(public):
+        return None
+    if public["MSWEA_ARTIFACT_JOB_ID"] != jobdir.name:
+        raise ValueError("Artifact job identifier must match the job directory")
+    min_bytes = int(public["MSWEA_ARTIFACT_MIN_FREE_BYTES"])
+    if min_bytes <= 0:
+        raise ValueError("Minimum free bytes must be a positive integer")
+    root = Path(public["MSWEA_ARTIFACT_STORE_ROOT"])
+    if not root.is_absolute():
+        raise ValueError("Artifact store root must be absolute")
+    verify_volume_mount(root.parent)
+    require_free_space(jobdir, min_bytes)
+    return ArtifactStore(root)
+
+
+def _finalize_job(jobdir: Path, status: dict, store: ArtifactStore) -> dict:
+    """Publish verified public artifacts before committing the local final status.
+
+    The caller keeps the claim and controller lock held; workload timing and exit
+    status are already final. Failure never removes local data or retries work.
+    """
+    final_status = status | {"workload_state": status["state"], "archive_state": "complete"}
+    success = False
+    try:
+        _save(jobdir, final_status | {"state": "archiving", "archive_state": "pending"})
+        store.finalize_job(jobdir, jobdir.name, final_status)
+        _save(jobdir, final_status)
+        success = True
+    finally:
+        if not success:
+            error = sys.exc_info()[1]
+            _save(
+                jobdir,
+                final_status
+                | {"state": "archive_failed", "archive_state": "failed", "error_type": type(error).__name__},
+            )
+    return final_status
+
+
 def _process(pid: int | None) -> dict | None:
     if pid is None:
         return None
@@ -124,7 +168,7 @@ def read_status(jobdir: Path) -> dict:
             status["runner_alive"] = False
     child = _process(status["child_pid"])
     status["child_alive"] = child is not None and child == status.get("child_identity")
-    if status["state"] in {"starting", "running"} and not status["runner_alive"]:
+    if status["state"] in {"starting", "running", "archiving"} and not status["runner_alive"]:
         status["state"] = "interrupted"
     return status
 
@@ -158,6 +202,7 @@ def run(request_path: Path) -> int:
                 raise PermissionError("Controller is disabled")
             request = json.loads(request_path.read_text())
             environment, secrets = _environment(request, jobdir)
+            store = _artifact_store(request["env"], jobdir)
             log = stack.enter_context(_private(jobdir / "run.log", os.O_TRUNC))
             child = subprocess.Popen(
                 request["argv"],
@@ -188,7 +233,10 @@ def run(request_path: Path) -> int:
             finished_at=_now(),
             exit_code=exit_code,
         )
-        _save(jobdir, status)
+        if store is None:
+            _save(jobdir, status)
+        else:
+            _finalize_job(jobdir, status, store)
         return exit_code
 
 

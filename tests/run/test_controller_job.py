@@ -6,12 +6,22 @@ import signal
 import stat
 import subprocess
 import sys
+import tarfile
 import time
 from pathlib import Path
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_job import DUPLICATE, MODULE, SETUP_FAILED, read_status
+from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore
+from pocketcontextagent.run.benchmarks.utils.controller_job import (
+    DUPLICATE,
+    MODULE,
+    SETUP_FAILED,
+    _artifact_store,
+    _finalize_job,
+    _save,
+    read_status,
+)
 
 
 @pytest.fixture
@@ -340,3 +350,221 @@ def test_signal_termination_records_cancelled_without_signalling_other_processes
         assert cancelled["finished_at"] and not cancelled["child_alive"]
     finally:
         (path.parent / "release").touch()
+
+
+@pytest.mark.parametrize(("mounted_directory",), [(False,), (True,)])  # noqa: PT006
+def test_configured_volume_never_falls_back_to_local_disk(tmp_path, processes, mounted_directory):
+    mount = tmp_path / "ordinary-directory"
+    if mounted_directory:
+        mount.mkdir()
+    path = request(
+        tmp_path,
+        "from pathlib import Path; Path('unexpected').touch()",
+        env={
+            "MSWEA_ARTIFACT_STORE_ROOT": str(mount / "artifacts-v1"),
+            "MSWEA_ARTIFACT_JOB_ID": "job",
+            "MSWEA_ARTIFACT_MIN_FREE_BYTES": "1",
+            "PUBLIC_MARKER": "not-status-metadata",
+        },
+    )
+    assert start(path, processes).wait(timeout=10) == SETUP_FAILED
+    status = read_status(path.parent)
+    assert status["state"] == "failed" and status["exit_code"] == SETUP_FAILED
+    assert status["child_pid"] is None and status["error_type"] == "ValueError"
+    assert not (path.parent / "unexpected").exists() and not (path.parent / "run.log").exists()
+    assert not (mount / "artifacts-v1").exists()
+    persisted = (path.parent / "status.json").read_text()
+    assert "not-status-metadata" not in persisted and "MSWEA_ARTIFACT" not in persisted
+    assert "private-test-value-92381" not in persisted and "ordinary-directory" not in persisted
+
+
+@pytest.mark.parametrize(
+    ("settings", "error_type"),
+    [
+        ({"MSWEA_ARTIFACT_JOB_ID": None}, "KeyError"),
+        ({"MSWEA_ARTIFACT_JOB_ID": "other-job"}, "ValueError"),
+        ({"MSWEA_ARTIFACT_MIN_FREE_BYTES": "0"}, "ValueError"),
+        ({"MSWEA_ARTIFACT_MIN_FREE_BYTES": "-1"}, "ValueError"),
+        ({"MSWEA_ARTIFACT_MIN_FREE_BYTES": "1.5"}, "ValueError"),
+        ({"MSWEA_ARTIFACT_MIN_FREE_BYTES": "private-test-value-92381"}, "ValueError"),
+        ({"MSWEA_ARTIFACT_STORE_ROOT": "relative/artifacts-v1"}, "ValueError"),
+    ],
+)
+def test_invalid_archive_settings_never_spawn_or_leak(tmp_path, processes, settings, error_type):
+    public = {
+        "MSWEA_ARTIFACT_STORE_ROOT": str(tmp_path / "missing-volume" / "artifacts-v1"),
+        "MSWEA_ARTIFACT_JOB_ID": "job",
+        "MSWEA_ARTIFACT_MIN_FREE_BYTES": "1",
+    } | settings
+    path = request(
+        tmp_path,
+        "from pathlib import Path; Path('unexpected').touch()",
+        env={key: value for key, value in public.items() if value is not None},
+    )
+    assert start(path, processes).wait(timeout=10) == SETUP_FAILED
+    status = read_status(path.parent)
+    assert status["error_type"] == error_type and status["child_pid"] is None
+    assert status["exit_code"] == SETUP_FAILED and not (path.parent / "unexpected").exists()
+    assert "private-test-value-92381" not in (path.parent / "status.json").read_text()
+
+
+def test_inherited_archive_settings_do_not_enable_archival(tmp_path, processes):
+    path = request(tmp_path, "print('no volume requested')", env={"PUBLIC_MARKER": "changed-request-env"})
+    runner = start(
+        path,
+        processes,
+        env=dict(os.environ)
+        | {
+            "MSWEA_ARTIFACT_STORE_ROOT": str(tmp_path / "must-not-be-created"),
+            "MSWEA_ARTIFACT_JOB_ID": "wrong-job",
+            "MSWEA_ARTIFACT_MIN_FREE_BYTES": "invalid",
+        },
+    )
+    assert runner.wait(timeout=10) == 0
+    status = read_status(path.parent)
+    assert status["state"] == "completed" and "archive_state" not in status and "workload_state" not in status
+    assert _artifact_store({}, path.parent) is None
+    assert not (tmp_path / "must-not-be-created").exists()
+    assert "changed-request-env" not in (path.parent / "status.json").read_text()
+
+
+@pytest.fixture
+def finished_job(tmp_path, processes):
+    path = request(tmp_path, "import sys; print('public log'); sys.exit(7)")
+    assert start(path, processes).wait(timeout=10) == 7
+    job = path.parent
+    (job / "input").mkdir()
+    (job / "input" / "tasks.json").write_text("private input")
+    (job / "credentials").mkdir()
+    (job / "credentials" / "secret.json").write_text("private-test-value-92381")
+    (job / "launcher.log").write_text("private launcher data")
+    (job / "plan.json").write_text(json.dumps({"method": "test", "tasks": ["done", "unfinished"]}))
+    task = job / "output" / "test" / "tasks" / "done"
+    task.mkdir(parents=True)
+    (task / "run.yaml").write_text("public: configuration")
+    (task / "done.json").write_text('{"result":"done"}')
+    (task / "trajectories.tar.gz").write_bytes(b"finalized trajectory bundle")
+    (task / "trajectories").mkdir()
+    (task / "trajectories" / "trace.json").write_text('{"public":"trajectory"}')
+    store = ArtifactStore(tmp_path / "store")
+    receipt = store.archive_task(task, job.name, "test", "done")
+    assert not (task / "trajectories.tar.gz").exists() and not (task / "trajectories").exists()
+    unfinished = task.parent / "unfinished"
+    unfinished.mkdir()
+    (unfinished / "partial.json").write_text('{"result":"incomplete"}')
+    (job / "output" / "summary.json").write_text('{"completed":1}')
+    return job, store, receipt
+
+
+def test_finalization_restores_public_data_and_preserves_original_failure(finished_job, tmp_path):
+    job, store, task_receipt = finished_job
+    original = json.loads((job / "status.json").read_text())
+    before = {path.relative_to(job): path.read_bytes() for path in job.rglob("*") if path.is_file()}
+    final = _finalize_job(job, original, store)
+    assert final == original | {"workload_state": "failed", "archive_state": "complete"}
+    assert json.loads((job / "status.json").read_text()) == final
+    assert read_status(job)["state"] == "failed" and read_status(job)["exit_code"] == 7
+    assert store.job_status(job.name) == final | {
+        "archived_only": True,
+        "runner_alive": False,
+        "child_alive": False,
+    }
+    receipt = json.loads((store.root / "jobs" / job.name / "job.json").read_text())
+    assert receipt["tasks"] == [task_receipt] and receipt["status"] == final
+    destination = tmp_path / "restored.tar.gz"
+    store.export_job(job.name, destination)
+    with tarfile.open(destination) as archive:
+        restored = {member.name: archive.extractfile(member).read() for member in archive}
+    assert json.loads(restored.pop("status.json")) == final
+    assert restored["plan.json"] == before[Path("plan.json")]
+    assert restored["run.log"] == b"public log\n"
+    assert restored["output/test/tasks/done/trajectories.tar.gz"] == b"finalized trajectory bundle"
+    assert json.loads(restored["output/test/tasks/done/trajectories/trace.json"]) == {"public": "trajectory"}
+    assert json.loads(restored["output/test/tasks/unfinished/partial.json"]) == {"result": "incomplete"}
+    assert json.loads(restored["output/summary.json"]) == {"completed": 1}
+    assert not any(
+        part in {"input", "credentials", "request.json", "launcher.log"}
+        for name in restored
+        for part in Path(name).parts
+    )
+    assert all(b"private-test-value-92381" not in data for data in restored.values())
+    assert all((job / name).read_bytes() == data for name, data in before.items() if name != Path("status.json"))
+    assert (tmp_path / "credentials.json").exists()
+
+
+def test_successful_finalization_does_not_treat_an_outer_exception_as_archive_failure(finished_job):
+    job, store, _ = finished_job
+    original = json.loads((job / "status.json").read_text())
+    with pytest.raises(RuntimeError, match="unrelated outer failure"):  # noqa: PT012
+        try:
+            raise RuntimeError("unrelated outer failure")
+        finally:
+            _finalize_job(job, original, store)
+    final = json.loads((job / "status.json").read_text())
+    assert final == original | {"workload_state": "failed", "archive_state": "complete"}
+    assert store.job_status(job.name)["archive_state"] == "complete"
+
+
+@pytest.mark.parametrize(("corrupt_receipt",), [(False,), (True,)])  # noqa: PT006
+def test_archive_failure_retains_local_data_and_original_result(finished_job, processes, corrupt_receipt):
+    job, store, task_receipt = finished_job
+    original = json.loads((job / "status.json").read_text())
+    before = {path.relative_to(job): path.read_bytes() for path in job.rglob("*") if path.is_file()}
+    if corrupt_receipt:
+        target = store.root / "jobs" / job.name / "job.json"
+        target.write_text("corrupt immutable receipt: private-test-value-92381")
+    else:
+        # A real invalid filesystem target fails without replacing the store API.
+        target = store.root / "jobs" / job.name / "job.json"
+        target.mkdir()
+    with pytest.raises(ValueError):
+        _finalize_job(job, original, store)
+    failed = json.loads((job / "status.json").read_text())
+    assert failed == original | {
+        "state": "archive_failed",
+        "workload_state": "failed",
+        "archive_state": "failed",
+        "error_type": "ValueError",
+    }
+    assert read_status(job)["state"] == "archive_failed"
+    assert failed["exit_code"] == 7 and failed["finished_at"] == original["finished_at"]
+    assert "private-test-value-92381" not in (job / "status.json").read_text()
+    assert all((job / name).read_bytes() == data for name, data in before.items() if name != Path("status.json"))
+    store.verify(task_receipt)
+    assert start(job / "request.json", processes).wait(timeout=10) == DUPLICATE
+    assert json.loads((job / "status.json").read_text()) == failed
+
+
+@pytest.mark.parametrize(("exit_code", "state"), [(0, "completed"), (19, "failed"), (-15, "cancelled")])
+def test_finalizer_preserves_every_workload_outcome(tmp_path, processes, exit_code, state):
+    code = (
+        f"import sys; sys.exit({exit_code})"
+        if exit_code >= 0
+        else "import os, signal; os.kill(os.getpid(), signal.SIGTERM)"
+    )
+    path = request(tmp_path, code)
+    assert start(path, processes).wait(timeout=10) == (exit_code if exit_code >= 0 else 256 + exit_code)
+    original = json.loads((path.parent / "status.json").read_text())
+    store = ArtifactStore(tmp_path / "store")
+    final = _finalize_job(path.parent, original, store)
+    assert final["state"] == final["workload_state"] == state and final["exit_code"] == exit_code
+    assert final["started_at"] == original["started_at"] and final["finished_at"] == original["finished_at"]
+    assert store.job_status(path.parent.name)["state"] == state
+    assert json.loads((path.parent / "status.json").read_text()) == final
+
+
+def test_archiving_status_is_interrupted_only_after_claim_released(tmp_path, processes):
+    path = request(tmp_path, "pass")
+    assert start(path, processes).wait(timeout=10) == 0
+    original = json.loads((path.parent / "status.json").read_text())
+    pending = original | {"state": "archiving", "workload_state": "completed", "archive_state": "pending"}
+    _save(path.parent, pending)
+    with (path.parent / "claim").open("rb") as claim:
+        fcntl.flock(claim, fcntl.LOCK_EX)
+        active = read_status(path.parent)
+        assert active["state"] == "archiving" and active["runner_alive"] and not active["child_alive"]
+    interrupted = read_status(path.parent)
+    assert interrupted["state"] == "interrupted" and not interrupted["runner_alive"]
+    assert interrupted["exit_code"] == 0 and interrupted["finished_at"] == original["finished_at"]
+    assert interrupted["workload_state"] == "completed" and interrupted["archive_state"] == "pending"
+    assert json.loads((path.parent / "status.json").read_text()) == pending

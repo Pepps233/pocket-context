@@ -25,6 +25,7 @@ from pocketcontextagent.run.benchmarks.utils.controller_runtime import RUNTIME_R
 from pocketcontextagent.run.benchmarks.utils.controller_setup import (
     ControllerConfig,
     extract_artifacts,
+    parse_remote_json,
     provider_endpoint,
     sandbox_params,
     write_private_json,
@@ -62,14 +63,23 @@ def _exec(sandbox, command: list[str], *, timeout: int = 60) -> str:
 
 
 def _remote(sandbox, operation: str, **arguments) -> dict:
-    code = "import json,sys; from pocketcontextagent.run.benchmarks.utils.controller_remote import action; print(json.dumps(action(*json.loads(sys.argv[1]))))"
-    return json.loads(
+    marker = "PCA_REMOTE_" + uuid4().hex + ":"
+    code = (
+        "import json,sys; from pocketcontextagent.run.benchmarks.utils.controller_remote import action; print("
+        + repr(marker)
+        + "+json.dumps(action(*json.loads(sys.argv[1]))))"
+    )
+    result = parse_remote_json(
         _exec(
             sandbox,
             [PYTHON, "-c", code, json.dumps([operation, ROOT, arguments])],
             timeout=600 if operation in {"pack", "cleanup", "archive", "import-controller"} else 60,
-        )
+        ),
+        marker,
     )
+    if not isinstance(result, dict):
+        raise ValueError("Controller response must be an object")
+    return result
 
 
 def _upload(sandbox, data: bytes, target: str) -> None:

@@ -37,6 +37,7 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
 from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION
 from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
 from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
+from pocketcontextagent.run.benchmarks.utils.controller_setup import parse_remote_json
 from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
     ResourceJournal,
@@ -69,7 +70,7 @@ try:
         result = r.search(*args['arguments'])
     else:
         result = r.get_document(*args['arguments'])
-    print(json.dumps(result, ensure_ascii=False, allow_nan=False))
+    print('PCA_CORPUS_RESULT:' + json.dumps(result, ensure_ascii=False, allow_nan=False))
 finally:
     r.close()
 """
@@ -105,7 +106,7 @@ class RemoteRetriever:
             raise ValueError("Invalid retrieval command response")
         if response["returncode"]:
             raise RuntimeError(f"Corpus retrieval failed (exit {response['returncode']})")
-        result = json.loads(response["output"])
+        result = parse_remote_json(response["output"], "PCA_CORPUS_RESULT:")
 
         def document(row: object) -> bool:
             return isinstance(row, dict) and isinstance(row.get("docid"), str) and isinstance(row.get("text"), str)
@@ -253,7 +254,7 @@ def check_worker(
         f"assert Path({REMOTE_INDEX!r}).is_dir(); "
         "from transformers import AutoTokenizer; "
         f"assert AutoTokenizer.from_pretrained({TOKENIZER!r}, revision={tokenizer_revision!r}, local_files_only=True).encode('ready'); "
-        "print(json.dumps({'ready': True}))"
+        "print('PCA_CORPUS_CHECK:' + json.dumps({'ready': True}))"
     )
     if index_hashes:
         if any(Path(name).name != name for name in index_hashes):
@@ -269,7 +270,7 @@ def check_worker(
         if response.exit_code:
             raise ValueError("Corpus index checksum preflight failed")
     response = sandbox.process.exec(worker_command(["python", "-c", code]), timeout=120)
-    if response.exit_code or json.loads(response.result) != {"ready": True}:
+    if response.exit_code or parse_remote_json(response.result, "PCA_CORPUS_CHECK:") != {"ready": True}:
         raise RuntimeError("Corpus worker package/index/tokenizer preflight failed")
 
     def backend(command: str, *, timeout: int) -> dict:

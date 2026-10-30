@@ -14,6 +14,16 @@ if TYPE_CHECKING:
     from daytona import CreateSandboxFromSnapshotParams
 
 
+def parse_remote_json(output: str, marker: str) -> object:
+    """Separate one framed response from SDK-combined stdout/stderr diagnostics."""
+    if not marker or "\n" in marker or "\r" in marker:
+        raise ValueError("Invalid response marker")
+    records = [line[len(marker) :] for line in output.splitlines() if line.startswith(marker)]
+    if len(records) != 1:
+        raise ValueError("Expected exactly one framed remote response")
+    return json.loads(records[0])
+
+
 @dataclass(frozen=True)
 class ControllerConfig:
     cpu: int = 2

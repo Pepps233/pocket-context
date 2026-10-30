@@ -10,10 +10,33 @@ import pytest
 from pocketcontextagent.run.benchmarks.utils.controller_setup import (
     ControllerConfig,
     extract_artifacts,
+    parse_remote_json,
     provider_endpoint,
     sandbox_params,
     write_private_json,
 )
+
+
+def test_remote_json_preserves_payload_amid_combined_runtime_warnings() -> None:
+    marker = "PCA_TEST_123:"
+    payload = {"ready": True, "text": "line one\nPCA_TEST_123: not another record", "nested": [1, None]}
+    output = (
+        "[transformers] No model runtime; tokenizers are available.\n"
+        + marker
+        + json.dumps(payload)
+        + "\nJava warning after result\n"
+    )
+    assert parse_remote_json(output, marker) == payload
+    assert parse_remote_json("notice\nPCA_CORPUS_RESULT:null\n", "PCA_CORPUS_RESULT:") is None
+
+
+@pytest.mark.parametrize(
+    ("output", "marker"),
+    [("{}", "PCA:"), ("PCA:{}\nPCA:{}\n", "PCA:"), ("PCA:invalid", "PCA:"), ("{}", ""), ("{}", "PCA:\n")],
+)
+def test_remote_json_rejects_missing_ambiguous_or_invalid_frames(output: str, marker: str) -> None:
+    with pytest.raises(ValueError):
+        parse_remote_json(output, marker)
 
 
 def test_controller_defaults_and_real_daytona_params() -> None:

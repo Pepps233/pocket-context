@@ -67,6 +67,7 @@ def test_mixed_provider_usage_compactions_format_errors_and_tool_deduplication()
         "total_output_tokens": 21,
         "total_tokens": 286,
         "total_cached_input_tokens": 50,
+        "input_cache_hit_rate": 50 / 265,
         "calls_with_input_tokens": 3,
         "calls_with_output_tokens": 3,
         "calls_with_total_tokens": 3,
@@ -106,6 +107,24 @@ def test_response_id_deduplication_retains_usage_from_later_copies():
     )
     assert enriched["model_calls"] == 1
     assert enriched["total_tokens"] == enriched["peak_total_tokens"] == 25
+
+
+@pytest.mark.parametrize(
+    ("input_tokens", "cached_tokens", "expected"),
+    [(100, 0, 0.0), (100, 100, 1.0), (100, None, None), (None, 10, None), (0, 0, None), (100, 101, None)],
+)
+def test_cache_hit_rate_distinguishes_missing_zero_and_invalid_usage(input_tokens, cached_tokens, expected):
+    messages = [
+        {
+            "object": "response",
+            "usage": {"input_tokens": input_tokens, "input_tokens_details": {"cached_tokens": cached_tokens}},
+        }
+    ]
+    metrics = episode_metrics(messages)
+    assert metrics["input_cache_hit_rate"] == expected
+    assert summarize_results([{"metrics": metrics}])["input_cache_hit_rate"] == expected
+    assert episode_metrics(messages, model_stats={"api_calls": 2})["input_cache_hit_rate"] is None
+    assert summarize_results([{"metrics": metrics}, {"metrics": {}}])["input_cache_hit_rate"] is None
 
 
 def test_identical_anonymous_responses_are_distinct_calls_but_references_are_not():
@@ -265,6 +284,7 @@ def test_summary_totals_averages_and_tool_counts_include_failed_tasks():
     assert summary["total_output_tokens"] == 20
     assert summary["total_tokens"] == 320
     assert summary["total_cached_input_tokens"] == 65
+    assert summary["input_cache_hit_rate"] == pytest.approx(65 / 300)
     assert summary["avg_input_tokens_per_task"] == 150
     assert summary["avg_output_tokens_per_task"] == 10
     assert summary["avg_total_tokens_per_task"] == 160
@@ -320,6 +340,7 @@ def test_partial_summary_totals_and_averages_are_unknown_with_explicit_coverage(
         assert summary[key] == 1
     assert summary["total_cached_input_tokens"] is None
     assert summary["tasks_with_cached_input_tokens"] == 0
+    assert summary["input_cache_hit_rate"] is None
 
 
 def test_legacy_metrics_derive_total_but_do_not_reinterpret_missing_usage_as_zero():

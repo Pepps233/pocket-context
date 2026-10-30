@@ -25,6 +25,12 @@ def _average(values: list) -> float | None:
     return total / len(values) if total is not None else None
 
 
+def _cache_hit_rate(metrics: dict) -> float | None:
+    cached = _tokens(metrics.get("total_cached_input_tokens"))
+    total = _tokens(metrics.get("total_input_tokens"))
+    return cached / total if total and cached is not None and cached <= total else None
+
+
 def _usage(response: dict) -> dict:
     usage = response.get("usage") or {}
     input_tokens = _tokens(usage.get("prompt_tokens"))
@@ -34,11 +40,16 @@ def _usage(response: dict) -> dict:
     if output_tokens is None:
         output_tokens = _tokens(usage.get("output_tokens"))
     details = usage.get("prompt_tokens_details") or usage.get("input_tokens_details") or {}
+    cached = _tokens(details.get("cached_tokens"))
+    if cached is None:
+        cached = _tokens(usage.get("prompt_cache_hit_tokens"))
+    if cached is not None and input_tokens is not None and cached > input_tokens:
+        cached = None
     return {
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "tokens": _tokens(usage.get("total_tokens")),
-        "cached_input_tokens": _tokens(details.get("cached_tokens")),
+        "cached_input_tokens": cached,
     }
 
 
@@ -96,6 +107,7 @@ def episode_metrics(
         )
         if name in ("input_tokens", "tokens"):
             metrics["peak_input_tokens" if name == "input_tokens" else "peak_total_tokens"] = _max(values)
+    metrics["input_cache_hit_rate"] = _cache_hit_rate(metrics)
     return metrics
 
 
@@ -166,4 +178,5 @@ def summarize_results(results: list[dict]) -> dict:
         label = "total_tokens" if name == "tokens" else name
         summary[f"avg_{label}_per_task"] = _average(values)
         summary[f"tasks_with_{label}"] = sum(value is not None for value in values)
+    summary["input_cache_hit_rate"] = _cache_hit_rate(summary)
     return summary

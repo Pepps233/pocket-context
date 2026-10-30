@@ -12,7 +12,7 @@ import yaml
 from typer.testing import CliRunner
 
 from pocketcontextagent.comparisons.registry import METHODS
-from pocketcontextagent.comparisons.report import compare_runs
+from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment, subprocess_backend
 from pocketcontextagent.models.test_models import make_toolcall_output
 from pocketcontextagent.run.benchmarks.benchmark_grading import export_evaluation, import_evaluation
@@ -114,6 +114,11 @@ def test_four_method_coding_matrix_exports_actual_patches_and_native_grades(
             + " && git diff --check && echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT",
         )
     ]
+    for index, output in enumerate(outputs):
+        output["extra"]["response"] = {
+            "id": f"call-{index}",
+            "usage": {"prompt_tokens": 100 * (index + 1), "prompt_cache_hit_tokens": 20, "completion_tokens": 10},
+        }
     replay.write_text(
         yaml.safe_dump(
             {
@@ -145,13 +150,22 @@ def test_four_method_coding_matrix_exports_actual_patches_and_native_grades(
         )
         env.prepare(fresh_isolated=True)
         task = root / method / "tasks" / instance["query_id"]
-        run_instance(instance, task, manifests[method]["config"], env, manifests[method])
+        result = run_instance(instance, task, manifests[method]["config"], env, manifests[method])
+        expected_rate = 0.2 if step_limit == 1 or not edit else 40 / 300
+        assert result["metrics"]["input_cache_hit_rate"] == pytest.approx(expected_rate)
+        assert json.loads((task / f"{instance['query_id']}.json").read_text())["metrics"] == result["metrics"]
         with locks[method]:
             publish_matrix_task(task, root / method, instance["query_id"], manifests[method])
         assert "SECRET_" not in (task / "trajectories" / instance["query_id"] / "trajectory.json").read_text()
 
     run_matrix_workers({method: [{"id": f"{method}-{i}"} for i in range(2)] for method in METHODS}, instances, execute)
     assert all(row["success_rate"] is None for row in compare_runs(root)["methods"].values())
+    report = compare_runs(root)
+    assert all(
+        row["input_cache_hit_rate"] == pytest.approx(0.2 if step_limit == 1 or not edit else 40 / 300)
+        for row in report["methods"].values()
+    )
+    assert comparison_markdown(report).count("20.00%" if step_limit == 1 or not edit else "13.33%") == 4
     export_predictions(root)
     commands = export_evaluation(root, data, "fixture-run")
     assert all("--dataset_name" in command and "grading_dataset.jsonl" in command for command in commands.values())

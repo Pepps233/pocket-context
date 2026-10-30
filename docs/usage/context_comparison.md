@@ -208,6 +208,7 @@ Omit `--grades` to inspect resource usage before grading; correctness remains un
 | Cost USD/task | Mean accumulated model cost, including auxiliary calls. OpenRouter reports cost; LiteLLM estimates from its pricing registry. Infrastructure and external judge costs are excluded. |
 | Latency s/task | Mean monotonic time inside `agent.run`, including retries, tools, auxiliary calls and per-step saving; excludes environment/model setup, queueing and grading. |
 | Peak input tokens/task | Mean per-task maximum provider-reported input across main and auxiliary calls; not KV-cache size. YAML also reports the global maximum. |
+| Input cache hit rate | Total provider-reported cached input tokens / total input tokens across all attempts, including auxiliary calls and failures; token-weighted, not an average of task percentages. |
 
 Missing or partial measurement yields `N/A`, not zero or a measured-subset average. YAML includes grading/usage coverage, token and cached-input totals, tool counts and per-method provenance. Cached input is an input subset, never counted twice. Native LiteLLM/OpenRouter unavailable-cost markers make ignored-pricing fallback zeros unknown rather than free; older adapters without provenance cannot make that distinction.
 

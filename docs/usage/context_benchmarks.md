@@ -160,6 +160,11 @@ This is **600 attempts**, at most 120 active at once. Run the two benchmark phas
 
 ### Fixed 125-task SWE-bench Verified cohort
 
+Each task result records `metrics.input_cache_hit_rate`, and comparison YAML and Markdown report the rate separately for all four methods.
+The method rate is total cached input tokens divided by total input tokens across all 125 attempts, including failed tasks and auxiliary model calls.
+Missing token measurements or zero total input produce `null` in JSON/YAML and `N/A` in the report.
+This measures the fraction of input tokens served from the provider cache, not the fraction of requests with a cache hit.
+
 ```bash
 mini-extra benchmark-matrix matrix \
   --benchmark swebench-verified --data-dir data/swebench-verified \

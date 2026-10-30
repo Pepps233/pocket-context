@@ -130,8 +130,8 @@ def comparison_markdown(report: dict) -> str:
         return f"{value * 100:.2f}%" if percent else f"{value:,.2f}"
 
     lines = [
-        "| Method | Success rate | Total tokens/task | Cost USD/task | Latency s/task | Peak input tokens/task |",
-        "| --- | ---: | ---: | ---: | ---: | ---: |",
+        "| Method | Success rate | Total tokens/task | Cost USD/task | Latency s/task | Peak input tokens/task | Input cache hit rate |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for method, row in report["methods"].items():
         values = [
@@ -140,6 +140,7 @@ def comparison_markdown(report: dict) -> str:
             number(row["avg_cost_usd_per_task"]),
             number(row["avg_latency_seconds_per_task"]),
             number(row["avg_peak_input_tokens"]),
+            number(row["input_cache_hit_rate"], percent=True),
         ]
         lines.append(f"| {method} | " + " | ".join(values) + " |")
     tasks = next(iter(report["methods"].values()))["tasks"]

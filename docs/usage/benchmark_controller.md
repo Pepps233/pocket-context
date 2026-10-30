@@ -55,8 +55,11 @@ is reported as `interrupted`, never automatically resumed or fabricated as succe
   Do not size them as 4-GiB medium workers. Daytona's published Tier-3 500-GiB RAM pool
   is insufficient; verify actual quotas, per-sandbox caps, image sizes and capacity.
 - The 10-GiB controller disk can fill with trajectories, staged inputs and fetch archives.
-  Fetch needs additional archive headroom; it fails rather than deleting inputs to fit.
-  Lower concurrency, collect bounded outputs or arrange approved larger storage first.
+  Without a volume, fetch needs additional archive headroom. Opt into a controller-only
+  [artifact volume](controller_volumes.md) at creation for verified completed-trace offload
+  and volume-streamed fetch. Live state, staged inputs and temporary spool remain local;
+  volumes do not guarantee that the active working set fits. Lower concurrency or arrange
+  approved larger storage when needed.
 - Running controller compute is billed continuously, **including every idle day** until
   explicitly stopped (about **$5.53/day** for 2 CPU/8 GiB at audited public Linux rates,
   before disk). Stopped disks and snapshots can still cost storage. Workers and inference
@@ -177,7 +180,9 @@ mini-extra benchmark-controller cleanup --job "$JOB" --discard-uncollected
 redacted `run.log`, and any `controller-cleanup.json`. It excludes private inputs,
 credentials and the launch request; it verifies archive SHA-256 and rejects unsafe archive
 members. Use a fresh/empty destination. Default download budget is 2,000,000,000 bytes
-(`--max-bytes`); packing also requires free cloud disk. Fetch is not remote artifact deletion.
+(`--max-bytes`). Without an artifact volume, packing also requires free cloud disk;
+with one, committed bundles stream to a temporary export on the volume instead. Fetch
+is not remote artifact deletion. See [volume lifecycle and migration](controller_volumes.md).
 
 Cancellation retains uncollected worker state; it does not invent patches or discard
 recovery data. Inspect `output/sandbox-cleanup.json` and worker artifacts on the trusted

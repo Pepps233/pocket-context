@@ -1,5 +1,7 @@
 import json
+import os
 import subprocess
+import time
 from pathlib import Path
 from shlex import quote
 
@@ -69,6 +71,27 @@ def test_patch_is_complete_worktree_against_base_without_mutating_index(reposito
     assert (tmp_path / "pristine" / "new file.py").read_text() == "new = True\n"
     assert (tmp_path / "pristine" / "binary.dat").read_bytes() == bytes(range(256))
     assert not (tmp_path / "pristine" / "delete.py").exists()
+
+
+def test_patch_copy_preserves_racy_index_detection_and_staged_ignored_files(repository):
+    env = environment(repository)
+    shell("git config core.trustctime false", repository)
+    timestamp = int(time.time()) - 120
+    os.utime(repository / "code.py", (timestamp, timestamp))
+    shell("git add code.py", repository)
+    (repository / "explicit.cache").write_text("intentionally staged\n")
+    (repository / "build.cache").write_text("ignored build output\n")
+    shell("git add -f explicit.cache", repository)
+    index = repository / ".git/index"
+    os.utime(index, (timestamp, timestamp))
+    original_index, original_mtime = index.read_bytes(), index.stat().st_mtime_ns
+    (repository / "code.py").write_text("value = 8\n")
+    os.utime(repository / "code.py", (timestamp, timestamp))
+    patch = env.capture_patch()
+    assert "+value = 8" in patch and "explicit.cache" in patch and "build.cache" not in patch
+    assert env.capture_patch() == patch
+    assert index.read_bytes() == original_index and index.stat().st_mtime_ns == original_mtime
+    assert (repository / "code.py").read_text() == "value = 8\n"
 
 
 def test_explicit_prepare_only_and_no_clean_outside_owned_repo(repository):

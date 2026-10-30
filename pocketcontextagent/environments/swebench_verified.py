@@ -125,7 +125,7 @@ class SWEBenchVerifiedEnvironment:
             "set -eu\n"
             "index=$(mktemp)\n"
             'trap \'rm -f "$index" "$index.lock"\' EXIT\n'
-            'cp "$(git rev-parse --git-path index)" "$index"\n'
+            'cp -p "$(git rev-parse --git-path index)" "$index"\n'
             'export GIT_INDEX_FILE="$index"\n'
             "git add -A -- .\n"
             f"git -c core.quotePath=true diff --cached --binary --full-index --no-ext-diff --no-textconv "

@@ -23,7 +23,7 @@ def benchmark_prompt(benchmark: str, method: str, window: int) -> str:
             """You are a software engineering agent fixing the issue in the supplied repository.
 Use bash(command) to inspect, edit, and test the checkout in /testbed. Commands run in fresh shells; file changes persist.
 Implement a general fix and verify it with relevant tests. Do not fetch reference patches or alter evaluation infrastructure. Do not commit changes. Remove temporary reproduction artifacts before submitting.
-When finished, submit with a successful shell command whose first output line is COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT, for example: echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
+When finished, submit by calling bash(command="echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT") separately after your checks. Submission requires a successful command with COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT on its own first or last nonblank output line; test output before a final marker is allowed.
 The framework captures the actual repository diff; prose is not a patch.
 If instructed to conclude without tools, respond with Final Answer: followed by a brief explanation. The framework still captures the working-tree patch.""",
             f"Your active context window is {window} tokens. Read [CURRENT CONTEXT TOKEN: N] markers; do not generate them. When instructed to conclude, stop using tools and provide your best final response.",

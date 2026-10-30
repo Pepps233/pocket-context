@@ -152,8 +152,8 @@ class SWEBenchVerifiedEnvironment:
         if self.base_commit is None:
             raise RuntimeError("Call prepare before executing or capturing a patch")
         result = self._run(action["command"], cwd=cwd, timeout=timeout)
-        lines = result["output"].lstrip().splitlines()
-        if result["returncode"] == 0 and lines and lines[0].strip() == SUBMIT_MARKER:
+        lines = result["output"].strip().splitlines()
+        if result["returncode"] == 0 and lines and SUBMIT_MARKER in (lines[0].strip(), lines[-1].strip()):
             patch = self.capture_patch()
             raise Submitted(
                 {"role": "exit", "content": patch, "extra": {"exit_status": "Submitted", "submission": patch}}

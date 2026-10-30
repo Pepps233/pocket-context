@@ -107,7 +107,12 @@ def test_four_method_coding_matrix_exports_actual_patches_and_native_grades(
     )
     replay = tmp_path / "replay.yaml"
     outputs = ([native_call("edit", "printf 'answer = 42\\n' > solver.py")] if edit else []) + [
-        native_call("submit", "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT")
+        native_call(
+            "submit",
+            f"{shlex.quote(sys.executable)} -B -c "
+            + shlex.quote(f"import solver; assert solver.answer == {42 if edit else 0}; print('checks passed')")
+            + " && git diff --check && echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT",
+        )
     ]
     replay.write_text(
         yaml.safe_dump(

@@ -195,6 +195,8 @@ RUN_ROOT/
 
 Submission or an agent's claim of completion is **not correctness**. A budget-terminated SWE-bench attempt can still contain a grade-relevant patch: export and evaluate that patch rather than discarding it because of its termination status.
 
+All four SWE methods share the shell submission contract: a command must exit zero and print `COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` as its exact first or last nonblank output line. Prefer a separate `echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT` call after checks, or append it with `&&` so failed checks do not submit. Leading test output is allowed before a final marker; embedded text or an interior-only marker is not submission. This is an output-based signal, not shell-intent analysis: do not print the standalone marker incidentally at an output boundary. The framework captures the working-tree diff, not prose, and accepting submission does not grade the patch. Protocol/prompt changes apply to fresh attempts and their new fingerprints; historical attempts remain unchanged.
+
 ## Grade separately, then compare
 
 ### SWE-bench Verified official harness

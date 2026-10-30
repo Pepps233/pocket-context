@@ -96,19 +96,49 @@ def test_explicit_prepare_only_and_no_clean_outside_owned_repo(repository):
         SWEBenchVerifiedEnvironment(subprocess_backend, cwd=str(child)).prepare(fresh_isolated=True)
 
 
-def test_submission_snapshots_patch_not_agent_prose(repository):
+@pytest.mark.parametrize(
+    ("command",),  # noqa: PT006
+    [
+        (f"echo {SUBMIT_MARKER}",),
+        (f"echo '{SUBMIT_MARKER}'",),
+        (f"printf 'checks passed\\n{SUBMIT_MARKER}'",),
+        (f"echo {SUBMIT_MARKER}; echo 'this is prose, not a patch'",),
+        (f"printf 'checks passed\\n'; git diff --check && echo {SUBMIT_MARKER}",),
+        (f"printf '\\nchecks passed\\r\\n  {SUBMIT_MARKER}  \\r\\n\\n'",),
+    ],
+)
+def test_submission_snapshots_patch_not_agent_prose(repository, command):
     env = environment(repository)
     env.execute({"command": "printf 'value = 9\\n' > code.py"})
     assert env.execute({"command": "echo 'I fixed it.'"})["output"] == "I fixed it.\n"
     assert env.execute({"command": f"echo {SUBMIT_MARKER}; exit 1"})["returncode"] == 1
-    assert env.execute({"command": f"echo not_first; echo {SUBMIT_MARKER}"})["returncode"] == 0
     with pytest.raises(Submitted) as submitted:
-        env.execute({"command": f"echo {SUBMIT_MARKER}; echo 'this is prose, not a patch'"})
+        env.execute({"command": command})
     message = submitted.value.messages[0]
     assert message["extra"]["exit_status"] == "Submitted"
     assert message["extra"]["submission"] == env.capture_patch() == message["content"]
     assert "+value = 9" in message["content"] and "prose" not in message["content"]
     assert "resolved" not in message["extra"]
+
+
+@pytest.mark.parametrize(
+    ("command", "returncode"),
+    [
+        (f"echo {SUBMIT_MARKER}; exit 1", 1),
+        (f"echo checks; echo {SUBMIT_MARKER}; exit 7", 7),
+        (f"echo 'example: {SUBMIT_MARKER}'", 0),
+        (f"echo '{SUBMIT_MARKER} is the marker'", 0),
+        (f"printf 'before\\n{SUBMIT_MARKER}\\nafter\\n'", 0),
+        (f"printf 'before\\n\"{SUBMIT_MARKER}\"\\n'", 0),
+        ("true", 0),
+    ],
+)
+def test_submission_rejects_failed_commands_embedded_and_interior_markers(repository, command, returncode):
+    env = environment(repository)
+    (repository / "code.py").write_text("value = 8\n")
+    assert env.execute({"command": command})["returncode"] == returncode
+    assert "+value = 8" in env.capture_patch()
+    assert (repository / "code.py").read_text() == "value = 8\n"
 
 
 def test_budget_exit_and_agent_run_do_not_reset_worktree(repository, tmp_path):

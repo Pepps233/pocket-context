@@ -17,6 +17,7 @@ from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
 def evaluation_binding(runs: Path, settings: dict, run_prefix: str) -> dict:
     return {
         "run_prefix": run_prefix,
+        "execution_backend": "daytona",
         **{
             key: settings[key]
             for key in ("harness_revision", "dataset_revision", "queries_sha256", "grading_dataset_sha256")
@@ -54,6 +55,8 @@ def export_evaluation(
             grading_dataset_path=grading,
             max_workers=max_workers,
             python_executable=harness_python,
+            dataset_sha256=settings["grading_dataset_sha256"],
+            predictions_sha256=hashlib.sha256((runs / method / "predictions.jsonl").read_bytes()).hexdigest(),
         )
         for method in METHODS
     }
@@ -100,7 +103,11 @@ def import_evaluation(runs: Path, logs: Path, run_prefix: str, output: Path) -> 
                 "query_id": result["query_id"],
                 "response": result["model_patch"],
                 "is_completed": result["status"] == "completed",
-                "model_info": {"judge": "official-swebench-tests", "harness_revision": settings["harness_revision"]},
+                "model_info": {
+                    "judge": "official-swebench-tests",
+                    "harness_revision": settings["harness_revision"],
+                    "execution_backend": handoff["execution_backend"],
+                },
                 "evaluation_run_id": f"{run_prefix}-{method}",
                 "judge_result": {"correct": outcome["resolved"] if known else None, "parse_error": False},
                 "grading_basis": "official_harness"

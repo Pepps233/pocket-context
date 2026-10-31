@@ -13,8 +13,8 @@ Evidence:
 Contracts target official SWE-bench v4.1.0 (commit above). Instance images use
 mutable :latest tags, NOT immutable digests; record the provisioner's resolved
 image digest separately when reproducibility requires it. Coding uses that image
-directly in Daytona, without nested Docker. Grading uses the official harness in
-a separate trusted Docker-capable environment, never inside the coding sandbox.
+directly in Daytona, without nested Docker. Grading uses the official test scripts
+and parser with fresh Daytona grading sandboxes, never the coding sandbox.
 
 The v4.1.0 evaluator has no dataset revision CLI flag. To grade the exact pinned
 snapshot, optionally write a PRIVATE grading_dataset.jsonl, pass it as
@@ -123,6 +123,8 @@ def evaluator_command(
     run_id: str,
     *,
     grading_dataset_path: Path,
+    dataset_sha256: str,
+    predictions_sha256: str,
     max_workers: int = 1,
     timeout: int = 1800,
     python_executable: str = "python",
@@ -130,33 +132,33 @@ def evaluator_command(
     """Run outside coding sandboxes after installing swebench at HARNESS_REVISION.
 
     grading_dataset_path must be the private pinned file from prepare_dataset,
-    NOT sanitized tasks.jsonl. Use a fresh unique run_id: the harness reuses old
-    reports. import_official_results also verifies every report's saved patch.
+    NOT sanitized tasks.jsonl. The Daytona adapter rejects existing run directories.
+    import_official_results also verifies every report's saved patch.
     """
     if (
         not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", run_id)
-        or max_workers <= 0
+        or not 1 <= max_workers <= 6
         or timeout <= 0
         or not python_executable.strip()
     ):
         raise ValueError("Use a nonempty safe run_id and positive workers/timeout")
+    if any(not re.fullmatch(r"[0-9a-f]{64}", value) for value in (dataset_sha256, predictions_sha256)):
+        raise ValueError("Use the exported dataset and prediction SHA-256 checksums")
     return join(
         [
             python_executable,
             "-m",
-            "swebench.harness.run_evaluation",
+            "pocketcontextagent.run.benchmarks.swebench_daytona_evaluate",
             "--dataset_name",
             str(grading_dataset_path),
-            "--split",
-            DATASET_SPLIT,
             "--predictions_path",
             str(predictions_path),
             "--run_id",
             run_id,
-            "--namespace",
-            "swebench",
-            "--instance_image_tag",
-            "latest",
+            "--dataset-sha256",
+            dataset_sha256,
+            "--predictions-sha256",
+            predictions_sha256,
             "--max_workers",
             str(max_workers),
             "--timeout",

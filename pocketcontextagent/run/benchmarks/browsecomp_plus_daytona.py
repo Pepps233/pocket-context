@@ -830,10 +830,10 @@ def export_swebench(
     runs: Path = typer.Option(...),
     data_dir: Path = typer.Option(Path("data/swebench-verified")),
     run_prefix: str = typer.Option(...),
-    max_workers: int = typer.Option(1, min=1),
+    max_workers: int = typer.Option(1, min=1, max=6),
     harness_python: str = typer.Option("python", help="Python executable in the trusted grading environment."),
 ) -> None:
-    """Export predictions and print trusted Docker-host grading commands; never executes them."""
+    """Export predictions and print Daytona test-grading commands; never executes them."""
     from pocketcontextagent.run.benchmarks.benchmark_grading import export_evaluation
 
     export_evaluation(runs, data_dir, run_prefix, max_workers, harness_python)

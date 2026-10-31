@@ -96,10 +96,14 @@ def test_prediction_export_preserves_failed_denominator_and_discards_prose(tmp_p
 def test_official_command_uses_private_pinned_grading_file_and_image_contract(tmp_path):
     command = split(
         evaluator_command(
-            tmp_path / "predictions with spaces.jsonl", "unique_run", grading_dataset_path=tmp_path / "private.jsonl"
+            tmp_path / "predictions with spaces.jsonl",
+            "unique_run",
+            grading_dataset_path=tmp_path / "private.jsonl",
+            dataset_sha256="a" * 64,
+            predictions_sha256="b" * 64,
         )
     )
-    assert command[:3] == ["python", "-m", "swebench.harness.run_evaluation"]
+    assert command[:3] == ["python", "-m", "pocketcontextagent.run.benchmarks.swebench_daytona_evaluate"]
     assert (
         split(
             evaluator_command(
@@ -107,16 +111,25 @@ def test_official_command_uses_private_pinned_grading_file_and_image_contract(tm
                 "safe",
                 grading_dataset_path=tmp_path / "private",
                 python_executable="/grading venv/bin/python",
+                dataset_sha256="a" * 64,
+                predictions_sha256="b" * 64,
             )
         )[0]
         == "/grading venv/bin/python"
     )
     assert command[command.index("--dataset_name") + 1] == str(tmp_path / "private.jsonl")
     assert command[command.index("--predictions_path") + 1] == str(tmp_path / "predictions with spaces.jsonl")
-    assert command[command.index("--namespace") + 1] == "swebench"
-    assert command[command.index("--instance_image_tag") + 1] == "latest"
+    assert command[command.index("--dataset-sha256") + 1] == "a" * 64
+    assert command[command.index("--predictions-sha256") + 1] == "b" * 64
+    assert "swebench.harness.run_evaluation" not in command
     with pytest.raises(ValueError, match="safe run_id"):
-        evaluator_command(Path("preds"), "../old", grading_dataset_path=Path("private"))
+        evaluator_command(
+            Path("preds"),
+            "../old",
+            grading_dataset_path=Path("private"),
+            dataset_sha256="a" * 64,
+            predictions_sha256="b" * 64,
+        )
 
 
 def write_report(root: Path, row: dict, *, resolved: bool = True) -> Path:

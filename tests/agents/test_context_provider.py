@@ -148,8 +148,8 @@ def test_production_retry_sequence_uses_stable_ids(tmp_path, responses_server):
     assert len(requests) == 10 and len(agent.compactions) == 2 and agent.context.revision == 1
     assert "matches 2 messages. Use start_id/end_id. Eligible IDs: b001, b002" in json.dumps(requests[4])
     assert "history preserved. Continue the task" in json.dumps(requests[6])
-    assert "b001: 2 messages" in json.dumps(requests[6])
-    assert "b001: 2 messages" not in json.dumps(requests[8])
+    assert "position=1 block_id=b001 type=exchange archive_tag=none; messages=2" in json.dumps(requests[6])
+    assert "block_id=b001 " not in json.dumps(requests[8])
     for index in (5, 7):
         assert requests[index]["tool_choice"] == "none"
         assert "retained" not in json.dumps(requests[index]["input"])

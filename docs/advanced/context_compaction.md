@@ -18,6 +18,11 @@ Text-based bash models keep their existing syntax.
 
 When eligible history exists, the request ends with a block catalog in history order.
 Each stable ID identifies a complete model exchange, including reasoning, every tool call, and every result, or one standalone memory or older request.
+Each row shows its current chronological position, stable `block_id`, type, and associated `archive_tag` when present.
+Positions may change after compaction; block ID numbers do not indicate chronological order.
+Pass `block_id` values to `start_id` and `end_id`, following the displayed positions rather than numerical ID order.
+For example, if position 1 is `b003` and position 2 is `b002`, selecting `b003` through `b002` is valid.
+Protected gaps are marked in the catalog, and a selected range must not cross them.
 The framework resolves the inclusive range and rejects unknown, stale, or protected IDs.
 IDs remain stable while their messages remain active; compacted IDs disappear and expanded exchanges receive fresh IDs.
 Errors list eligible IDs or identify the required complete exchange.
@@ -61,6 +66,10 @@ Call `expand_block` with one canonical tag from the current run:
 ```json
 {"name": "expand_block", "arguments": {"tag": "ctx-0001"}}
 ```
+
+The catalog lists available archives separately from eligible live blocks, including archives whose summaries have been compacted again.
+Choose an existing archive tag from that list; block IDs and chronological positions are not archive tags.
+Ordinary live exchanges have no archive because their content is already visible.
 
 Expansion keeps the existing summary in place and appends a tool receipt followed by the block's local archived messages in their original order.
 It returns complete archived text and tool results, preferring saved raw output over truncated observation text.

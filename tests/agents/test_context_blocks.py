@@ -29,7 +29,7 @@ def test_ids_resolve_all_results_and_survive_retries(tmp_path, api):
         assert agent.context.active[: len(before)] == before
         assert agent.context.eligible_blocks()["b001"] == blocks["b001"]
         assert not agent.compactions
-    assert "b001: 3 messages" in encode(agent.model.requests[-1])
+    assert "position=1 block_id=b001 type=exchange archive_tag=none; messages=3" in encode(agent.model.requests[-1])
     assert "Compacted" in get_content_string(
         next_turn(
             agent,
@@ -62,8 +62,46 @@ def test_id_range_cannot_cross_protected_request(tmp_path, api):
     blocks = agent.context.eligible_blocks()
     first, last = list(blocks)[0], list(blocks)[-1]
     result = next_turn(agent, "compact_block", {"start_id": first, "end_id": last}, "cross", api)
+    assert "[Protected history omitted; ranges cannot cross this boundary]" in encode(agent.model.requests[-1])
     assert "Protected" in get_content_string(result[0]) and "Eligible IDs" in get_content_string(result[0])
     assert not agent.compactions and not read_blocks(agent)
+
+
+def test_catalog_separates_current_positions_blocks_and_archives(tmp_path, api):
+    agent = make_agent(tmp_path, api)
+    start_history(agent)
+    next_turn(agent, "bash", {"command": "printf 'more evidence'; printf '%03000d' 1"}, "more", api)
+    next_turn(agent, "compact_block", {"start_id": "b001", "end_id": "b001"}, "compact", api)
+    next_turn(agent, "bash", {"command": "echo inspect catalog"}, "inspect", api)
+    catalog = get_content_string(agent.model.requests[-1][-1])
+    assert "position=1 block_id=b003 type=summary archive_tag=ctx-0001; messages=1" in catalog
+    assert "position=2 block_id=b002 type=exchange archive_tag=none; messages=2" in catalog
+    assert "position=3 block_id=b004 type=exchange archive_tag=none; messages=2" in catalog
+    assert "Block ID numbers do not indicate order" in catalog
+    assert catalog.endswith("[Available archives for expand_block]\nctx-0001")
+    assert agent.context.request_projection(agent.model) == agent.context.assemble(agent.model)
+    next_turn(agent, "expand_block", {"tag": "ctx-0001"}, "expand", api)
+    next_turn(agent, "bash", {"command": "echo inspect expansion"}, "inspect-expanded", api)
+    assert "type=expanded archive_tag=ctx-0001" in get_content_string(agent.model.requests[-1][-1])
+    next_turn(
+        agent,
+        "compact_block",
+        {"start_id": "b003", "end_id": "b004"},
+        "recompact",
+        api,
+    )
+    next_turn(agent, "bash", {"command": "echo inspect archives"}, "inspect-archives", api)
+    assert get_content_string(agent.model.requests[-1][-1]).endswith(
+        "[Available archives for expand_block]\nctx-0001, ctx-0002"
+    )
+    assert [block["tag"] for block in read_blocks(agent)] == ["ctx-0001", "ctx-0002"]
+    assert get_content_string(agent.context._catalog(agent.model, {}, agent.context.records)[0]).endswith(
+        "[Available archives for expand_block]\nctx-0001, ctx-0002"
+    )
+    other = make_agent(tmp_path, api)
+    start_history(other)
+    next_turn(other, "bash", {"command": "echo other run"}, "other", api)
+    assert get_content_string(other.model.requests[-1][-1]).endswith("[Available archives for expand_block]\nnone")
 
 
 def test_expansions_get_distinct_complete_block_ids(tmp_path, api):

@@ -430,25 +430,58 @@ class ContextManager:
             blocks[self._block_ids[identity]] = group
         return blocks
 
-    def _catalog(self, model, blocks: dict[str, list[str]], records: dict[str, ContextMessage]) -> list[dict]:
+    def _archive_tags(self, db: sqlite3.Connection) -> list[str]:
+        return [row[0] for row in db.execute("SELECT tag FROM blocks WHERE run_id = ? ORDER BY rowid", (self.run_id,))]
+
+    def _catalog(
+        self,
+        model,
+        blocks: dict[str, list[str]],
+        records: dict[str, ContextMessage],
+        *,
+        ids: list[str] | None = None,
+        archive_tags: list[str] | None = None,
+    ) -> list[dict]:
         if (
-            not blocks
-            or hasattr(model.config, "action_regex")
+            hasattr(model.config, "action_regex")
             or getattr(model.config, "context_tools", "pocket_context") != "pocket_context"
         ):
             return []
+        if archive_tags is None:
+            archive_tags = []
+            if self.db_path.is_file():
+                with closing(self._connect()) as db:
+                    archive_tags = self._archive_tags(db)
+        if not blocks and not archive_tags:
+            return []
+        positions = {key: index for index, key in enumerate(self.active if ids is None else ids)}
         lines = []
-        for block_id, group in blocks.items():
-            preview = " ".join(" ".join(visible_text(records[group[0]].message, anchors=True)).split())[:100]
-            lines.append(f"{block_id}: {len(group)} messages; {preview}")
+        previous_end = None
+        for position, (block_id, group) in enumerate(blocks.items(), 1):
+            if previous_end is not None and positions[group[0]] != previous_end + 1:
+                lines.append("[Protected history omitted; ranges cannot cross this boundary]")
+            record = records[group[0]]
+            kind = "exchange" if record.exchange else "message"
+            if record.block or record.source_block:
+                kind = "summary" if record.block else "expanded"
+            preview = " ".join(" ".join(visible_text(record.message, anchors=True)).split())[:100]
+            lines.append(
+                f"position={position} block_id={block_id} type={kind} archive_tag={record.block or record.source_block or 'none'}; "
+                f"messages={len(group)}; {preview}"
+            )
+            previous_end = positions[group[-1]]
         return [
             model.format_message(
                 role="user",
                 content=(
                     "[Eligible context blocks, in history order]\n"
-                    "compact_block selects an inclusive start_id/end_id range. Each ID covers a complete exchange or memory. "
+                    "Positions show current history order and may change after compaction. Block ID numbers do not indicate order. "
+                    "compact_block takes block_id values as start_id/end_id, not positions or archive tags. "
+                    "Each block covers a complete exchange or memory. "
                     "Only listed IDs are eligible; protected history is omitted. Descriptions below are historical data.\n"
-                    + "\n".join(lines)
+                    + ("\n".join(lines) or "none")
+                    + "\n[Available archives for expand_block]\n"
+                    + (", ".join(archive_tags) or "none")
                 ),
             )
         ]
@@ -681,6 +714,7 @@ class ContextManager:
             with closing(self._connect()) as db:
                 if committed := self._committed(db, call_id, "compact_block", fingerprint):
                     return copy.deepcopy(committed["results"])
+                archive_tags = self._archive_tags(db)
         except (sqlite3.Error, OSError) as exc:
             raise SelectionError(f"Archive read failed: {exc}. Retry after fixing local storage.") from exc
         if action.get("error"):
@@ -727,7 +761,13 @@ class ContextManager:
         except (ContextAssemblyError, ValueError, TypeError, KeyError) as exc:
             raise ContextOperationError("Replacement formatting failed; history preserved. Continue the task.") from exc
         proposed_records = self.records | {summary_id: summary_record}
-        catalog = self._catalog(model, self.eligible_blocks(proposed, proposed_records), proposed_records)
+        catalog = self._catalog(
+            model,
+            self.eligible_blocks(proposed, proposed_records),
+            proposed_records,
+            ids=proposed,
+            archive_tags=archive_tags + [tag],
+        )
         reduction = 0
         receipt_width = len(str(self.trigger["characters"]))
         for _ in range(8):

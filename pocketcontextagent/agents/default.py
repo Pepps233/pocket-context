@@ -219,7 +219,8 @@ class DefaultAgent:
                         role="user",
                         content=self._render_template(self.config.context_limit_template),
                         extra={"interrupt_type": "ContextLimit"},
-                    )
+                    ),
+                    origins=[{"provenance": "instruction"}],
                 )
                 options["final_answer"] = True
             remaining = self.config.context_token_limit - self.context_tokens(

@@ -50,7 +50,7 @@ def conversation_text(messages: list[dict]) -> str:
 class ComparisonContext(ContextManager):
     """Deletion events preserve a complete audit trail without inventing PCA memory blocks."""
 
-    def _catalog(self, model, blocks, records) -> list[dict]:
+    def _catalog(self, model, blocks, records, *, ids=None, archive_tags=None) -> list[dict]:
         return []
 
     def eligible_blocks(self, ids=None, records=None) -> dict[str, list[str]]:

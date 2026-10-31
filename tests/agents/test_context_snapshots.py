@@ -86,6 +86,7 @@ def test_budgeted_compaction_reports_the_actual_rebuilt_request_reduction(tmp_pa
     assert rejected.run("Keep working")["exit_status"] == "Submitted"
     assert rejected.context.revision == 0 and not read_blocks(rejected)
     assert "Net request reduction" in get_content_string(rejected.messages[-3])
+    assert get_content_string(rejected.model.requests[-1][-1]).endswith("[Available archives for expand_block]\nnone")
 
 
 def test_saved_checkpoint_stays_frozen_while_agent_recompacts(tmp_path, api):

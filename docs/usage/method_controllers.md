@@ -1,15 +1,20 @@
-# One BrowseComp-Plus controller per method
+# One benchmark controller per method
 
 Use four independent trusted controllers to isolate the RAM and process lifetime of Pocket Context, ReAct, ReSum and ACM.
-Each controller runs one method with **six concurrent agents**, for **24 corpus workers total**, plus four controllers.
-This workflow applies to managed BrowseComp-Plus runs; SWE-bench Verified still uses its four-method matrix.
+Each controller runs one method with **six concurrent agents**, for **24 workers total**, plus four controllers.
+This workflow supports managed BrowseComp-Plus and SWE-bench Verified runs.
 Omitting `--method` preserves the existing all-method behavior and its defaults.
 
 The controller owns inference, live histories and tokenizers.
-Corpus workers only execute retrieval operations and receive no provider credentials.
+Corpus workers execute retrieval operations, and SWE workers execute coding tools in fresh official instance images.
+Neither receives provider credentials.
 Completed traces are verified on the controller's artifact volume before their bulk local copies are deleted.
 A controller failure interrupts only that controller's job; failed jobs are not resumed or retried automatically.
 Workers belonging to a killed workload may still need explicit cleanup.
+
+For SWE-bench Verified, use `--benchmark swebench-verified --split test --data-dir data/swebench-verified --limit 125` and the `context_benchmark_deepseek` / `context_full_swebench` profiles with the prepared image-digest map.
+The selected 125 tasks produce 500 attempts across the four controllers.
+Use `--preflight --limit 6 --workers-per-method 6` for infrastructure checks, including edit capture and the repository-specific test runner, without model inference.
 
 ## Plan locally
 

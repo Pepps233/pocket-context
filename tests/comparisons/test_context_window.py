@@ -3,10 +3,14 @@ import copy
 import pytest
 from jinja2 import StrictUndefined, Template
 
+from pocketcontextagent.agents import get_agent
 from pocketcontextagent.agents.default import AgentConfig
+from pocketcontextagent.agents.utils.context_budget import estimate_tokens
 from pocketcontextagent.comparisons.methods.base import ComparisonConfig
 from pocketcontextagent.comparisons.methods.resum import ReSumConfig
 from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.environments.local import LocalEnvironment
+from pocketcontextagent.models import get_model
 from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import matrix_config
 
@@ -54,3 +58,17 @@ def test_context_window_flag_overrides_config_without_changing_provider(builder,
     for invalid in (0, -1, True, "64k"):
         with pytest.raises(ValueError, match="positive integer"):
             builder(specs, context_window=invalid)
+
+
+@pytest.mark.parametrize(("method",), [("react",), ("resum",), ("acm",)])  # noqa: PT006
+def test_pocket_pressure_does_not_change_baseline_accounting(tmp_path, method):
+    config = configure_method(benchmark_config([], context_window=64000), method)
+    model = get_model(config=config["model"])
+    agent = get_agent(model, LocalEnvironment(), config["agent"] | {"context_db_path": tmp_path / "context.sqlite"})
+    assert "compact_pressure_fraction" not in config["agent"]
+    for characters in (100, 120000):
+        messages = [model.format_message(role="user", content="x" * characters)]
+        assert agent.context_tokens(messages) == estimate_tokens(
+            agent.context._prepare(model, messages), tools=model.get_tools()
+        )
+        assert "one substantial range" not in agent._render_template(agent.config.system_template)

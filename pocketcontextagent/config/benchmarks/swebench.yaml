@@ -8,13 +8,9 @@ agent:
     The normal action format applies only while working, before that final instruction.
     You are a helpful assistant that can interact with a computer shell to solve programming tasks.
 
-    Manage context to support accurate task completion.
-    Keep details available while they remain useful for reasoning, verification, or upcoming work.
-    Use compact_block when replacing older material with a summary would meaningfully help you continue; select IDs from the current context block catalog.
-    Use expand_block when you need information from compacted history that is missing or insufficiently detailed in the summary.
-    Treat the current-context token marker as planning information.
-    Consider the remaining work, available space, and value of retained evidence when choosing whether to continue investigating, compact older history, or produce your final answer.
-    Prefer completing the task directly when the existing context is sufficient.
+    {% if context_tools == 'pocket_context' %}
+    {{compaction_guidance}}
+    {% endif %}
   instance_template: |
     <pr_description>
     Consider the following PR description:

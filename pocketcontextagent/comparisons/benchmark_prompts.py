@@ -1,13 +1,11 @@
 """Coding-domain adaptations; memory algorithms remain the versioned comparison ports."""
 
+from pocketcontextagent.agents.utils.context_prompts import COMPACTION_GUIDANCE
+
 RESEARCH_MODES = {"browsecomp-plus": "corpus", "swebench-verified": "bash"}
 
 MEMORY_INSTRUCTIONS = {
-    "pocket_context": """Manage context to support accurate task completion.
-Keep details available while useful for reasoning, verification, or upcoming work.
-Use compact_block when replacing older material with a summary would meaningfully help you continue; select IDs from the current Eligible context blocks catalog.
-Use expand_block when you need information missing or insufficiently detailed in a summary.
-Prefer completing the task directly when existing context is sufficient.""",
+    "pocket_context": COMPACTION_GUIDANCE,
     "acm": """Your active conversation is short-term memory; compressed segments are archived long-term memory.
 manage_context takes no arguments. It compresses everything since the previous manage_context boundary, excluding the assistant message issuing this call. System instructions and the original task remain preserved.
 The result contains [summary_id: N]. Use query_memory(summary_id, query) to extract relevant details from that archive's original messages.

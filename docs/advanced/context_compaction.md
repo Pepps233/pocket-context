@@ -6,6 +6,17 @@ The compaction agent has an independent conversation and cannot execute tools.
 Compaction and expansion each take a dedicated turn with exactly one call and no other tools.
 Text-based bash models keep their existing syntax.
 
+Pocket Context offers `compact_block` when estimated input reaches `compact_pressure_fraction * max(0, context_token_limit - output_allowance)`.
+The default fraction is `0.5`: a 64,000-token context with a 16,384-token output allowance has a 23,808-token threshold.
+The pressure check excludes the generated catalog and the unavailable compaction schema, so their overhead cannot activate the tool.
+Input uses the configured tokenizer when available, otherwise the existing serialized-byte estimate; it is not an exact provider token count.
+Availability is recalculated from the reduced history after compaction, so the tool and eligible-block catalog disappear below the threshold and return as input grows.
+Set `compact_pressure_fraction=0` to disable gating; an unlimited context also leaves compaction available.
+Archive expansion remains available below the threshold, with a separate compact archive-tag list when archives exist.
+The working prompt encourages batching completed investigation and obsolete outputs into substantial ranges while retaining current reasoning and recent evidence.
+It discourages repeatedly summarizing the same memory without substantial new information.
+These pressure and prompt changes apply only to Pocket Context, not ReAct, ReSum, or ACM.
+
 ```json
 {
   "name": "compact_block",
@@ -16,7 +27,7 @@ Text-based bash models keep their existing syntax.
 }
 ```
 
-When eligible history exists, the request ends with a block catalog in history order.
+When eligible history exists and compaction is available, the request ends with a fresh block catalog in history order.
 Each stable ID identifies a complete model exchange, including reasoning, every tool call, and every result, or one standalone memory or older request.
 Each row shows its current chronological position, stable `block_id`, type, and associated `archive_tag` when present.
 Positions may change after compaction; block ID numbers do not indicate chronological order.

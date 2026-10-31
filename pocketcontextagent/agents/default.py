@@ -23,6 +23,7 @@ from pocketcontextagent.agents.utils.context_budget import (
     request_tools,
     retained_reasoning_tokens,
 )
+from pocketcontextagent.agents.utils.context_prompts import COMPACTION_GUIDANCE
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, Submitted, TimeExceeded
 from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
 from pocketcontextagent.models.utils.response import response_text
@@ -50,6 +51,8 @@ class AgentConfig(BaseModel):
     compact_min_reduction: int = Field(default=512, ge=0)
     compact_pressure_fraction: float = Field(default=0.5, ge=0, le=1)
     """Offer compaction at this fraction of context minus output allowance; 0 disables gating."""
+    compaction_guidance: str = COMPACTION_GUIDANCE
+    """Pocket Context working-memory instructions available to prompt templates."""
     context_token_limit: int = Field(default=0, ge=0)
     """Working context window, including the next response; 0 disables accounting."""
     response_token_limit: int = Field(default=16384, gt=0)
@@ -238,7 +241,11 @@ class DefaultAgent:
                     }
                 )
             options[key] = min(allowance, remaining)
-            if self.config.compact_pressure_fraction and hasattr(self.model, "get_tools"):
+            if (
+                self.config.compact_pressure_fraction
+                and hasattr(self.model, "get_tools")
+                and getattr(self.model.config, "context_tools", "pocket_context") == "pocket_context"
+            ):
                 options["tools"] = request_tools(
                     self.model, compact=self.compaction_available(self.context.projection())
                 )
@@ -263,7 +270,11 @@ class DefaultAgent:
         return self.add_observations(self.model.format_observation_messages(message, outputs, self.get_template_vars()))
 
     def compaction_available(self, messages: list[dict]) -> bool:
-        if not self.config.context_token_limit or not self.config.compact_pressure_fraction:
+        if (
+            getattr(self.model.config, "context_tools", "pocket_context") != "pocket_context"
+            or not self.config.context_token_limit
+            or not self.config.compact_pressure_fraction
+        ):
             return True
         _, allowance = output_token_setting(self.model, self.config.response_token_limit)
         return self.context_tokens(

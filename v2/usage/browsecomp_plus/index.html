@@ -555,6 +555,16 @@
       
         
       
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
     
     
     
@@ -843,6 +853,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#matched-daytona-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matched Daytona matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-selection-and-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local selection and artifacts
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -894,6 +926,146 @@
     
   
     Context-method comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context_benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmark_controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trusted cloud controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../method_controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One controller per method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controller_volumes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Controller artifact volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../full_context_evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full context evaluation
   
 
     
@@ -2791,6 +2963,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#matched-daytona-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matched Daytona matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-selection-and-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local selection and artifacts
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2930,14 +3124,14 @@ The existing <code>compact_block</code> and <code>expand_block</code> tools rema
 <span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/deepseek-smoke/pocket_context
 </code></pre></div>
 <p>This uses <code>deepseek/deepseek-flash</code> through LiteLLM at <code>https://api.deepseek.com</code>, with thinking enabled and high effort. It does not use OpenRouter or serve the Qwen model. The profile keeps a 128,000-token experimental window, 100 main calls, 16,384 maximum output tokens, a $0.50 stopping threshold, and a 30-minute task timeout. It uses ten BM25 results, 512/128-token new/seen previews and an 8,192-token document cap. The Qwen corpus tokenizer remains fixed for retrieval consistency; context counts are estimates, not DeepSeek's exact chat-template tokenization.</p>
-<p>Apply the same profile to <code>react</code>, <code>resum</code> and <code>acm</code>; see <a href="../context_comparison/">Context-method comparison</a>. Do not layer this profile on top of the OpenRouter profile or reuse its output directories. API keys stay out of the YAML and saved manifests. The existing Daytona launcher is OpenRouter-specific and does not yet forward DeepSeek credentials; use the local runner for this profile. These commands incur DeepSeek model charges, but merely loading or validating the configuration does not call the API.</p>
+<p>Apply the same profile to <code>react</code>, <code>resum</code> and <code>acm</code>; see <a href="../context_comparison/">Context-method comparison</a>. Do not layer this profile on top of the OpenRouter profile or reuse its output directories. API keys stay out of the YAML and saved manifests. For Daytona, use <code>create --provider-key DEEPSEEK_API_KEY</code> with the matched <code>daytona matrix</code> workflow below; the legacy single-provider <code>daytona run</code> remains OpenRouter-only. These commands incur DeepSeek model charges, but merely loading or validating the configuration does not call the API.</p>
 <h3 id="muse-spark-13-contributor-meta-direct">Muse Spark 1.3 Contributor (Meta direct)</h3>
 <p>Set <code>META_API_KEY</code> in your shell or ignored <code>.env</code>, then select the exact Contributor profile:</p>
 <div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>pocket_context<span class="w"> </span>--split<span class="w"> </span>development680<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-c<span class="w"> </span>browsecomp_plus_muse_spark_1_3_contributor<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/muse-1.3-contributor-smoke/pocket_context
 </code></pre></div>
-<p>The model is explicitly <strong><code>meta/muse-spark-1.3-contributor</code></strong>, not Standard <code>muse-spark-1.3</code> or Contributor 1.2. The profile uses the direct endpoint <code>https://api.meta.ai/v1</code> and LiteLLM's native Responses interface, with encrypted reasoning replay, optional readable reasoning summaries, high effort, and no server-managed response storage. Contributor does not support <code>max</code> effort. It retains the shared 128,000-token experimental cap and corpus/budget settings, and requires no OpenRouter key. Use fresh output directories and the same profile for every method; do not merge it with another provider's profile. The Daytona launcher does not yet forward Meta credentials.</p>
+<p>The model is explicitly <strong><code>meta/muse-spark-1.3-contributor</code></strong>, not Standard <code>muse-spark-1.3</code> or Contributor 1.2. The profile uses the direct endpoint <code>https://api.meta.ai/v1</code> and LiteLLM's native Responses interface, with encrypted reasoning replay, optional readable reasoning summaries, high effort, and no server-managed response storage. Contributor does not support <code>max</code> effort. It retains the shared 128,000-token experimental cap and corpus/budget settings, and requires no OpenRouter key. Use fresh output directories and the same profile for every method; do not merge it with another provider's profile. For Daytona, create a fresh pool with <code>--provider-key META_API_KEY</code> and use <code>daytona matrix -c browsecomp_plus_muse_spark_1_3_contributor</code>. The legacy single-provider <code>daytona run</code> does not support Meta credentials.</p>
 <p><strong>Contributor permits Meta to use prompts and responses for model training.</strong> This includes submitted benchmark context; <code>store: false</code> does not opt out of Contributor data use. Check your benchmark/data policy before launching held-out tasks. See <a href="https://ai.developer.meta.com/docs/pricing-rate-limits">Meta's Contributor terms</a> and the <a href="../context_comparison/#muse-spark-13-contributor">comparison guide</a>. No inference runs are launched by loading this profile.</p>
 <h3 id="openrouter-and-the-paper-settings">OpenRouter and the paper settings</h3>
 <p>Copy <code>.env.example</code> to <code>.env</code> and supply <code>OPENROUTER_API_KEY</code> and, for cloud workers, <code>DAYTONA_API_KEY</code>.
@@ -2967,7 +3161,7 @@ These tools differ from the paper's memory pipeline, and the profile does not re
 The model decides whether context tools are useful; a short successful episode can use neither.</p>
 <h3 id="ten-parallel-daytona-workers">Ten parallel Daytona workers</h3>
 <p>Daytona is optional for local corpus retrieval.
-The cloud runner uses one task per sandbox and shares a snapshot containing Java 21, CPU dependencies, the pinned BM25 index, and the Qwen tokenizer:</p>
+The legacy single-provider <code>daytona run</code> launcher remains OpenRouter-only and supports at most 10 workers. It uses one active task per sandbox and shares a snapshot containing Java 21, CPU dependencies, the pinned BM25 index, and the Qwen tokenizer. <code>daytona create --workers</code> supports pools of up to 120 workers, with at most 10 sandbox startups in flight; larger pools are for the matrix workflow below, not increased legacy <code>run</code> concurrency.</p>
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv/bin/python<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[browsecomp-plus,daytona]'</span>
 mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>snapshot<span class="w"> </span>--name<span class="w"> </span>pocket-browsecomp-plus
 mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">10</span>
@@ -2991,8 +3185,53 @@ Use <code>daytona status</code> to inspect workers and <code>daytona delete</cod
 <span class="w">  </span>--keep-artifacts<span class="w"> </span>--output<span class="w"> </span>runs/browsecomp-plus/eval150
 </code></pre></div>
 <p>The pool manifest is ignored at <code>data/browsecomp-plus/daytona-pool.json</code>.
-Create a fresh pool after application changes or after idle deletion.</p>
-<p>Use repeated <code>--query-id ID</code>, <code>--offset N</code>, and <code>--limit N</code> to select queries in dataset order.
+Create a fresh pool after application or credential changes or after idle deletion.</p>
+<h3 id="matched-daytona-matrix">Matched Daytona matrix</h3>
+<p><code>daytona matrix</code> runs Pocket Context, ReAct, ReSum and ACM concurrently with dedicated sandboxes per method and one active question per sandbox. <code>--workers-per-method</code> defaults to <code>1</code>, preserving sequential processing within each method. Effective workers per method are <code>min(requested workers per method, selected question count)</code>; the pool needs <strong>four times that many distinct workers</strong>. Methods never share workers or oversubscribe sandboxes. Each method's dynamic queue assigns the next selected question to a free worker, retaining failed attempts without retries or dropping failures. Use a separate <code>--pool</code> manifest and a fresh pool containing the updated application:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provider-key<span class="w"> </span>DEEPSEEK_API_KEY<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-smoke<span class="w"> </span>--dry-run
+</code></pre></div>
+<p><code>create --provider-key</code> forwards only the named key, defaulting to <code>OPENROUTER_API_KEY</code>. Any key name ending in <code>_API_KEY</code> is allowed except <code>DAYTONA_API_KEY</code>; the Daytona credential is never forwarded. Match the key to the matrix's provider profile and recreate the pool when changing it. Matrix uses the DeepSeek profile by default if no <code>-c</code> is supplied. Explicit configs replace the default provider profile; the base configuration is always applied. Do not merge provider profiles.</p>
+<p>Repeat <code>--query-id ID</code> for explicit selection (use <code>--limit 0</code> to run all specified IDs); <code>--limit 0</code> without IDs selects the whole split. <code>--seed N</code> samples reproducibly without replacement; otherwise selection follows dataset order. The shared cohort is randomized once, not separately per method or worker. The parent <code>selection.yaml</code> records the shared IDs, seed, requested <code>workers_per_method</code>, effective workers per method and per-method sandbox lists. Matrix requires a new or empty output directory, with no hidden resampling or resume.</p>
+<p><code>--dry-run</code> validates selection/configuration without writing files or calling any API. Omit it to launch the paid run:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-smoke
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>status<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json
+<span class="c1"># After matrix completion:</span>
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>compare<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--runs<span class="w"> </span>runs/browsecomp-plus/matched-smoke<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-smoke/comparison.yaml
+</code></pre></div>
+<p>For a full 30-question cohort with up to 30 dedicated sandboxes per method (120 total):</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">120</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provider-key<span class="w"> </span>DEEPSEEK_API_KEY<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-120-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers-per-method<span class="w"> </span><span class="m">30</span><span class="w"> </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">30</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-30
+</code></pre></div>
+<p>The matrix command above launches a paid run; append <code>--dry-run</code> to validate without launching tasks. The 10-at-a-time pool startup limit is not a matrix task-concurrency limit. Fewer questions clamp concurrency: <code>--workers-per-method 30 --limit 10</code> uses only 10 workers per method, or 40 active task slots, even with a 120-worker pool. Extra sandboxes do not receive duplicate questions.</p>
+<p>Use the existing <code>daytona status</code> command for worker tracking. With one effective worker per method, each method directory keeps its original <code>run.yaml</code>, <code>summary.yaml</code>, root query results and <code>trajectories.tar.gz</code>. Multiworker runs keep each task's original artifacts under <code>METHOD/tasks/QUERY_ID/{run.yaml,QUERY_ID.json,trajectories.tar.gz}</code> and publish parent <code>METHOD/run.yaml</code>, root <code>METHOD/QUERY_ID.json</code> results and <code>METHOD/summary.yaml</code> with the common full-cohort manifest and fingerprint, without rewriting shard provenance. Shared selection metadata and sandbox lists stay in the matrix parent.</p>
+<p><code>compare</code> still accepts the matrix parent output, and grading still uses the <strong>root per-method directories</strong>, not task shards. Without judge grades, comparison reports resource usage only, not answer correctness; judge each method separately and supply <code>--grades</code> as described in <a href="../context_comparison/#grade-and-compare">Context-method comparison</a>.</p>
+<p>The DeepSeek profile's $0.50 threshold is per method per question, including auxiliary inference, and is checked between calls: it is not a hard billing cap. Budget for all four methods' model charges, provider request/token rate limits, Daytona account quotas, infrastructure and any judge costs. The snapshot uses 1 CPU / 4 GB per worker: 120 provisioned sandboxes require 120 CPUs / 480 GB even if fewer tasks are active. Pool creation provisions billable infrastructure; <code>check</code> makes no model calls and matrix <code>--dry-run</code> calls no API. Editing these docs or validating with <code>--dry-run</code> starts no paid run. These examples are instructions, not claims that a run has occurred.</p>
+<h3 id="local-selection-and-artifacts">Local selection and artifacts</h3>
+<p>Use repeated <code>--query-id ID</code>, <code>--offset N</code>, and <code>--limit N</code> to select queries in dataset order for the local <code>run</code> command.
 <code>--queries FILE</code> accepts an alternative decrypted JSONL with <code>query_id</code> and <code>query</code> fields, and <code>--index DIR</code> accepts an alternative Lucene index.
 Local development runs without <code>--method</code> skip completed queries and retry incomplete queries. Explicit method runs and local <code>eval150</code> runs retain all recorded attempts, including failures, to avoid retry-until-success bias. Runs reject changed settings in an existing output directory.
 Use <code>--redo-existing</code> to explicitly replace recorded attempts with the same settings; use fresh directories for independent evaluation repeats.
@@ -3035,14 +3274,15 @@ data/browsecomp-plus/judge-venv/bin/python<span class="w"> </span><span class="s
 <p>Copy the prepared questions and run outputs to the GPU machine and adjust paths and GPU count as needed.
 The judge loads <code>Qwen/Qwen3-32B</code>; it does not need a paid model API key.
 Upstream requests Qwen3-32B judging for leaderboard submissions.</p>
-<p>For an API-based check using the upstream alternate GPT-4.1 judge, export <code>OPENAI_API_KEY</code> and run:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>data/browsecomp-plus/upstream/scripts_evaluation/evaluate_with_openai.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input_dir<span class="w"> </span>runs/browsecomp-plus/my-model<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--ground_truth<span class="w"> </span>data/browsecomp-plus/queries.jsonl<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--qrel_evidence<span class="w"> </span>data/browsecomp-plus/upstream/topics-qrels/qrel_evidence.txt<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--eval_dir<span class="w"> </span>runs/browsecomp-plus/evals-openai
+<p>For an API-based check using GPT-6 Luna, export <code>OPENAI_API_KEY</code> and run our launcher for the upstream alternate judge:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pocketcontextagent.run.benchmarks.browsecomp_plus_judge<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input-dir<span class="w"> </span>runs/browsecomp-plus/my-model<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--eval-dir<span class="w"> </span>runs/browsecomp-plus/evals-gpt-6-luna
 </code></pre></div>
-<p>This alternate judge incurs API charges and should be identified separately from the official Qwen judge in reported results.</p>
+<p>The launcher defaults to <code>gpt-6-luna</code> with an 8,192-token output budget for reasoning and the answer, using the Responses API and the model's default reasoning effort.
+It preserves the pinned upstream grading prompt and judgment format, including judge model metadata used by <code>compare --grades</code>.
+Use the same settings for all four methods and a fresh evaluation root when changing judge models or settings: the upstream script otherwise reuses existing judgments.
+This alternate judge incurs API charges and should be identified separately from the official Qwen judge in reported results.</p>
 <h2 id="validate-the-integration">Validate the integration</h2>
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv/bin/python<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[dev,browsecomp-plus]'</span>
 pytest<span class="w"> </span>-q<span class="w"> </span>tests/run/test_browsecomp_plus.py

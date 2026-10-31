@@ -11,7 +11,7 @@
         <link rel="prev" href="../browsecomp_plus/">
       
       
-        <link rel="next" href="../inspector/">
+        <link rel="next" href="../context_benchmarks/">
       
       
         
@@ -555,6 +555,16 @@
       
         
       
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
     
     
     
@@ -872,6 +882,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#matched-daytona-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matched Daytona matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Matched Daytona matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#thirty-questions-across-120-sandboxes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thirty questions across 120 sandboxes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#grade-and-compare" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -897,6 +935,146 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context_benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmark_controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trusted cloud controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../method_controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One controller per method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controller_volumes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Controller artifact volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../full_context_evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full context evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2787,6 +2965,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#matched-daytona-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matched Daytona matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Matched Daytona matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#thirty-questions-across-120-sandboxes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thirty questions across 120 sandboxes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#grade-and-compare" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2924,7 +3130,60 @@
 <p>A run may exit with status 1 when an attempt hits a budget. Inspect the retained failure record; keep it in the denominator. Missing task artifacts cause comparison to fail rather than evaluate only the intersection or successful tasks.</p>
 <p>Explicit method runs and all local <code>eval150</code> runs retain <strong>all</strong> attempts on resume, including failures. They do not silently retry until success. <code>--redo-existing</code> explicitly replaces attempts; use new directories for independent repetitions, not best-of-reruns Pass@1. Legacy development runs without <code>--method</code> retain retry-incomplete behavior.</p>
 <p>Manifests record selected IDs, source/index revisions, inventory, workers, attempt policy, implementation hash, and <strong>per-method upstream revision, prompt hash and method settings</strong>. Changing code, selection, configuration or data requires fresh output directories. Old local “X-style” runs lack the new method provenance and are intentionally rejected by the comparison importer.</p>
-<p>This workflow uses the local <code>run</code> command. The Daytona parent launcher does not yet support the method matrix/provenance contract; do not use its parent output as <code>compare</code> input.</p>
+<p>The loops above use the local <code>run</code> command. For matched cloud runs, use <code>daytona matrix</code> below, not the legacy OpenRouter-only <code>daytona run</code> launcher; its parent output is not a matched comparison input.</p>
+<h2 id="matched-daytona-matrix">Matched Daytona matrix</h2>
+<p><code>daytona matrix</code> runs all four methods concurrently with dedicated sandboxes per method and <strong>one active question per sandbox</strong>. <code>--workers-per-method</code> defaults to <code>1</code>, preserving the original sequential-per-method behavior. Each method uses <code>min(requested workers per method, selected question count)</code> effective workers; the pool must contain at least <strong>four times that many distinct workers</strong>, with no sharing between methods or oversubscription. Each method has a dynamic queue: a free worker takes its next selected question. Failed attempts remain in the cohort, with no retries or dropped failures.</p>
+<p><code>daytona create --workers</code> supports pools of up to <strong>120 workers</strong>, starting at most <strong>10 concurrently</strong>; this startup limit does not cap matrix task concurrency. The legacy <code>daytona run</code> still supports at most 10 workers. Prepare the snapshot as described in <a href="../browsecomp_plus/#ten-parallel-daytona-workers">BrowseComp-Plus setup</a>, then create a fresh pool after application or credential changes. A separate <code>--pool</code> path is recommended to avoid reusing the legacy launcher's pool.</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provider-key<span class="w"> </span>DEEPSEEK_API_KEY<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-smoke<span class="w"> </span>--dry-run
+</code></pre></div>
+<p><code>create --provider-key</code> forwards only the named provider credential; its default is <code>OPENROUTER_API_KEY</code>. Any name ending in <code>_API_KEY</code> is accepted except <code>DAYTONA_API_KEY</code>, which stays on the launcher. Use <code>DEEPSEEK_API_KEY</code> for DeepSeek or <code>META_API_KEY</code> with the Meta profile; the old single-provider <code>daytona run</code> remains OpenRouter-only. <code>check</code> performs corpus/tokenizer checks without model calls.</p>
+<p>The matrix defaults to <code>browsecomp_plus_deepseek</code> when no <code>-c</code> is supplied. Explicit configs replace that default provider profile; the base configuration is always applied. Do not layer provider profiles. The pool's forwarded credential must match the selected provider.</p>
+<p>Selection is shared across methods: repeat <code>--query-id ID</code> to select specific questions (add <code>--limit 0</code> to run all specified IDs), use <code>--limit 0</code> without IDs for the whole split, or use <code>--seed N</code> for reproducible random selection without replacement. The cohort is randomized <strong>once</strong>, not independently per method or worker; without a seed, selection follows dataset order. <code>selection.yaml</code> in the parent output records the shared selected IDs, seed, requested <code>workers_per_method</code>, effective workers per method and per-method sandbox lists. There is no hidden resampling or resume: matrix requires a new or empty output directory.</p>
+<p><code>--dry-run</code> validates selection and configuration, writes nothing and calls no API. To launch the paid smoke run after validation, omit that flag:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-smoke
+</code></pre></div>
+<h3 id="thirty-questions-across-120-sandboxes">Thirty questions across 120 sandboxes</h3>
+<p>To run all four methods with up to 30 dedicated sandboxes each on the same 30-question cohort:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">120</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provider-key<span class="w"> </span>DEEPSEEK_API_KEY<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-120-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-120-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers-per-method<span class="w"> </span><span class="m">30</span><span class="w"> </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">30</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-30
+</code></pre></div>
+<p>This launches a paid run; append <code>--dry-run</code> to the matrix command to validate without launching tasks. Fewer selected questions clamp the worker count: with <code>--workers-per-method 30 --limit 10</code>, only 10 workers per method (40 active task slots total) are used, even in a 120-worker pool. Unused workers do not receive duplicate questions.</p>
+<p>For a single effective worker per method, the original <code>METHOD/run.yaml</code>, <code>METHOD/summary.yaml</code>, root query results and <code>METHOD/trajectories.tar.gz</code> layout is unchanged. Multiworker runs retain task shards at:</p>
+<div class="highlight"><pre><span></span><code>METHOD/tasks/QUERY_ID/run.yaml
+METHOD/tasks/QUERY_ID/QUERY_ID.json
+METHOD/tasks/QUERY_ID/trajectories.tar.gz
+</code></pre></div>
+<p>Each method also publishes its parent <code>METHOD/run.yaml</code>, root <code>METHOD/QUERY_ID.json</code> results and <code>METHOD/summary.yaml</code> using the common full-cohort manifest and fingerprint. Original shard provenance is preserved rather than rewritten during aggregation. Shared selection metadata and sandbox lists stay in the matrix parent's <code>selection.yaml</code>. Compare and grade the <strong>root method directories</strong>, not individual task shards; the comparison and grading interface is unchanged.</p>
+<p>Successful collection removes the remote workspace. On timeout, available partial artifacts are collected before raising; collection failures retain the remote workspace at the recovery path printed when launching. Recover it before the sandbox's idle deletion. With this profile, the $0.50 threshold applies per method per question, including auxiliary calls. It is a soft stopping threshold checked between calls, not a billing cap. Plan for model costs across all four methods, provider request/token rate limits, Daytona account quotas and infrastructure costs, plus any judging costs. At the snapshot's 1 CPU / 4 GB per worker, provisioning 120 sandboxes provisions 120 CPUs / 480 GB even if fewer task slots are active. Creating a pool provisions billable infrastructure; <code>check</code> makes no model calls, and matrix <code>--dry-run</code> calls no API. Editing these docs or validating with <code>--dry-run</code> starts no paid run. These examples do not imply an evaluation has been run.</p>
+<p>Inspect workers with the existing status command; after matrix completion, compare its parent output directly:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>status<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/daytona-matrix-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>compare<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--runs<span class="w"> </span>runs/browsecomp-plus/matched-smoke<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus/matched-smoke/comparison.yaml
+</code></pre></div>
+<p>This ungraded comparison reports resources, not correctness. Run the judge separately for each method directory, as below, and pass the corresponding grade parent with <code>--grades</code> to report success rates.</p>
 <h2 id="grade-and-compare">Grade and compare</h2>
 <p>Run the pinned official Qwen judge from <a href="../browsecomp_plus/#evaluate">BrowseComp-Plus evaluation</a> separately for each method, on the GPU judge machine:</p>
 <div class="highlight"><pre><span></span><code><span class="k">for</span><span class="w"> </span>method<span class="w"> </span><span class="k">in</span><span class="w"> </span>pocket_context<span class="w"> </span>react<span class="w"> </span>resum<span class="w"> </span>acm<span class="p">;</span><span class="w"> </span><span class="k">do</span>
@@ -2971,6 +3230,10 @@
 <tr>
 <td>Peak input tokens/task</td>
 <td>Mean per-task maximum provider-reported input across main and auxiliary calls; not KV-cache size. YAML also reports the global maximum.</td>
+</tr>
+<tr>
+<td>Input cache hit rate</td>
+<td>Total provider-reported cached input tokens / total input tokens across all attempts, including auxiliary calls and failures; token-weighted, not an average of task percentages.</td>
 </tr>
 </tbody>
 </table>
@@ -3066,13 +3329,13 @@
         
         
           
-          <a href="../inspector/" class="md-footer__link md-footer__link--next" aria-label="Next: Inspector">
+          <a href="../context_benchmarks/" class="md-footer__link md-footer__link--next" aria-label="Next: Corpus and coding matrix">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Inspector
+                Corpus and coding matrix
               </div>
             </div>
             <div class="md-footer__button md-icon">

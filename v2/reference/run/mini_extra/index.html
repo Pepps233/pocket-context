@@ -548,6 +548,16 @@
       
         
       
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
     
     
     
@@ -746,6 +756,146 @@
     
   
     Context-method comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../usage/context_benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../usage/benchmark_controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trusted cloud controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../usage/method_controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One controller per method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../usage/controller_volumes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Controller artifact volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../usage/full_context_evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full context evaluation
   
 
     
@@ -2791,6 +2941,16 @@
     <span class="p">),</span>
     <span class="p">(</span><span class="s2">"pocketcontextagent.run.benchmarks.programbench"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"programbench"</span><span class="p">],</span> <span class="s2">"Run on ProgramBench (batch mode)"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"pocketcontextagent.run.benchmarks.browsecomp_plus"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"browsecomp-plus"</span><span class="p">],</span> <span class="s2">"Prepare and run BrowseComp-Plus"</span><span class="p">),</span>
+    <span class="p">(</span>
+        <span class="s2">"pocketcontextagent.run.benchmarks.browsecomp_plus_daytona"</span><span class="p">,</span>
+        <span class="p">[</span><span class="s2">"benchmark-matrix"</span><span class="p">],</span>
+        <span class="s2">"Run matched corpus and coding methods in Daytona sandboxes"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="p">(</span>
+        <span class="s2">"pocketcontextagent.run.benchmarks.benchmark_controller"</span><span class="p">,</span>
+        <span class="p">[</span><span class="s2">"benchmark-controller"</span><span class="p">],</span>
+        <span class="s2">"Manage a durable SSH-accessible trusted Daytona benchmark controller"</span><span class="p">,</span>
+    <span class="p">),</span>
 <span class="p">]</span>
 
 
@@ -2905,6 +3065,16 @@ inspecting trajectories, etc.</p>
         <span class="p">[</span><span class="s2">"browsecomp-plus"</span><span class="p">],</span>
         <span class="s2">"Prepare and run BrowseComp-Plus"</span><span class="p">,</span>
     <span class="p">),</span>
+    <span class="p">(</span>
+        <span class="s2">"pocketcontextagent.run.benchmarks.browsecomp_plus_daytona"</span><span class="p">,</span>
+        <span class="p">[</span><span class="s2">"benchmark-matrix"</span><span class="p">],</span>
+        <span class="s2">"Run matched corpus and coding methods in Daytona sandboxes"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="p">(</span>
+        <span class="s2">"pocketcontextagent.run.benchmarks.benchmark_controller"</span><span class="p">,</span>
+        <span class="p">[</span><span class="s2">"benchmark-controller"</span><span class="p">],</span>
+        <span class="s2">"Manage a durable SSH-accessible trusted Daytona benchmark controller"</span><span class="p">,</span>
+    <span class="p">),</span>
 <span class="p">]</span>
 </code></pre></div>
 
@@ -2933,17 +3103,17 @@ inspecting trajectories, etc.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>pocketcontextagent/run/utilities/mini_extra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_docstring</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_docstring</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span>
         <span class="s2">"This is the [yellow]central entry point for all extra commands[/yellow] from mini-swe-agent."</span><span class="p">,</span>
         <span class="s2">""</span><span class="p">,</span>
@@ -2976,17 +3146,17 @@ inspecting trajectories, etc.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>pocketcontextagent/run/utilities/mini_extra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+              <div class="highlight"><table class="highlighttable"><tbody><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
     <span class="n">args</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
 
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"-h"</span><span class="p">,</span> <span class="s2">"--help"</span><span class="p">]:</span>

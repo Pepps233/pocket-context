@@ -542,6 +542,16 @@
       
         
       
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
     
     
     
@@ -740,6 +750,146 @@
     
   
     Context-method comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/context_benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/benchmark_controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trusted cloud controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/method_controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One controller per method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/controller_volumes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Controller artifact volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/full_context_evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full context evaluation
   
 
     
@@ -2646,6 +2796,16 @@ The calling agent selects the bounds, then waits for a separate compaction agent
 The compaction agent has an independent conversation and cannot execute tools.
 Compaction and expansion each take a dedicated turn with exactly one call and no other tools.
 Text-based bash models keep their existing syntax.</p>
+<p>Pocket Context offers <code>compact_block</code> when estimated input reaches <code>compact_pressure_fraction * max(0, context_token_limit - output_allowance)</code>.
+The default fraction is <code>0.5</code>: a 64,000-token context with a 16,384-token output allowance has a 23,808-token threshold.
+The pressure check excludes the generated catalog and the unavailable compaction schema, so their overhead cannot activate the tool.
+Input uses the configured tokenizer when available, otherwise the existing serialized-byte estimate; it is not an exact provider token count.
+Availability is recalculated from the reduced history after compaction, so the tool and eligible-block catalog disappear below the threshold and return as input grows.
+Set <code>compact_pressure_fraction=0</code> to disable gating; an unlimited context also leaves compaction available.
+Archive expansion remains available below the threshold, with a separate compact archive-tag list when archives exist.
+The working prompt encourages batching completed investigation and obsolete outputs into substantial ranges while retaining current reasoning and recent evidence.
+It discourages repeatedly summarizing the same memory without substantial new information.
+These pressure and prompt changes apply only to Pocket Context, not ReAct, ReSum, or ACM.</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"compact_block"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"arguments"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -2654,11 +2814,17 @@ Text-based bash models keep their existing syntax.</p>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
-<p>When eligible history exists, the request ends with a block catalog in history order.
+<p>When eligible history exists and compaction is available, the request ends with a fresh block catalog in history order.
 Each stable ID identifies a complete model exchange, including reasoning, every tool call, and every result, or one standalone memory or older request.
+Each row shows its current chronological position, stable <code>block_id</code>, type, and associated <code>archive_tag</code> when present.
+Positions may change after compaction; block ID numbers do not indicate chronological order.
+Pass <code>block_id</code> values to <code>start_id</code> and <code>end_id</code>, following the displayed positions rather than numerical ID order.
+For example, if position 1 is <code>b003</code> and position 2 is <code>b002</code>, selecting <code>b003</code> through <code>b002</code> is valid.
+Protected gaps are marked in the catalog, and a selected range must not cross them.
 The framework resolves the inclusive range and rejects unknown, stale, or protected IDs.
 IDs remain stable while their messages remain active; compacted IDs disappear and expanded exchanges receive fresh IDs.
 Errors list eligible IDs or identify the required complete exchange.
+Reversed selections report both endpoint positions and require an explicit retry in catalog order; endpoints are never swapped automatically.
 Instructions, the latest genuine user request, and the latest model response and its results are protected.
 A rejected selection returns a tool error and leaves active context intact.
 A mixed tool batch rejects every call before executing any command.</p>
@@ -2678,7 +2844,12 @@ The next model request contains this replacement before the agent chooses furthe
 The receipt reports the tag and measured character reduction.
 It identifies the same archive as the earlier memory, not a second memory or a reused tag.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.</p>
-<p>Summaries retain important facts, source identifiers, uncertainty, and brief outcomes of unsuccessful approaches.
+<p>Pocket Context summaries use a decision record with sections for the current patch, established facts, failed approaches, test results, open questions, and next action.
+Empty or inapplicable sections are omitted, and next actions must be supported by the selected history.
+Summaries distinguish applied edits from proposals, observed test outcomes from unrun checks, and abandoned attempts from untested ideas.
+Consequential decisions retain their reasons and supporting evidence so the agent can avoid repeating settled investigation.
+The prompt targets 150-300 words while allowing extra space for essential patch or verification details; this is guidance, not a truncation limit.
+These instructions apply to Pocket Context's compaction agent; the comparison methods retain their own summarization prompts.
 Earlier context only resolves references; task instructions, answer formats, counters, context-management history, and exhaustive search logs are omitted from the summary.
 An unsuccessful search does not rule out a lead or make its archive unhelpful.
 Archive identity and provenance come from framework headers rather than generated prose.
@@ -2691,6 +2862,10 @@ The main agent receives a receipt only after a successful summary passes the red
 <p>Call <code>expand_block</code> with one canonical tag from the current run:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"expand_block"</span><span class="p">,</span><span class="w"> </span><span class="nt">"arguments"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"tag"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ctx-0001"</span><span class="p">}}</span>
 </code></pre></div>
+<p>The catalog lists available archives separately from eligible live blocks, including archives whose summaries have been compacted again.
+Choose an existing archive tag from that list; block IDs and chronological positions are not archive tags.
+Ordinary live exchanges have no archive because their content is already visible.
+An unknown archive tag returns the available archive tags for this run, or <code>none</code> when no archives exist.</p>
 <p>Expansion keeps the existing summary in place and appends a tool receipt followed by the block's local archived messages in their original order.
 It returns complete archived text and tool results, preferring saved raw output over truncated observation text.
 If the expansion would exhaust the context budget, it returns an error before journaling or appending history instead of silently truncating it.

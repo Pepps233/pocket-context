@@ -553,6 +553,16 @@
       
         
       
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
     
     
     
@@ -751,6 +761,146 @@
     
   
     Context-method comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/context_benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/benchmark_controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trusted cloud controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/method_controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One controller per method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/controller_volumes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Controller artifact volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/full_context_evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full context evaluation
   
 
     
@@ -2827,13 +2977,9 @@ This is done with the <code>model_kwargs</code> dictionary which is directly pas
 <span class="w">    </span><span class="no">You are Pocket Context, an agent that completes tasks using a computer and manages its own working context.</span>
 
 <span class="w">    </span><span class="no">Use bash to inspect the environment, make changes, and verify results.</span>
-<span class="w">    </span><span class="no">Manage context to support accurate task completion.</span>
-<span class="w">    </span><span class="no">Keep details available while they remain useful for reasoning, verification, or upcoming work.</span>
-<span class="w">    </span><span class="no">Use compact_block when replacing older material with a summary would meaningfully help you continue; select IDs from the current context block catalog.</span>
-<span class="w">    </span><span class="no">Use expand_block when you need information from compacted history that is missing or insufficiently detailed in the summary.</span>
-<span class="w">    </span><span class="no">Treat the current-context token marker as planning information.</span>
-<span class="w">    </span><span class="no">Consider the remaining work, available space, and value of retained evidence when choosing whether to continue investigating, compact older history, or produce your final answer.</span>
-<span class="w">    </span><span class="no">Prefer completing the task directly when the existing context is sufficient.</span>
+<span class="w">    </span><span class="no">{% if context_tools == 'pocket_context' %}</span>
+<span class="w">    </span><span class="no">{{compaction_guidance}}</span>
+<span class="w">    </span><span class="no">{% endif %}</span>
 <span class="w">    </span><span class="no">Verify your results before finishing.</span>
 <span class="w">    </span><span class="no">Finish by issuing echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT as a standalone command.</span>
 <span class="w">  </span><span class="nt">instance_template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>

@@ -1,0 +1,3597 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://mini-swe-agent.com/latest/usage/context_benchmarks/">
+      
+      
+        <link rel="prev" href="../context_comparison/">
+      
+      
+        <link rel="next" href="../benchmark_controller/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/mini_square.svg">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Corpus and coding matrix - mini-SWE-agent documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+  
+  
+  
+  
+  <style>:root{--md-annotation-icon:url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M22%2012a10%2010%200%200%201-10%2010A10%2010%200%200%201%202%2012%2010%2010%200%200%201%2012%202a10%2010%200%200%201%2010%2010m-12%206%206-6-6-6-1.4%201.4%204.6%204.6-4.6%204.6z%22/%3E%3C/svg%3E');}</style>
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/custom.css">
+    
+      <link rel="stylesheet" href="../../assets/gif-controls.css">
+    
+      <link rel="stylesheet" href="../../assets/mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../assets/image_theme.css">
+    
+      <link rel="stylesheet" href="../../assets/bubbles.css">
+    
+      <link rel="stylesheet" href="../../assets/navigation_cards.css">
+    
+      <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-SG2NC1GDRD"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-SG2NC1GDRD",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-SG2NC1GDRD",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#context-benchmarks-browsecomp-plus-and-swe-bench-verified" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+              <button class="md-banner__button md-icon" aria-label="Don't show this again">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+              </button>
+            
+            
+<a href="../programbench/">
+  🎉 Run mini-swe-agent on our new &amp; extremely challenging benchmark, ProgramBench
+</a>
+
+          </div>
+          
+            <script>var el=document.querySelector("[data-md-component=announce]");if(el){var content=el.querySelector(".md-typeset");__md_hash(content.innerHTML)===__md_get("__announce")&&(el.hidden=!0)}</script>
+          
+        </aside>
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="mini-SWE-agent documentation" class="md-header__button md-logo" aria-label="mini-SWE-agent documentation" data-md-component="logo">
+      
+  <img src="../../assets/mini_square.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            mini-SWE-agent documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Corpus and coding matrix
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="deep-orange" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="deep-orange" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/SWE-agent/mini-SWE-agent" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    SWE-agent/mini-SWE-agent
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://www.swebench.com/blog.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Blog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://swebench.com" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Leaderboard
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="mini-SWE-agent documentation" class="md-nav__button md-logo" aria-label="mini-SWE-agent documentation" data-md-component="logo">
+      
+  <img src="../../assets/mini_square.svg" alt="logo">
+
+    </a>
+    mini-SWE-agent documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/SWE-agent/mini-SWE-agent" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    SWE-agent/mini-SWE-agent
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked="">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../.." class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_3" checked="">
+        
+          
+          <label class="md-nav__link" for="__nav_1_3" id="__nav_1_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command line usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Command line usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mini/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    <code>mini</code>
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../swebench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SWE-bench
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programbench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ProgramBench
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../browsecomp_plus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BrowseComp-Plus
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../context_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Context-method comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Corpus and coding matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#evaluation-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation allocation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites-and-execution-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites and execution boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites and execution boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#different-daytona-lifecycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Different Daytona lifecycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-swe-bench-verified-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare SWE-bench Verified data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-task-smoke-validate-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-task smoke: validate first
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One-task smoke: validate first">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#swe-bench-verified-no-precreated-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SWE-bench Verified: no precreated pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browsecomp-plus-retain-the-existing-pool-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BrowseComp-Plus: retain the existing pool workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-allocation-only-after-smoke-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full allocation: only after smoke review
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Full allocation: only after smoke review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#all-150-browsecomp-plus-evaluation-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All 150 BrowseComp-Plus evaluation tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-125-task-swe-bench-verified-cohort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed 125-task SWE-bench Verified cohort
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts-and-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts and provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grade-separately-then-compare" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grade separately, then compare
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Grade separately, then compare">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#swe-bench-verified-official-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SWE-bench Verified official harness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browsecomp-plus-existing-judge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BrowseComp-Plus existing judge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ready-to-run-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ready-to-run handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmark_controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trusted cloud controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../method_controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One controller per method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controller_volumes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Controller artifact volumes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../full_context_evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full context evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_4">
+        
+          
+          <label class="md-nav__link" for="__nav_1_4" id="__nav_1_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language models
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Language models
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../models/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../models/local_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../models/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_5">
+        
+          
+          <label class="md-nav__link" for="__nav_1_5" id="__nav_1_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/global_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/yaml_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Yaml config files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_6">
+        
+          
+          <label class="md-nav__link" for="__nav_1_6" id="__nav_1_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python bindings &amp; more
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python bindings &amp; more
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_bindings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic Python bindings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/control_flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Understanding the agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subclassing and more
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/v2_migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v2 migration guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2">
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2">
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agents
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Agents
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/agents/default/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DefaultAgent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/agents/interactive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    InteractiveAgent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3">
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Models
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/litellm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LitellmModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/litellm_response_toolcall/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LitellmResponseModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/openrouter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenRouterModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/requesty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RequestyModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/portkey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PortkeyModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/portkey_response/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PortkeyResponse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/test_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DeterministicModel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/extra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_4">
+        
+          
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Environments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LocalEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DockerEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/singularity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SingularityEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/swerex_docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SwerexDockerEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/bubblewrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BubblewrapEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/contree/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ContreeEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/environments/swerex_modal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SwerexModalEnvironment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_5">
+        
+          
+          <label class="md-nav__link" for="__nav_2_5" id="__nav_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run Scripts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run Scripts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/hello_world/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hello World
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/mini/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mini
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/mini_extra/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    mini-extra
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/inspector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/swebench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SWE-bench (batch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/swebench_single/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SWE-bench (single)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/programbench/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ProgramBench
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://www.swebench.com/blog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://swebench.com" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#evaluation-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation allocation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites-and-execution-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites and execution boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites and execution boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#different-daytona-lifecycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Different Daytona lifecycles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prepare-swe-bench-verified-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prepare SWE-bench Verified data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-task-smoke-validate-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-task smoke: validate first
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One-task smoke: validate first">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#swe-bench-verified-no-precreated-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SWE-bench Verified: no precreated pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browsecomp-plus-retain-the-existing-pool-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BrowseComp-Plus: retain the existing pool workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-allocation-only-after-smoke-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full allocation: only after smoke review
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Full allocation: only after smoke review">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#all-150-browsecomp-plus-evaluation-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All 150 BrowseComp-Plus evaluation tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-125-task-swe-bench-verified-cohort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed 125-task SWE-bench Verified cohort
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artifacts-and-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts and provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grade-separately-then-compare" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grade separately, then compare
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Grade separately, then compare">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#swe-bench-verified-official-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SWE-bench Verified official harness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browsecomp-plus-existing-judge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BrowseComp-Plus existing judge
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ready-to-run-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ready-to-run handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+
+                  
+
+
+  
+    <a href="https://github.com/SWE-agent/mini-SWE-agent/edit/main/docs/usage/context_benchmarks.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"></path></svg>
+    </a>
+  
+  
+
+
+<h1 id="context-benchmarks-browsecomp-plus-and-swe-bench-verified">Context benchmarks: BrowseComp-Plus and SWE-bench Verified</h1>
+<p>Compare <strong>Pocket Context, ReAct, training-free ReSum, and ACM Base</strong> on a fixed cohort within each benchmark. Method IDs are <code>pocket_context</code>, <code>react</code>, <code>resum</code>, and <code>acm</code>. Each method receives the same selected task IDs, model profile and shared budgets; failed attempts stay in the cohort, without retries or replacement tasks.</p>
+<p>This page describes the generic <code>mini-extra benchmark-matrix</code> interface and the existing BrowseComp-Plus matrix workflow. The BrowseComp-Plus corpus, pool lifecycle and grading path remain unchanged; see <a href="../browsecomp_plus/">BrowseComp-Plus setup</a> and <a href="../context_comparison/">method fidelity and comparison</a>. Benchmark-specific prompt/tool adaptations are recorded in provenance. This is a controlled shared-policy comparison, <strong>not a reproduction of published paper scores</strong>, and does not include ReSum-GRPO training.</p>
+<h2 id="evaluation-allocation">Evaluation allocation</h2>
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>Split and selection</th>
+<th style="text-align: right;">Unique tasks</th>
+<th style="text-align: right;">Methods</th>
+<th style="text-align: right;">Attempts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BrowseComp-Plus</td>
+<td>Entire <code>eval150</code>, seed 42</td>
+<td style="text-align: right;">150</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">600</td>
+</tr>
+<tr>
+<td>SWE-bench Verified</td>
+<td><code>test</code>, 125 tasks selected with seed 42</td>
+<td style="text-align: right;">125</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">500</td>
+</tr>
+<tr>
+<td>Total</td>
+<td>Two distinct benchmark cohorts</td>
+<td style="text-align: right;"><strong>275</strong></td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;"><strong>1,100</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The allocation is configured in <code>pocketcontextagent/config/benchmarks/context_evaluation.yaml</code>. After preparing both datasets, freeze and inspect the selected IDs without calling APIs:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>allocation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/context-evaluation/allocation.yaml
+</code></pre></div>
+<p>The seed fixes selection, not model determinism. Selection happens once per benchmark, not independently per method or worker. The 1,100 attempts refer to the full allocation only; separate one-task/four-method smoke runs add four attempts per benchmark and are not silently merged into the full evaluation. Freeze code, prompts, configuration and selection before the full evaluation. Keep smoke outputs separate from full-evaluation outputs; use fresh output directories rather than replacing failed attempts or selecting the best rerun.</p>
+<p><strong>No paid runs are launched as part of setup or documentation validation.</strong> Data preparation downloads public artifacts without model calls. Matrix <code>--dry-run</code> calls no API and creates no sandboxes. Pool creation, live matrix execution and model-based grading are separate, explicitly paid operations.</p>
+<h2 id="prerequisites-and-execution-boundaries">Prerequisites and execution boundaries</h2>
+<p>For unattended SWE runs or a laptop that cannot reach the model provider, use the
+<a href="../benchmark_controller/">trusted Daytona controller</a>. Its detached cloud jobs continue
+after laptop/SSH disconnect; native SSH, status, log and artifact commands let you reconnect.
+The direct <code>benchmark-matrix matrix</code> commands below run the model loop on their <strong>invoking
+host</strong> and only shell tools in coding sandboxes. Invoke them on a trusted cloud host, or
+use <code>benchmark-controller submit</code>, rather than assuming a coding sandbox also hosts inference.</p>
+<ul>
+<li>Put <code>DAYTONA_API_KEY</code> and <code>DEEPSEEK_API_KEY</code> in the orchestrator's environment or ignored <code>.env</code>. Do not print credentials or commit them.</li>
+<li>Prepare the pinned BrowseComp-Plus corpus/index, tokenizer and compatible snapshot using the <a href="../browsecomp_plus/">existing setup</a>. These examples retain its <code>pocket-browsecomp-plus</code> snapshot name; confirm it exists in your Daytona account and contains the current application and required corpus/runtime dependencies.</li>
+<li>Use <code>browsecomp_plus_deepseek</code> for BrowseComp-Plus and <code>context_benchmark_deepseek</code> for SWE-bench Verified, consistently across all four methods within each benchmark. Do not layer provider profiles.</li>
+<li>Plan provider request/token rate limits, per-task cost/time limits, Daytona sandbox quotas and infrastructure costs before increasing concurrency. Stopping thresholds checked between calls are not hard billing caps. Auxiliary memory/model calls contribute to usage and cost.</li>
+<li>SWE-bench grading uses the pinned official harness on a trusted launcher and fresh Daytona grading sandboxes.
+  It requires no local Docker daemon and never reuses a coding sandbox.</li>
+</ul>
+<h3 id="different-daytona-lifecycles">Different Daytona lifecycles</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>BrowseComp-Plus</th>
+<th>SWE-bench Verified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Provisioning</td>
+<td>Existing precreated <code>--pool</code></td>
+<td>Automatically create and delete one fresh sandbox per method/task attempt</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>Existing corpus worker application</td>
+<td>Four independent sandboxes from one shared digest-pinned official snapshot per task</td>
+</tr>
+<tr>
+<td>Inference</td>
+<td>Existing remote worker execution, with the explicitly forwarded provider key</td>
+<td>Model agents run on the invoking host, preferably the trusted cloud controller; coding tools run in separate Daytona sandboxes</td>
+</tr>
+<tr>
+<td>Sandbox credentials</td>
+<td>Existing <code>create --provider-key DEEPSEEK_API_KEY</code>; Daytona key stays on launcher</td>
+<td><strong>No model keys or Daytona keys in the coding sandbox</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Do not pass a precreated <code>--pool</code> to the SWE-bench workflow. The connector imports one explicit named snapshot per question, then creates independent method sandboxes from it instead of invoking an implicit image build for every attempt. The bounded cache holds at most <code>active_workers_per_method</code> snapshots, admits questions in cohort order, and permits two concurrent imports by default. A snapshot remains leased until all four methods finish; a fast method cannot evict an image still needed by a slower method or jump ahead of that method's pending questions.</p>
+<p>Coding sandboxes are <strong>persistent at creation</strong>, with <strong>idle auto-stop and auto-pause disabled (<code>0</code>)</strong>, stopped-state auto-delete disabled (<code>-1</code>), and an independent <strong>four-hour absolute TTL</strong> for orphan protection. Ephemeral sandboxes cannot be converted to persistent later. The connector verifies the server's actual resources, lifecycle settings and deadline. The agent's separate wall-time budget is <strong>two hours</strong>, replacing the former 30 minutes; the existing $0.50 model-cost and 100-step limits are unchanged. For longer tasks, override both limits, for example <code>-c agent.wall_time_limit_seconds=14400 -c sandbox.ttl_minutes=300</code>. A shorter organization-imposed lifetime fails preflight rather than being silently accepted. Explicit <code>sandbox.ttl_minutes=0</code> requires the organization to allow disabling the absolute safety limit.</p>
+<p>All four methods must pass a question's repository and lifecycle preflight before any starts inference. Each fresh checkout is restored to its immutable task base commit and must have an empty initial patch. Coding uses the official image directly, <strong>without nested Docker</strong>, with outbound networking blocked and <code>BASH_ENV</code> preserving conda activation. Shell commands have a process-level timeout as well as the SDK request timeout. Official grading is separate.</p>
+<p>Successful artifact capture is followed by confirmed deletion. If capture fails, the launcher stops the persistent sandbox and retains it and its snapshot for recovery before the absolute TTL expires; retained disks can incur storage charges. Resource names are journaled <strong>before blocking create calls</strong>, including creates that time out before returning an ID, and per-method stages/errors are printed immediately. Stop the controller before reconciling resources, then run <code>mini-extra benchmark-matrix delete --pool RUN_ROOT/sandbox-cleanup.json</code>. This deletes only journaled names/IDs, waits for sandbox destruction and polls snapshot removal to completion. An SDK creation timeout does <strong>not</strong> cancel server-side work; do not discard the journal or retry automatically while cleanup is unresolved.</p>
+<p>Both matrices support up to <strong>30 active task slots per method, 120 total</strong>, with one active task per sandbox. Effective concurrency is <code>min(workers_per_method, selected task count)</code> for each method. Thus a one-task smoke with <code>--workers-per-method 1</code> means four attempts, while requesting 30 workers for one task still gives only four active slots. Slots are concurrency limits, not the number of attempts in the cohort.</p>
+<h2 id="prepare-swe-bench-verified-data">Prepare SWE-bench Verified data</h2>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>prepare<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark<span class="w"> </span>swebench-verified<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-dir<span class="w"> </span>data/swebench-verified
+</code></pre></div>
+<p>Preparation uses <code>princeton-nlp/SWE-bench_Verified</code>, revision <strong><code>c104f840cc67f8b6eec6f759ebc8b2693d585d4a</code></strong>, split <code>test</code>. Keep evaluator-only data on the trusted orchestrator/grading host. Agent inputs are allowlisted public fields: task ID, problem statement, repository, version and base commit, plus the canonical runtime image identifier. Gold patches, test patches, hidden evaluation labels and hints are not agent inputs and must not be copied or mounted into coding sandboxes.</p>
+<p>Each task uses the canonical Docker Hub image:</p>
+<div class="highlight"><pre><span></span><code>docker.io/swebench/sweb.eval.x86_64.&lt;normalized-instance-id&gt;:latest
+</code></pre></div>
+<p>Normalize the instance ID by replacing <code>__</code> with <code>_1776_</code> and lowercasing. For example, <code>django__django-11099</code> maps to <code>docker.io/swebench/sweb.eval.x86_64.django_1776_django-11099:latest</code>. Image names are derived from instance IDs, not arbitrary dataset-supplied image URLs. The prepared dataset retains upstream <code>:latest</code> tags for provenance. Before importing a snapshot, the connector resolves the image to its <strong>immutable Docker Hub digest</strong>; all four methods use that same snapshot and digest. Requested tags are recorded in the resource journal; resolved digests are recorded there, in worker metadata and in attempt metadata. Tags can change between separate runs, so preserve these digests when reproducing or comparing runs; a pinned dataset alone does not pin image contents.</p>
+<p>The coding sandbox allocation is <strong>2 CPU, 8 GB RAM and 10 GB disk per sandbox</strong>. At 120 concurrent slots that is up to 240 CPUs, 960 GB RAM and 1,200 GB disk provisioned. Verify account quotas and image availability before a paid launch; lower concurrency when necessary without changing the selected cohort. The orchestrator also holds active model histories and performs token accounting, so monitor its RAM/CPU before scaling to 120 local agent threads.</p>
+<h2 id="one-task-smoke-validate-first">One-task smoke: validate first</h2>
+<h3 id="swe-bench-verified-no-precreated-pool">SWE-bench Verified: no precreated pool</h3>
+<p>This selects one task, shared by all four methods, and makes no API calls:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark<span class="w"> </span>swebench-verified<span class="w"> </span>--data-dir<span class="w"> </span>data/swebench-verified<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--workers-per-method<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>context_benchmark_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/swebench-verified-smoke<span class="w"> </span>--dry-run
+</code></pre></div>
+<p>The existing dispatcher is equivalent for the new benchmark:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark<span class="w"> </span>swebench-verified<span class="w"> </span>--data-dir<span class="w"> </span>data/swebench-verified<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--workers-per-method<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>context_benchmark_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/swebench-verified-smoke<span class="w"> </span>--dry-run
+</code></pre></div>
+<p>Before inference, check the real infrastructure independently (this incurs Daytona charges, but no model charges):</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark<span class="w"> </span>swebench-verified<span class="w"> </span>--data-dir<span class="w"> </span>data/swebench-verified<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>--workers-per-method<span class="w"> </span><span class="m">1</span><span class="w"> </span>-c<span class="w"> </span>context_benchmark_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--preflight<span class="w"> </span>--output<span class="w"> </span>runs/swebench-infrastructure-check
+</code></pre></div>
+<p><code>--preflight</code> creates all four method sandboxes from one shared snapshot, checks lifecycle settings, the clean base commit, Python environment and filesystem isolation, then deletes the sandboxes and snapshot with confirmation. It neither instantiates nor queries a model and needs only Daytona credentials. Inspect <code>preflight.yaml</code>, task <code>worker.yaml</code> files and <code>sandbox-cleanup.json</code>. It produces no benchmark results or grading inputs. Add <code>--dry-run</code> to this command for a no-API plan.</p>
+<p>After reviewing the selection, configuration and budget, and with explicit authorization for inference, <strong>omit <code>--dry-run</code> from one of the earlier non-preflight commands</strong> to launch the paid one-task/four-method smoke. It automatically provisions fresh task sandboxes; do not run <code>daytona create</code> for SWE-bench Verified.</p>
+<h3 id="browsecomp-plus-retain-the-existing-pool-workflow">BrowseComp-Plus: retain the existing pool workflow</h3>
+<p>Pool creation provisions billable infrastructure, even before model inference. Run these commands only when ready for the paid smoke, after completing the existing corpus/snapshot setup:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provider-key<span class="w"> </span>DEEPSEEK_API_KEY<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/context-smoke-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/context-smoke-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/context-smoke-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers-per-method<span class="w"> </span><span class="m">1</span><span class="w"> </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">1</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/browsecomp-plus-smoke<span class="w"> </span>--dry-run
+</code></pre></div>
+<p><code>check</code> checks the remote corpus/runtime without model calls, but uses the provisioned pool. Matrix <code>--dry-run</code> itself calls no API. To authorize four paid smoke attempts, omit <code>--dry-run</code> from the matrix command. The existing BrowseComp-Plus pool management and cleanup commands remain unchanged; follow the <a href="../browsecomp_plus/">pool lifecycle instructions</a>.</p>
+<h2 id="full-allocation-only-after-smoke-review">Full allocation: only after smoke review</h2>
+<p>These examples retain <code>--dry-run</code> intentionally. Removing it launches paid inference. Do not run both a smoke and a full evaluation into the same output directory.</p>
+<h3 id="all-150-browsecomp-plus-evaluation-tasks">All 150 BrowseComp-Plus evaluation tasks</h3>
+<p>Create a separate 120-worker pool only after budget/quota approval. Pool startup permits at most 10 concurrent creations; that startup limit is not the matrix task-concurrency limit.</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--snapshot<span class="w"> </span>pocket-browsecomp-plus<span class="w"> </span>--workers<span class="w"> </span><span class="m">120</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--provider-key<span class="w"> </span>DEEPSEEK_API_KEY<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/context-eval150-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/context-eval150-pool.json
+mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>daytona<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pool<span class="w"> </span>data/browsecomp-plus/context-eval150-pool.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers-per-method<span class="w"> </span><span class="m">30</span><span class="w"> </span>--split<span class="w"> </span>eval150<span class="w"> </span>--limit<span class="w"> </span><span class="m">150</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>browsecomp_plus_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/bcp150<span class="w"> </span>--dry-run
+</code></pre></div>
+<p>This is <strong>600 attempts</strong>, at most 120 active at once. Run the two benchmark phases sequentially if you want to keep the overall maximum at 120; separate matrix invocations do not share a global concurrency limit. The existing corpus snapshot's resource allocation determines pool infrastructure cost, including idle workers. A dry-run matrix does not make the preceding pool creation free.</p>
+<h3 id="fixed-125-task-swe-bench-verified-cohort">Fixed 125-task SWE-bench Verified cohort</h3>
+<p>Each task result records <code>metrics.input_cache_hit_rate</code>, and comparison YAML and Markdown report the rate separately for all four methods.
+The method rate is total cached input tokens divided by total input tokens across all 125 attempts, including failed tasks and auxiliary model calls.
+Missing token measurements or zero total input produce <code>null</code> in JSON/YAML and <code>N/A</code> in the report.
+This measures the fraction of input tokens served from the provider cache, not the fraction of requests with a cache hit.</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>matrix<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark<span class="w"> </span>swebench-verified<span class="w"> </span>--data-dir<span class="w"> </span>data/swebench-verified<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--split<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--limit<span class="w"> </span><span class="m">125</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span>--workers-per-method<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>context_benchmark_deepseek<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/swe125<span class="w"> </span>--dry-run
+</code></pre></div>
+<p>This is <strong>500 attempts</strong>, with fresh task-image sandboxes and at most 120 active at once. Do not precreate a pool. Preserve the exact selected IDs and original full-cohort fingerprints; do not substitute a new cohort if an image, task or provider call fails. Failures remain visible with no automatic task retries. Normal agent budget exits are retained and the queue continues. Infrastructure/model exceptions fail closed rather than reusing a sandbox with uncertain state; completed artifacts remain available, and incomplete cohort coverage blocks a purported complete comparison.</p>
+<h2 id="artifacts-and-provenance">Artifacts and provenance</h2>
+<p>The matrix parent records shared selection and configuration. Inspect the root method directories, not an intersection of successful task shards:</p>
+<div class="highlight"><pre><span></span><code>RUN_ROOT/
+  selection.yaml
+  sandbox-cleanup.json      # SWE-bench: intended names, returned IDs and snapshot digests
+  cleanup.yaml              # SWE-bench: confirmed cleanup or retained recovery resources
+  METHOD/
+    run.yaml
+    summary.yaml
+    ID.json
+    tasks/ID/
+      worker.yaml           # SWE-bench: stages, sandbox identity and verified lifecycle
+      run.yaml
+      ID.json
+      trajectories...
+    predictions.jsonl       # SWE-bench predictions, for official evaluation
+</code></pre></div>
+<p><code>METHOD</code> is one of the four method IDs. Task-shard provenance and the original full-cohort fingerprints are preserved during aggregation; parent manifests must still describe every selected attempt. The existing BrowseComp-Plus single-worker trajectory/archive layout is unchanged. SWE-bench predictions contain actual patches, not final-answer prose; empty/failed attempts must not silently disappear. Inspect trajectories, termination reasons, model/auxiliary usage, sandbox cleanup and exported patches before interpreting a smoke as operationally successful.</p>
+<p>Submission or an agent's claim of completion is <strong>not correctness</strong>. A budget-terminated SWE-bench attempt can still contain a grade-relevant patch: export and evaluate that patch rather than discarding it because of its termination status.</p>
+<p>All four SWE methods share the shell submission contract: a command must exit zero and print <code>COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code> as its exact first or last nonblank output line. Prefer a separate <code>echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT</code> call after checks, or append it with <code>&amp;&amp;</code> so failed checks do not submit. Leading test output is allowed before a final marker; embedded text or an interior-only marker is not submission. This is an output-based signal, not shell-intent analysis: do not print the standalone marker incidentally at an output boundary. The framework captures the working-tree diff, not prose, and accepting submission does not grade the patch. Protocol/prompt changes apply to fresh attempts and their new fingerprints; historical attempts remain unchanged.</p>
+<h2 id="grade-separately-then-compare">Grade separately, then compare</h2>
+<h3 id="swe-bench-verified-official-harness">SWE-bench Verified official harness</h3>
+<p>Use official SWE-bench <strong>v4.1.0</strong>, commit <strong><code>726c5461e2ef52d83cf1ea2107870a8bb3328d57</code></strong>, with our Daytona execution adapter.
+The upstream checkout remains unmodified: the adapter uses its test specifications, patch-application commands, log parsers and <code>get_eval_report</code> function.
+Fresh Daytona sandboxes run the official Linux x86_64 instance images directly, without local or nested Docker.
+This is a custom execution backend for the official test-based grader, not the upstream Docker CLI.</p>
+<p>Install the harness and adapter together in an isolated environment on the trusted launcher:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span>v4.1.0<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>https://github.com/SWE-bench/SWE-bench.git<span class="w"> </span>data/swebench-verified/upstream
+<span class="nb">test</span><span class="w"> </span><span class="s2">"</span><span class="k">$(</span>git<span class="w"> </span>-C<span class="w"> </span>data/swebench-verified/upstream<span class="w"> </span>rev-parse<span class="w"> </span>HEAD<span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>726c5461e2ef52d83cf1ea2107870a8bb3328d57
+uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.11<span class="w"> </span>data/swebench-verified/harness-venv
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>data/swebench-verified/harness-venv/bin/python<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span>data/swebench-verified/upstream<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[daytona]'</span>
+data/swebench-verified/harness-venv/bin/python<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-m<span class="w"> </span>pocketcontextagent.run.benchmarks.swebench_daytona_evaluate<span class="w"> </span>--help
+</code></pre></div>
+<p>For an existing installation, verify its revision and reuse it rather than cloning over it.
+The checkout and environment are ignored local dependencies.
+The adapter verifies the installed harness version, Git revision and tracked source before creating resources.
+Keep <code>DAYTONA_API_KEY</code> and the pinned private grading dataset on the trusted launcher.
+Only the predicted patch and that instance's official evaluation script go into a fresh grading sandbox; no provider credentials, Daytona credentials, gold solution patch or full dataset is uploaded.
+Agent coding sandboxes never receive private grading inputs.</p>
+<p>Export one prediction file and print the Daytona grading command for each method:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>export-swebench<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--runs<span class="w"> </span>runs/swebench-verified-smoke<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-dir<span class="w"> </span>data/swebench-verified<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-prefix<span class="w"> </span>swe-smoke-42<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--harness-python<span class="w"> </span>data/swebench-verified/harness-venv/bin/python
+</code></pre></div>
+<p>Exporting does not run tests or create Daytona resources.
+Public/private dataset hashes, harness revision, prediction hashes and run fingerprints are bound into the exported handoff.
+Each printed command validates the private dataset and predictions against their exported SHA-256 checksums before execution.
+Append <code>--dry-run</code> to a printed command to validate inputs and build official test specifications without contacting Daytona.
+A dry run does not establish live sandbox or test readiness.</p>
+<p>Run the printed commands on the trusted launcher when grading is authorized.
+The default is one grading sandbox at a time, with 2 CPUs, 8 GiB RAM, 10 GiB disk and a 1,800-second test timeout.
+Use <code>--max_workers</code> up to 6, and <code>--cpu</code>, <code>--memory</code>, <code>--disk</code> or <code>--timeout</code> to adjust resources after a live smoke test.
+Concurrency applies per command; running all four methods concurrently multiplies the allocation.
+The adapter pins each official image to a registry digest, records owned resources, restores the declared task base, verifies the clean checkout, and downloads test logs before cleanup.
+Grading sandboxes allow outbound networking for upstream integration tests, such as Requests tests against HTTPBin; coding sandboxes retain their network block.
+A process timeout bounds the tests, and an absolute sandbox lifetime limits orphaned compute if the launcher exits unexpectedly.</p>
+<p>Logs default to <code>logs/run_evaluation/RUN_ID/MODEL/INSTANCE_ID/</code> and include the exact <code>patch.diff</code>, <code>eval.sh</code>, test output, <code>report.json</code>, image digest and cleanup journal.
+Use <code>--logs /path/on/mounted/daytona-volume/run_evaluation</code> on a trusted Daytona controller to persist grading artifacts on its volume, then pass that same log root to the importer.
+Retain these artifacts before removing the controller or local output directory.
+Use a fresh run prefix for every execution: existing run directories are rejected to prevent stale report reuse.
+Infrastructure errors and timeouts do not publish grades; patch-application failures remain missing reports, matching upstream behavior.
+Cleanup runs on both success and failure and targets only the adapter's owned sandboxes and snapshots.
+If cleanup fails, recover the recorded resources using the per-instance <code>sandbox-cleanup.json</code> journal.</p>
+<p>Import the resulting official reports and saved patches, then compare:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>import-swebench<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--runs<span class="w"> </span>runs/swebench-verified-smoke<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--logs<span class="w"> </span>/trusted/swebench/logs/run_evaluation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-prefix<span class="w"> </span>swe-smoke-42<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>runs/swebench-verified-smoke-grades
+mini-extra<span class="w"> </span>benchmark-matrix<span class="w"> </span>compare<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--runs<span class="w"> </span>runs/swebench-verified-smoke<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--grades<span class="w"> </span>runs/swebench-verified-smoke-grades
+</code></pre></div>
+<p>Use the log root corresponding to the printed harness commands. Import binds official report instance IDs to the <strong>actual exported patches</strong>, rejecting mismatched/stale results. Retain <code>report.json</code> and <code>patch.diff</code> from the same trusted harness execution. This checks artifact consistency, not the authenticity of untrusted logs.</p>
+<p>Only official test evidence establishes <code>resolved</code>; neither <code>Submitted</code>, nonempty patches nor successful patch application is sufficient. A successfully captured, genuinely empty patch is explicitly marked <code>confirmed_empty_patch</code> and counted as a known no-op failure, not an official test evaluation. Failed patch capture blocks prediction export and requires recovery; it is never replaced with a fabricated empty patch. Report evaluation/test coverage explicitly. <strong>Missing grades mean unknown correctness</strong>, not success, and partial coverage must not be presented as a fully evaluated resolved rate. Keep every selected attempt in the denominator, including budget failures and empty predictions.</p>
+<p>For the full SWE-bench run, substitute <code>runs/swe125</code>, a fresh prefix such as <code>swe125-42</code>, and a separate grade root in all three commands.</p>
+<h3 id="browsecomp-plus-existing-judge">BrowseComp-Plus existing judge</h3>
+<p>Use the pinned official BrowseComp-Plus judge and existing per-method evaluation procedure in <a href="../context_comparison/#grade-and-compare">Grade and compare</a>. Grading is separate from matrix execution and has its own model/compute requirements. Pass the resulting grade parent, containing grades for all four methods, to the unchanged comparison interface:</p>
+<div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>browsecomp-plus<span class="w"> </span>compare<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--runs<span class="w"> </span>runs/browsecomp-plus-smoke<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--grades<span class="w"> </span>PATH_TO_BCP_SMOKE_GRADE_ROOT
+</code></pre></div>
+<p>The generic alias also supports <code>mini-extra benchmark-matrix compare --runs ROOT --grades ROOT</code>; the old <code>mini-extra browsecomp-plus compare</code> interface remains supported. Compare each benchmark separately: their graders and correctness definitions differ. Do not pool their correctness scores into a single purported benchmark score. Without <code>--grades</code>, comparison can report resource usage, but correctness remains unknown.</p>
+<h2 id="ready-to-run-handoff">Ready-to-run handoff</h2>
+<ol>
+<li>Prepare public data and verify local configuration, credentials, snapshot/image prerequisites and quotas. Run the <strong>one-task SWE-bench dry-run</strong> above; it must not call an API or provision infrastructure.</li>
+<li>With explicit spending approval, launch <strong>one task across all four methods per benchmark</strong>, using the separate smoke output roots. Inspect retained failures, all four method artifacts, resource accounting and cleanup; grade separately and verify coverage.</li>
+<li>Stop for review. Only after accepting both smoke results and the budget should you create the 120-worker BrowseComp-Plus pool and authorize the full <strong>150 + 125 task / 1,100 attempt</strong> allocation by removing <code>--dry-run</code>. Preparing these instructions does not authorize or launch that paid evaluation.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+                
+
+
+<div class="floating-bubbles">
+<div class="floating-bubbles-title">Our projects</div>
+  <a href="https://swe-agent.com/" class="bubble" title="SWE-agent">
+    <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/sweagent_logo.svg" alt="SWE-agent">
+    <span class="bubble-tooltip">SWE-agent</span>
+  </a>
+  <a href="https://swe-rex.com/" class="bubble" title="SWE-rex">
+    <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/swerex_logo.svg" alt="SWE-rex">
+    <span class="bubble-tooltip">SWE-ReX</span>
+  </a>
+  <a href="https://swesmith.com" class="bubble" title="SWE-smith">
+    <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/swesmith_logo.png" alt="SWE-smith">
+    <span class="bubble-tooltip">SWE-smith</span>
+  </a>
+  <a href="https://swebench.com" class="bubble" title="SWE-bench">
+    <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/swebench_logo.png" alt="SWE-bench">
+    <span class="bubble-tooltip">SWE-bench</span>
+  </a>
+  <a href="https://codeclash.ai" class="bubble" title="CodeClash">
+    <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/codeclash_logo.svg" alt="CodeClash">
+    <span class="bubble-tooltip">CodeClash</span>
+  </a>
+  <a href="https://www.swebench.com/sb-cli/" class="bubble" title="sb-cli">
+    <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/sbcli_logo.svg" alt="sb-cli">
+    <span class="bubble-tooltip">sb-cli</span>
+  </a>
+</div>
+
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden="">
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer">
+        
+          
+          <a href="../context_comparison/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Context-method comparison">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Context-method comparison
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../benchmark_controller/" class="md-footer__link md-footer__link--next" aria-label="Next: Trusted cloud controller">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Trusted cloud controller
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"></path></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.indexes", "navigation.top", "content.action.edit", "navigation.footer", "content.code.copy", "content.footnote.tooltips", "header.autohide", "announce.dismiss", "content.code.annotate", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../../assets/js/sh-annotation.js"></script>
+      
+        <script src="../../assets/js/gif-controls.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html><!-- Floating Bubbles -->

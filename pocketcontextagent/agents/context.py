@@ -515,7 +515,10 @@ class ContextManager:
     def _selection_hint(self) -> str:
         blocks = list(self.trigger["blocks"]) if self.trigger else []
         return "Eligible IDs: " + (
-            ", ".join(blocks[:16]) + ("; see catalog for more" if len(blocks) > 16 else "") if blocks else "none"
+            ", ".join(f"{block} (position {position})" for position, block in enumerate(blocks[:16], 1))
+            + ("; see catalog for more" if len(blocks) > 16 else "")
+            if blocks
+            else "none"
         )
 
     def _select(self, action: dict) -> list[str]:
@@ -530,7 +533,8 @@ class ContextManager:
                 block = self.trigger["blocks"].get(action.get(field))
                 if not block:
                     raise SelectionError(
-                        f"Unknown, stale or protected {field}={action.get(field)!r}. {self._selection_hint()}"
+                        f"Unknown, stale or protected {field}={action.get(field)!r}. "
+                        f"Use block_id values, not positions or archive tags. {self._selection_hint()}"
                     )
                 positions.append(ids.index(block[0 if field == "start_id" else -1]))
         else:
@@ -548,7 +552,16 @@ class ContextManager:
                 positions.append(matches[0])
         start, end = positions
         if start > end:
-            raise SelectionError(f"Reversed selection: start must precede end. {self._selection_hint()}")
+            detail = "start must precede end"
+            if "start_id" in action:
+                blocks = list(self.trigger["blocks"])
+                detail = "; ".join(
+                    f"{field}={action[field]} is at position {blocks.index(action[field]) + 1}"
+                    for field in ("start_id", "end_id")
+                )
+            raise SelectionError(
+                f"Reversed selection: {detail}. Select endpoints in catalog order. {self._selection_hint()}"
+            )
         selected = ids[start : end + 1]
         try:
             self._validate_selection(selected, ids, self.records)
@@ -576,7 +589,10 @@ class ContextManager:
     def _archive(self, db, tag: str) -> tuple[dict, list[dict], list[str]]:
         row = db.execute("SELECT record FROM blocks WHERE run_id = ? AND tag = ?", (self.run_id, tag)).fetchone()
         if row is None:
-            raise SelectionError(f"No archive for {tag} in this run. Choose an existing summary tag from this run.")
+            raise SelectionError(
+                f"No archive for {tag} in this run. Available archive tags: {', '.join(self._archive_tags(db)) or 'none'}. "
+                "Use archive tags, not block IDs."
+            )
         block = json.loads(row[0])
         if block["version"] not in (1, 2):
             raise SelectionError("Unsupported archive version; use a compatible agent to read this block.")

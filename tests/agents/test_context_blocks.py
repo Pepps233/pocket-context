@@ -127,6 +127,33 @@ def test_expansions_get_distinct_complete_block_ids(tmp_path, api):
     assert read_blocks(agent)[1]["children"] == ["ctx-0001"]
 
 
+def test_reversed_selection_reports_positions_and_allows_explicit_retry(tmp_path, api):
+    agent = make_agent(tmp_path, api)
+    agent.model.config.outputs[1] = native_turn(
+        "bash", {"command": "printf 'retained evidence'; printf '%03000d' 1"}, "c", "Retain evidence", api
+    )
+    start_history(agent)
+    next_turn(agent, "bash", {"command": "echo latest evidence"}, "latest", api)
+    next_turn(agent, "compact_block", {"start_id": "b001", "end_id": "b001"}, "compact", api)
+    blocks = agent.context.eligible_blocks()
+    before = list(agent.context.active)
+    result = next_turn(agent, "compact_block", {"start_id": "b002", "end_id": "b003"}, "reversed", api)
+    diagnostic = get_content_string(result[0])
+    assert "start_id=b002 is at position 2; end_id=b003 is at position 1" in diagnostic
+    assert "Select endpoints in catalog order" in diagnostic
+    assert "Eligible IDs: b003 (position 1), b002 (position 2)" in diagnostic
+    assert agent.context.active[: len(before)] == before
+    assert agent.context.revision == 1 and len(agent.compactions) == 1
+    result = next_turn(agent, "compact_block", {"start_id": "ctx-0001", "end_id": "b002"}, "wrong-kind", api)
+    assert "Use block_id values, not positions or archive tags" in get_content_string(result[0])
+    assert agent.context.active[: len(before)] == before
+    assert agent.context.revision == 1 and len(agent.compactions) == 1
+    assert "Compacted [ctx-0002]" in get_content_string(
+        next_turn(agent, "compact_block", {"start_id": "b003", "end_id": "b002"}, "retry", api)[0]
+    )
+    assert read_blocks(agent)[1]["selection_order"] == blocks["b003"] + blocks["b002"]
+
+
 def test_legacy_decoded_commands_ignore_failed_control_arguments(tmp_path, api):
     command = "printf '%s' 'escaped \"command\" \\path'; printf '%03000d' 0"
     agent = make_agent(tmp_path, api)

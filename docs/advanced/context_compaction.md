@@ -26,6 +26,7 @@ Protected gaps are marked in the catalog, and a selected range must not cross th
 The framework resolves the inclusive range and rejects unknown, stale, or protected IDs.
 IDs remain stable while their messages remain active; compacted IDs disappear and expanded exchanges receive fresh IDs.
 Errors list eligible IDs or identify the required complete exchange.
+Reversed selections report both endpoint positions and require an explicit retry in catalog order; endpoints are never swapped automatically.
 Instructions, the latest genuine user request, and the latest model response and its results are protected.
 A rejected selection returns a tool error and leaves active context intact.
 A mixed tool batch rejects every call before executing any command.
@@ -70,6 +71,7 @@ Call `expand_block` with one canonical tag from the current run:
 The catalog lists available archives separately from eligible live blocks, including archives whose summaries have been compacted again.
 Choose an existing archive tag from that list; block IDs and chronological positions are not archive tags.
 Ordinary live exchanges have no archive because their content is already visible.
+An unknown archive tag returns the available archive tags for this run, or `none` when no archives exist.
 
 Expansion keeps the existing summary in place and appends a tool receipt followed by the block's local archived messages in their original order.
 It returns complete archived text and tool results, preferring saved raw output over truncated observation text.

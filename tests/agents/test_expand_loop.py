@@ -182,11 +182,18 @@ def test_repeated_expansion_selection_and_idempotency(tmp_path, api):
 def test_bad_tags_and_run_isolation(tmp_path, api, tag, expected):
     agent = compacted_agent(tmp_path, api)
     before = len(agent.context.active)
-    assert expected in get_content_string(next_turn(agent, "expand_block", {"tag": tag}, "bad", api)[0])
+    diagnostic = get_content_string(next_turn(agent, "expand_block", {"tag": tag}, "bad", api)[0])
+    assert expected in diagnostic
+    if expected == "No archive":
+        assert "Available archive tags: ctx-0001." in diagnostic
     assert len(agent.context.active) == before + 2 and not expanded_records(agent)
     other = make_agent(tmp_path, api)
-    assert "No archive" in get_content_string(next_turn(other, "expand_block", {"tag": "ctx-0001"}, "other", api)[0])
+    diagnostic = get_content_string(next_turn(other, "expand_block", {"tag": "ctx-0001"}, "other", api)[0])
+    assert "No archive" in diagnostic and "Available archive tags: none." in diagnostic
     assert not expanded_records(other) and not other.context.expansions
+    assert "Expanded [ctx-0001]" in get_content_string(
+        next_turn(agent, "expand_block", {"tag": "ctx-0001"}, "recover", api)[0]
+    )
 
 
 def test_conflicts_and_storage_rollback(tmp_path, api):

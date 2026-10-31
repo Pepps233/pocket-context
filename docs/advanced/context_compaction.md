@@ -50,7 +50,12 @@ The receipt reports the tag and measured character reduction.
 It identifies the same archive as the earlier memory, not a second memory or a reused tag.
 Summaries and expanded historical messages may be compacted again; earlier archives and their direct references remain available.
 
-Summaries retain important facts, source identifiers, uncertainty, and brief outcomes of unsuccessful approaches.
+Pocket Context summaries use a decision record with sections for the current patch, established facts, failed approaches, test results, open questions, and next action.
+Empty or inapplicable sections are omitted, and next actions must be supported by the selected history.
+Summaries distinguish applied edits from proposals, observed test outcomes from unrun checks, and abandoned attempts from untested ideas.
+Consequential decisions retain their reasons and supporting evidence so the agent can avoid repeating settled investigation.
+The prompt targets 150-300 words while allowing extra space for essential patch or verification details; this is guidance, not a truncation limit.
+These instructions apply to Pocket Context's compaction agent; the comparison methods retain their own summarization prompts.
 Earlier context only resolves references; task instructions, answer formats, counters, context-management history, and exhaustive search logs are omitted from the summary.
 An unsuccessful search does not rule out a lead or make its archive unhelpful.
 Archive identity and provenance come from framework headers rather than generated prose.

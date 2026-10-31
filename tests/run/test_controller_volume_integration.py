@@ -10,6 +10,7 @@ from contextlib import closing
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from pocketcontextagent.run.benchmarks.benchmark_controller import app
@@ -485,7 +486,7 @@ def test_only_controller_params_mount_real_volume_and_coding_has_no_secrets(volu
 def test_volume_commands_and_flags_have_offline_help(arguments: list[str], expected: tuple[str, ...]) -> None:
     result = CliRunner().invoke(app, arguments, color=False, env={"COLUMNS": "160"})
     assert result.exit_code == 0, result.output
-    assert all(text in result.output for text in expected)
+    assert all(text in unstyle(result.output) for text in expected)
 
 
 def test_volume_delete_without_destructive_confirmation_fails_before_client() -> None:

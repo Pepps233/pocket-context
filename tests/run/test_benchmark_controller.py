@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from click import unstyle
 from typer.testing import CliRunner
 
 from pocketcontextagent.comparisons.registry import METHODS
@@ -268,7 +269,7 @@ def test_submit_worker_bounds_are_cli_errors_before_io(tmp_path: Path, workers: 
         app, ["submit", "--data-dir", str(tmp_path / "missing"), "--workers-per-method", str(workers), "--dry-run"]
     )
     assert result.exit_code == 2
-    assert "workers-per-method" in result.output
+    assert "workers-per-method" in unstyle(result.output)
     assert not list(tmp_path.iterdir())
 
 

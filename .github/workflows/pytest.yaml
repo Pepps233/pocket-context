@@ -80,7 +80,7 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Install dependencies
         run: |
-            uv pip install --python ${Python_ROOT_DIR} -e '.[full,browsecomp-plus]'
+            uv pip install --python ${Python_ROOT_DIR} -e '.[full,browsecomp-plus,daytona]'
       - name: Configure mini-swe-agent
         run: |
           mini-extra config set MSWEA_CONFIGURED 'true'

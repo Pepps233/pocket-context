@@ -82,6 +82,36 @@ def prepare_httpbin(sandbox: "Sandbox", instance: dict, directory: Path) -> str:
     return "HTTPBIN_URL=http://localhost/ NO_PROXY=localhost,127.0.0.1 "
 
 
+def prepare_timeout_network(sandbox: "Sandbox", instance: dict, directory: Path) -> None:
+    """Provide the unreachable TCP endpoint expected by Requests' timeout tests."""
+    if instance["repo"] != "psf/requests" or instance["version"] not in {"2.4", "2.9"}:
+        return
+    setup = """set -eu
+grep -q '10.255.255.1' /testbed/test_requests.py
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends iptables
+iptables -w 5 -A OUTPUT -d 10.255.255.1/32 -p tcp --dport 80 -j DROP
+iptables-save
+dpkg-query -W iptables
+/opt/miniconda3/envs/testbed/bin/python - <<'PY'
+import errno, json, socket, time
+for _ in range(3):
+    with socket.socket() as connection:
+        connection.settimeout(0.1)
+        start = time.monotonic()
+        result = connection.connect_ex(('10.255.255.1', 80))
+        elapsed = time.monotonic() - start
+        print(json.dumps({'errno': result, 'elapsed': elapsed}))
+        assert result in (errno.EAGAIN, errno.ETIMEDOUT) and elapsed >= 0.08
+PY
+"""
+    (directory / "timeout-network-setup.sh").write_text(setup)
+    response = sandbox.process.exec("/bin/bash -c " + quote(setup), cwd="/tmp", timeout=300)
+    (directory / "timeout-network-setup.log").write_text(response.result)
+    if response.exit_code != 0:
+        raise RuntimeError("TCP timeout fixture setup failed; see timeout-network-setup.log")
+
+
 def verify_harness() -> None:
     import swebench
 
@@ -227,6 +257,11 @@ def evaluate(
             (directory / "status.json").write_text(json.dumps({"state": "patch_application_failed"}))
             return
         fixture_environment = prepare_httpbin(sandbox, instance, directory)
+        prepare_timeout_network(sandbox, instance, directory)
+        if instance["repo"] == "sphinx-doc/sphinx":
+            reporting = {"PYTEST_ADDOPTS": "-rA", "TOX_OVERRIDE": "testenv.pass_env+=PYTEST_ADDOPTS"}
+            (directory / "test-reporting-environment.json").write_text(json.dumps(reporting))
+            fixture_environment += " ".join(f"{key}={quote(value)}" for key, value in reporting.items()) + " "
         sandbox.fs.upload_file(spec.eval_script.encode(), "/eval.sh")
         sandbox.process.create_session("evaluation")
         command = sandbox.process.execute_session_command(

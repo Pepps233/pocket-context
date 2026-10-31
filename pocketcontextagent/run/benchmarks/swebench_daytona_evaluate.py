@@ -262,6 +262,9 @@ def evaluate(
             reporting = {"PYTEST_ADDOPTS": "-rA", "TOX_OVERRIDE": "testenv.pass_env+=PYTEST_ADDOPTS"}
             (directory / "test-reporting-environment.json").write_text(json.dumps(reporting))
             fixture_environment += " ".join(f"{key}={quote(value)}" for key, value in reporting.items()) + " "
+        if instance["repo"] == "django/django" and instance["version"] in {"1.11", "2.2"}:
+            (directory / "test-runtime-environment.json").write_text(json.dumps({"PYTHONPATH": "/testbed"}))
+            fixture_environment += "PYTHONPATH=/testbed "
         sandbox.fs.upload_file(spec.eval_script.encode(), "/eval.sh")
         sandbox.process.create_session("evaluation")
         command = sandbox.process.execute_session_command(

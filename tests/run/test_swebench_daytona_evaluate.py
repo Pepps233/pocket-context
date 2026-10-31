@@ -1,15 +1,46 @@
 import hashlib
 import json
+import subprocess
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.swebench_daytona_evaluate import load_inputs, publish_journal, publish_report
+from pocketcontextagent.run.benchmarks.swebench_daytona_evaluate import (
+    grading_preflight_command,
+    load_inputs,
+    publish_journal,
+    publish_report,
+)
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import ResourceJournal
 from pocketcontextagent.run.benchmarks.utils.swebench_verified import import_official_results
 
 
 def prediction() -> dict:
     return {"instance_id": "psf__requests-1", "model_name_or_path": "org/model", "model_patch": "a patch\n"}
+
+
+def test_grading_preserves_official_setup_commit_and_rejects_other_states(tmp_path):
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(tmp_path), *args], text=True).strip()
+
+    def preflight(base):
+        return subprocess.run(["bash", "-c", grading_preflight_command(base)], cwd=tmp_path).returncode
+
+    git("init")
+    git("config", "user.name", "SWE-bench")
+    git("config", "user.email", "setup@swebench.config")
+    (tmp_path / "tox.ini").write_text("pytest\n")
+    git("add", "tox.ini")
+    git("commit", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    assert preflight(base) == 0
+    (tmp_path / "tox.ini").write_text("pytest -rA\n")
+    assert preflight(base) != 0
+    git("commit", "-am", "SWE-bench")
+    assert preflight(base) == 0
+    assert (tmp_path / "tox.ini").read_text() == "pytest -rA\n"
+    assert preflight("a" * 40) != 0
+    git("commit", "--allow-empty", "-m", "unexpected")
+    assert preflight(base) != 0
 
 
 def test_published_journal_preserves_local_recovery_evidence(tmp_path):

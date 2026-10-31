@@ -15,7 +15,6 @@ from uuid import uuid4
 import typer
 from dotenv import load_dotenv
 
-from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
     ResourceJournal,
     RuntimeConfig,
@@ -125,6 +124,16 @@ def evaluation_command(timeout: int) -> str:
     return f"timeout --signal=TERM --kill-after=10s {timeout}s /bin/bash /eval.sh > /tmp/pca-test-output.txt 2>&1"
 
 
+def grading_preflight_command(base_commit: str) -> str:
+    """Validate the official image without discarding its harness preparation."""
+    return (
+        'test "$(pwd -P)" = "$(git rev-parse --show-toplevel)" && '
+        "git diff --quiet HEAD && "
+        f'{{ test "$(git rev-parse HEAD)" = {quote(base_commit)} || '
+        f'test "$(git rev-parse HEAD^)" = {quote(base_commit)}; }}'
+    )
+
+
 def publish_report(spec: "TestSpec", pred: dict, directory: Path, exit_code: int) -> dict:
     from swebench.harness.grading import get_eval_report
 
@@ -180,26 +189,30 @@ def evaluate(
         journal.record("sandboxes", name, id=sandbox.id, phase="running")
         journal.record("sandboxes", name, lifecycle=sandbox_metadata(api.get(sandbox.id).model_dump(), runtime))
         publish_journal(journal, directory)
-        initial = sandbox.process.exec("git rev-parse HEAD && git status --porcelain", cwd="/testbed", timeout=60)
+        initial = sandbox.process.exec(
+            "git rev-parse HEAD && git status --porcelain && git log -2 --format=fuller",
+            cwd="/testbed",
+            timeout=60,
+        )
         (directory / "initial-repository-state.log").write_text(initial.result)
 
-        def command_backend(command: str, *, cwd: str, timeout: int) -> dict:
-            response = sandbox.process.exec(command, cwd=cwd, timeout=timeout)
-            return {"output": response.result, "returncode": response.exit_code}
-
-        environment = SWEBenchVerifiedEnvironment(command_backend, base_commit=instance["base_commit"])
-        environment.prepare(fresh_isolated=True)
         check = sandbox.process.exec(
             "/bin/bash -c "
             + quote(
                 'test "$(uname -m)" = x86_64 && command -v timeout && '
-                f'test "$(git -C /testbed rev-parse HEAD)" = {quote(instance["base_commit"])} && '
-                'test -z "$(git -C /testbed status --porcelain)"'
+                + grading_preflight_command(instance["base_commit"])
             ),
+            cwd="/testbed",
             timeout=60,
         )
         if check.exit_code != 0:
             raise RuntimeError(f"Grading sandbox failed base-image validation: {check.result}")
+        prepared = sandbox.process.exec(
+            f"git diff --binary {quote(instance['base_commit'])}", cwd="/testbed", timeout=60
+        )
+        if prepared.exit_code != 0:
+            raise RuntimeError(f"Could not capture official image preparation: {prepared.result}")
+        (directory / "image-preparation.diff").write_text(prepared.result)
         sandbox.fs.upload_file(pred["model_patch"].encode(), "/tmp/patch.diff")
         applied = False
         patch_log = ""

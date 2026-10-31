@@ -21,7 +21,12 @@ import yaml
 
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
-from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.registry import (
+    METHODS,
+    configure_context_window,
+    configure_method,
+    method_provenance,
+)
 from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment
@@ -112,11 +117,12 @@ def pin_instances(instances: list[dict], images: dict[str, str] | None) -> list[
     return result
 
 
-def benchmark_config(config_spec: list[str]) -> dict:
+def benchmark_config(config_spec: list[str], context_window: int | None = None) -> dict:
     config = recursive_merge(
         get_config_from_spec("swebench_verified_context"),
         *[get_config_from_spec(spec) for spec in config_spec or ["context_benchmark_deepseek"]],
     )
+    configure_context_window(config, context_window)
     if config.get("benchmark") != "swebench-verified":
         raise ValueError("The coding connector requires benchmark=swebench-verified")
     allowed = {"cwd", "timeout", "research_tools", "context_tools"}
@@ -279,11 +285,12 @@ def run_matrix(
     workers_per_method: int,
     preflight: bool = False,
     method: str | None = None,
+    context_window: int | None = None,
 ) -> None:
     if method is not None and method not in METHODS:
         raise ValueError(f"Unknown method: {method}")
     methods = [method] if method is not None else list(METHODS)
-    config = benchmark_config(config_spec)
+    config = benchmark_config(config_spec, context_window)
     instances = pin_instances(
         load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed, split=split), config.get("task_images")
     )
@@ -293,6 +300,7 @@ def run_matrix(
         raise ValueError("Select 1 to 30 workers per method")
     selection = {
         "benchmark": "swebench-verified",
+        "context_token_limit": config["agent"]["context_token_limit"],
         "methods": methods,
         "implementation_sha256": implementation_hash(),
         "queries_sha256": hashlib.sha256((data_dir / "queries.jsonl").read_bytes()).hexdigest(),

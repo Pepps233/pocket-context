@@ -14,7 +14,13 @@ from dotenv import load_dotenv
 
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
-from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.registry import (
+    CONTEXT_WINDOW_HELP,
+    METHODS,
+    configure_context_window,
+    configure_method,
+    method_provenance,
+)
 from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
@@ -137,6 +143,7 @@ def run(
     model_class: str | None = typer.Option(None, help="Existing model interface, e.g. litellm or openrouter."),
     method: str | None = typer.Option(None, help="Context strategy: pocket_context, react, resum, or acm."),
     config_spec: list[str] = typer.Option([], "-c", "--config", help="YAML or key=value overrides, merged in order."),
+    context_window: int | None = typer.Option(None, min=1, help=CONTEXT_WINDOW_HELP),
     query_id: list[str] = typer.Option([], help="Run only these query IDs (repeatable)."),
     offset: int = typer.Option(0, min=0, help="Skip this many selected queries."),
     limit: int = typer.Option(0, min=0, help="Maximum selected queries; 0 runs all."),
@@ -151,6 +158,7 @@ def run(
     config = recursive_merge(
         get_config_from_spec(DEFAULT_CONFIG), *[get_config_from_spec(spec) for spec in config_spec]
     )
+    configure_context_window(config, context_window)
     config["model"]["model_name"] = get_model_name(model, config["model"])
     if model_class:
         config["model"]["model_class"] = model_class

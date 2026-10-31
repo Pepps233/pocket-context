@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 
 from pocketcontextagent.comparisons.registry import METHODS
 from pocketcontextagent.config import builtin_config_dir
-from pocketcontextagent.run.benchmarks.benchmark_controller import app, validate_remote_plan
+from pocketcontextagent.run.benchmarks.benchmark_controller import app, submission_plan, validate_remote_plan
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import app as matrix_app
 from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
 from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import app as corpus_app
@@ -59,6 +59,39 @@ def credential_free_env() -> dict:
     return {key: None for key in os.environ if key.endswith("_API_KEY")} | {"MSWEA_SILENT_STARTUP": "1"}
 
 
+def test_context_window_survives_frozen_config_upload(prepared: Path, tmp_path: Path):
+    config, plan = submission_plan(prepared, [], 4, 42, 6, [], context_window=64000)
+    frozen = tmp_path / "frozen.yaml"
+    frozen.write_text(yaml.safe_dump(config))
+    result = CliRunner().invoke(
+        matrix_app,
+        [
+            "matrix",
+            "--benchmark",
+            "swebench-verified",
+            "--data-dir",
+            str(prepared),
+            "--limit",
+            "4",
+            "--seed",
+            "42",
+            "--workers-per-method",
+            "6",
+            "-c",
+            str(frozen),
+            "--dry-run",
+        ],
+        env=credential_free_env(),
+    )
+    assert result.exit_code == 0, result.output
+    remote = yaml.safe_load(result.stdout)
+    assert remote["context_token_limit"] == 64000
+    plan.update(attempts=plan["planned_attempts"], preflight_only=False)
+    validate_remote_plan(plan, remote)
+    with pytest.raises(ValueError, match="context_token_limit"):
+        validate_remote_plan(plan, remote | {"context_token_limit": 128000})
+
+
 @pytest.fixture
 def prepared_corpus(tmp_path: Path) -> Path:
     ids = json.loads((builtin_config_dir / "benchmarks/browsecomp_plus_eval150.json").read_text())["query_ids"][:8]
@@ -83,6 +116,8 @@ def test_single_method_submission_matches_cloud_cli_without_resources(
         "42",
         "--method",
         method,
+        "--context-window",
+        "64000",
         "--dry-run",
         *(["--preflight"] if preflight else []),
     ]
@@ -97,13 +132,21 @@ def test_single_method_submission_matches_cloud_cli_without_resources(
     assert submitted.exit_code == remote.exit_code == 0, submitted.output + remote.output
     local_plan, remote_plan = yaml.safe_load(submitted.stdout), yaml.safe_load(remote.stdout)
     validate_remote_plan(local_plan, remote_plan)
+    assert local_plan["context_token_limit"] == remote_plan["context_token_limit"] == 64000
     assert local_plan["methods"] == [method]
     assert local_plan["workers_per_method"] == local_plan["active_workers_per_method"] == 6
     assert local_plan["maximum_active_sandboxes"] == 6
     assert local_plan["planned_attempts"] == 8 and local_plan["attempts"] == (0 if preflight else 8)
     assert PRIVATE not in submitted.stdout + remote.stdout
     assert [path.name for path in prepared_corpus.iterdir()] == ["queries.jsonl"]
-    for key in ("methods", "workers_per_method", "maximum_active_sandboxes", "queries_sha256", "implementation_sha256"):
+    for key in (
+        "methods",
+        "workers_per_method",
+        "maximum_active_sandboxes",
+        "queries_sha256",
+        "implementation_sha256",
+        "context_token_limit",
+    ):
         with pytest.raises(ValueError, match=key):
             validate_remote_plan(local_plan, remote_plan | {key: None})
 
@@ -164,6 +207,8 @@ def test_submit_dry_run_matches_seeded_matrix_without_controller_or_credentials(
         "4",
         "--workers-per-method",
         str(workers),
+        "--context-window",
+        "64000",
         "--dry-run",
         *(["--preflight"] if preflight else []),
     ]
@@ -177,6 +222,8 @@ def test_submit_dry_run_matches_seeded_matrix_without_controller_or_credentials(
     )
     assert matrix.exit_code == 0, matrix.output
     selection = yaml.safe_load(matrix.stdout)
+    validate_remote_plan(plan, selection)
+    assert plan["context_token_limit"] == selection["context_token_limit"] == 64000
     assert (
         plan["selected_query_ids"]
         == selection["selected_query_ids"]

@@ -43,7 +43,21 @@ METHODS = {
     ),
 }
 
+CONTEXT_WINDOW_HELP = (
+    "Shared context budget in tokens, including output; overrides agent.context_token_limit in configs."
+)
+
+
+def configure_context_window(config: dict, context_window: int | None = None) -> dict:
+    if context_window is not None:
+        if type(context_window) is not int or context_window <= 0:
+            raise ValueError("Context window must be a positive integer")
+        config.setdefault("agent", {})["context_token_limit"] = context_window
+    return config
+
+
 METHOD_AGENT_FIELDS = {
+    "context_token_limit",
     "resum_trigger_ratio",
     "resum_headroom_tokens",
     "resum_summary_token_limit",

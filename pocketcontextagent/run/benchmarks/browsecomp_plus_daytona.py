@@ -21,7 +21,13 @@ import typer
 import yaml
 from dotenv import load_dotenv
 
-from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.registry import (
+    CONTEXT_WINDOW_HELP,
+    METHODS,
+    configure_context_window,
+    configure_method,
+    method_provenance,
+)
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION, load_instances
 from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
@@ -438,11 +444,13 @@ def matrix_query_bytes(instances: list[dict]) -> bytes:
     return "".join(json.dumps(instance, ensure_ascii=False) + "\n" for instance in instances).encode()
 
 
-def matrix_config(config_spec: list[str]) -> dict:
-    return recursive_merge(
+def matrix_config(config_spec: list[str], context_window: int | None = None) -> dict:
+    config = recursive_merge(
         get_config_from_spec("browsecomp_plus"),
         *[get_config_from_spec(spec) for spec in (config_spec or ["browsecomp_plus_deepseek"])],
     )
+
+    return configure_context_window(config, context_window)
 
 
 def matrix_provider_key(config: dict) -> str:
@@ -654,6 +662,7 @@ def run_matrix(
     limit: int = typer.Option(1, min=0, help="Questions per method; 0 selects the entire split."),
     seed: int | None = typer.Option(None, help="Sample once without replacement using this random seed."),
     config_spec: list[str] = typer.Option([], "-c", "--config", help="Shared overrides; defaults to direct DeepSeek."),
+    context_window: int | None = typer.Option(None, min=1, help=CONTEXT_WINDOW_HELP),
     output: Path = typer.Option(Path("runs/browsecomp-plus/matrix")),
     dry_run: bool = typer.Option(False, help="Validate selection/config only; no API calls or writes."),
     workers_per_method: int = typer.Option(
@@ -681,6 +690,7 @@ def run_matrix(
             limit=limit,
             seed=seed,
             config_spec=config_spec,
+            context_window=context_window,
             output=Path("runs/swebench-verified/matrix") if output == Path("runs/browsecomp-plus/matrix") else output,
             dry_run=dry_run,
             workers_per_method=workers_per_method,
@@ -696,7 +706,7 @@ def run_matrix(
         raise ValueError("Use the check command for a precreated corpus pool")
     split = split or "development680"
     instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_id, limit, seed)
-    config = matrix_config(config_spec)
+    config = matrix_config(config_spec, context_window)
     for method in METHODS:
         configure_method(config, method)
     provider_key = matrix_provider_key(config)
@@ -704,6 +714,7 @@ def run_matrix(
         "split": split,
         "seed": seed,
         "model": config["model"]["model_name"],
+        "context_token_limit": config["agent"]["context_token_limit"],
         "workers_per_method": workers_per_method,
         "active_workers_per_method": min(workers_per_method, len(instances)),
         "selected_query_ids": [instance["query_id"] for instance in instances],

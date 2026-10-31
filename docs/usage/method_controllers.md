@@ -41,6 +41,35 @@ done
 Each plan records exactly one entry in `methods`, six `maximum_active_sandboxes`, and 150 `planned_attempts`.
 Submission checks the remote method, concurrency, cohort hash, implementation and other execution settings against this plan before launching the workload.
 
+## Switch the context window
+
+Use `--context-window 64000` to set the shared working context budget for a new run.
+Use `--context-window 128000` to select 128K instead.
+The value is an exact token count including the next response allowance, not a cumulative token budget across calls.
+
+```bash
+mini-extra benchmark-controller submit \
+  --benchmark swebench-verified --data-dir data/swebench-verified \
+  --limit 125 --seed 42 --workers-per-method 6 \
+  -c context_benchmark_deepseek -c context_full_swebench \
+  --context-window 64000 --dry-run
+```
+
+This prints a local plan without creating sandboxes or running inference.
+Use the same option on each method's submission when using separate controllers.
+The option is also available on `browsecomp-plus daytona matrix`, `browsecomp-plus run`, and the corpus controller worker CLI.
+
+`agent.context_token_limit` remains the single configuration value consumed by the agents.
+The CLI option overrides that value after all `-c` profiles are merged; omitting the option preserves the configured limit, which defaults to 128,000 in the benchmark profiles.
+You can also put `agent: {context_token_limit: 64000}` in a shared YAML override.
+All method system prompts are generated from the effective value; memory tool descriptions have no separate context-window setting to edit.
+Runtime context checks and auxiliary model calls use this same limit, while each method retains its existing compaction policy and summary output allowance.
+
+Dry-run plans show `context_token_limit`, and controller submission checks that the remote plan agrees.
+Saved run configurations and method provenance record the effective limit.
+Changing the limit applies to new runs; it does not update existing controller jobs or historical results.
+Use fresh run outputs for a different context budget so the experiment remains distinguishable.
+
 ## Create controllers when authorized
 
 These commands create billable infrastructure; they are instructions for a later authorized deployment.

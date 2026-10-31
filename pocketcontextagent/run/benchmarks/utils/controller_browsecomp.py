@@ -15,7 +15,7 @@ import typer
 import yaml
 
 from pocketcontextagent import __version__
-from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.registry import CONTEXT_WINDOW_HELP, METHODS, configure_method, method_provenance
 from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
 from pocketcontextagent.models import get_model
 from pocketcontextagent.run.benchmarks.benchmark_matrix import archive_trajectories
@@ -148,6 +148,7 @@ def plan(
     query_ids: list[str],
     split: str = "eval150",
     method: str | None = None,
+    context_window: int | None = None,
 ) -> tuple[dict, dict]:
     if not 1 <= workers <= 30:
         raise ValueError("Select 1 to 30 workers per method")
@@ -155,7 +156,7 @@ def plan(
         raise ValueError(f"Unknown method: {method}; select one of {', '.join(METHODS)}")
     methods = [method] if method is not None else list(METHODS)
     instances = select_matrix_instances(data_dir / "queries.jsonl", split, query_ids, limit, seed)
-    config = matrix_config(config_spec)
+    config = matrix_config(config_spec, context_window)
     matrix_provider_key(config)
     if "api_key" in config["model"].get("model_kwargs", {}):
         raise ValueError("Keep provider keys outside saved configurations")
@@ -176,6 +177,7 @@ def plan(
         "query_ids": query_ids,
         "implementation_sha256": implementation_hash(),
         "model": config["model"]["model_name"],
+        "context_token_limit": config["agent"]["context_token_limit"],
         "workers_per_method": workers,
         "active_workers_per_method": active,
         "methods": methods,
@@ -304,8 +306,11 @@ def run_matrix(
     wheel: Path | None = None,
     dry_run: bool = False,
     preflight: bool = False,
+    context_window: int | None = None,
 ) -> None:
-    config, selection = plan(data_dir, config_spec, limit, seed, workers_per_method, query_ids or [], split, method)
+    config, selection = plan(
+        data_dir, config_spec, limit, seed, workers_per_method, query_ids or [], split, method, context_window
+    )
     methods = selection["methods"]
     selection.update(snapshot={"name": snapshot}, preflight_only=preflight)
     if preflight:
@@ -462,6 +467,7 @@ def main(
     data_dir: Path = typer.Option(...),
     output: Path = typer.Option(...),
     config_spec: list[str] = typer.Option([], "-c", "--config"),
+    context_window: int | None = typer.Option(None, min=1, help=CONTEXT_WINDOW_HELP),
     limit: int = 0,
     seed: int = 42,
     workers_per_method: int | None = typer.Option(
@@ -479,6 +485,7 @@ def main(
         data_dir=data_dir,
         output=output,
         config_spec=config_spec,
+        context_window=context_window,
         limit=limit,
         seed=seed,
         workers_per_method=workers_per_method if workers_per_method is not None else (6 if method is not None else 10),

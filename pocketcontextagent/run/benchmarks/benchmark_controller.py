@@ -14,7 +14,7 @@ from uuid import uuid4
 import typer
 import yaml
 
-from pocketcontextagent.comparisons.registry import METHODS
+from pocketcontextagent.comparisons.registry import CONTEXT_WINDOW_HELP, METHODS
 from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     build_wheel,
@@ -359,11 +359,22 @@ def submission_plan(
     benchmark: str = "swebench-verified",
     split: str | None = None,
     method: str | None = None,
+    context_window: int | None = None,
 ) -> tuple[dict, dict]:
     if benchmark == "browsecomp-plus":
         from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import plan
 
-        return plan(data_dir, config_spec, limit, seed, workers, query_ids, split=split or "eval150", method=method)
+        return plan(
+            data_dir,
+            config_spec,
+            limit,
+            seed,
+            workers,
+            query_ids,
+            split=split or "eval150",
+            method=method,
+            context_window=context_window,
+        )
     if method is not None and method not in METHODS:
         raise ValueError(f"Unknown method: {method}")
     methods = [method] if method is not None else list(METHODS)
@@ -376,7 +387,7 @@ def submission_plan(
         run_manifest,
     )
 
-    config = benchmark_config(config_spec)
+    config = benchmark_config(config_spec, context_window)
     if not 1 <= workers <= 30:
         raise ValueError("Select 1 to 30 workers per method")
     instances = pin_instances(
@@ -396,6 +407,7 @@ def submission_plan(
         "maximum_active_coding_sandboxes": min(workers, len(instances)) * len(methods),
         "planned_attempts": len(instances) * len(methods),
         "model": config["model"]["model_name"],
+        "context_token_limit": config["agent"]["context_token_limit"],
         "implementation_sha256": implementation_hash(),
     }
 
@@ -403,6 +415,7 @@ def submission_plan(
 def validate_remote_plan(plan: dict, remote: dict) -> None:
     keys = [
         "selected_query_ids",
+        "context_token_limit",
         "methods",
         "workers_per_method",
         "attempts",
@@ -446,6 +459,7 @@ def submit(
     method: str | None = typer.Option(None, help="Isolate one method on this controller."),
     query_ids: list[str] = typer.Option([], "--query-id"),
     config_spec: list[str] = typer.Option([], "-c", "--config"),
+    context_window: int | None = typer.Option(None, min=1, help=CONTEXT_WINDOW_HELP),
     min_free_bytes: int = typer.Option(
         1024**3, min=1, help="Minimum free controller-disk bytes before new volume-backed work."
     ),
@@ -465,6 +479,7 @@ def submit(
         benchmark=benchmark,
         split=split,
         method=method,
+        context_window=context_window,
     )
     if benchmark == "browsecomp-plus":
         if config.get("corpus_snapshot") and config["corpus_snapshot"]["name"] != corpus_snapshot:

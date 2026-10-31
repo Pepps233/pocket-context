@@ -2903,7 +2903,7 @@ you might not be able to run them on other architectures.</p>
 <p>Batch mode runs on all task instances in parallel.</p>
 <div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>swebench<span class="w"> </span>--help
 <span class="c1"># or</span>
-python<span class="w"> </span>pocketcontextagent/run/benchmarks/swebench.py<span class="w"> </span>--help
+python<span class="w"> </span>benchmarks/swebench.py<span class="w"> </span>--help
 <span class="c1"># Example:</span>
 mini-extra<span class="w"> </span>swebench<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--model<span class="w"> </span>anthropic/claude-sonnet-4-5-20250929<span class="w"> </span><span class="se">\</span>
@@ -2936,7 +2936,7 @@ mini-extra<span class="w"> </span>swebench<span class="w"> </span><span class="s
 <p>Single instance mode runs on a single task instance with interactivity. This is meant for debugging, and so unlike the batch mode command above, this will not produce a preds.json file.</p>
 <div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>swebench-single<span class="w"> </span>--help
 <span class="c1"># or</span>
-python<span class="w"> </span>pocketcontextagent/run/benchmarks/swebench_single.py<span class="w"> </span>--help
+python<span class="w"> </span>benchmarks/swebench_single.py<span class="w"> </span>--help
 <span class="c1"># Example:</span>
 mini-extra<span class="w"> </span>swebench-single<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--subset<span class="w"> </span>verified<span class="w"> </span><span class="se">\</span>
@@ -3202,7 +3202,7 @@ For example, you could use</p>
 <details class="note">
 <summary><code>swebench.py</code> run script</summary>
 <ul>
-<li><a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/swebench.py">Read on GitHub</a></li>
+<li><a href="https://github.com/Pepps233/pocket-context/blob/main/benchmarks/swebench.py">Read on GitHub</a></li>
 <li><a href="../../reference/run/swebench/">API reference</a></li>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="ch">#!/usr/bin/env python3</span>
@@ -3223,12 +3223,12 @@ For example, you could use</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">jinja2</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrictUndefined</span><span class="p">,</span> <span class="n">Template</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">rich.live</span><span class="w"> </span><span class="kn">import</span> <span class="n">Live</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">benchmarks.utils.batch_progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">RunBatchProgressManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">benchmarks.utils.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProgressTrackingAgent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent</span><span class="w"> </span><span class="kn">import</span> <span class="n">Environment</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">builtin_config_dir</span><span class="p">,</span> <span class="n">get_config_from_spec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.environments</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_environment</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_model</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.run.benchmarks.utils.batch_progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">RunBatchProgressManager</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.run.benchmarks.utils.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProgressTrackingAgent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.utils.log</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_file_handler</span><span class="p">,</span> <span class="n">logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.utils.serialize</span><span class="w"> </span><span class="kn">import</span> <span class="n">UNSET</span><span class="p">,</span> <span class="n">recursive_merge</span>
 
@@ -3485,7 +3485,7 @@ For example, you could use</p>
 <details class="note">
 <summary><code>swebench_single.py</code> run script</summary>
 <ul>
-<li><a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/swebench_single.py">Read on GitHub</a></li>
+<li><a href="https://github.com/Pepps233/pocket-context/blob/main/benchmarks/swebench_single.py">Read on GitHub</a></li>
 <li><a href="../../reference/run/swebench_single/">API reference</a></li>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="sd">"""Run on a single SWE-Bench instance."""</span>
@@ -3494,14 +3494,14 @@ For example, you could use</p>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">typer</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">benchmarks.swebench</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DATASET_MAPPING</span><span class="p">,</span>
+    <span class="n">get_sb_environment</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent</span><span class="w"> </span><span class="kn">import</span> <span class="n">global_config_dir</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_agent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">builtin_config_dir</span><span class="p">,</span> <span class="n">get_config_from_spec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_model</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.run.benchmarks.swebench</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">DATASET_MAPPING</span><span class="p">,</span>
-    <span class="n">get_sb_environment</span><span class="p">,</span>
-<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.utils.log</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.utils.serialize</span><span class="w"> </span><span class="kn">import</span> <span class="n">UNSET</span><span class="p">,</span> <span class="n">recursive_merge</span>
 

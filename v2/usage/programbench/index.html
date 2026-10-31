@@ -2898,7 +2898,7 @@ assume an x86 Linux architecture; you might not be able to run them on other arc
 <p class="admonition-title">Quickstart</p>
 <div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>programbench<span class="w"> </span>--help
 <span class="c1"># or</span>
-python<span class="w"> </span>pocketcontextagent/run/benchmarks/programbench.py<span class="w"> </span>--help
+python<span class="w"> </span>benchmarks/programbench.py<span class="w"> </span>--help
 <span class="c1"># Example:</span>
 mini-extra<span class="w"> </span>programbench<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--model<span class="w"> </span>anthropic/claude-sonnet-4-5-20250929<span class="w"> </span><span class="se">\</span>
@@ -3136,7 +3136,7 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <details class="note">
 <summary><code>programbench.py</code> run script</summary>
 <ul>
-<li><a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/programbench.py">Read on GitHub</a></li>
+<li><a href="https://github.com/Pepps233/pocket-context/blob/main/benchmarks/programbench.py">Read on GitHub</a></li>
 <li><a href="../../reference/run/programbench/">API reference</a></li>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="sd">"""Run mini-SWE-agent on ProgramBench instances in batch mode."""</span>
@@ -3151,11 +3151,11 @@ docker troubleshooting, singularity backend) apply equally to ProgramBench.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">typer</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">rich.live</span><span class="w"> </span><span class="kn">import</span> <span class="n">Live</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">benchmarks.utils.batch_progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">RunBatchProgressManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">benchmarks.utils.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProgressTrackingAgent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">builtin_config_dir</span><span class="p">,</span> <span class="n">get_config_from_spec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.environments</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_environment</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_model</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.run.benchmarks.utils.batch_progress</span><span class="w"> </span><span class="kn">import</span> <span class="n">RunBatchProgressManager</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.run.benchmarks.utils.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProgressTrackingAgent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.utils.log</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_file_handler</span><span class="p">,</span> <span class="n">logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pocketcontextagent.utils.serialize</span><span class="w"> </span><span class="kn">import</span> <span class="n">UNSET</span><span class="p">,</span> <span class="n">recursive_merge</span>
 

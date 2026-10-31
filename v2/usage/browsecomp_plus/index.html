@@ -3275,7 +3275,7 @@ data/browsecomp-plus/judge-venv/bin/python<span class="w"> </span><span class="s
 The judge loads <code>Qwen/Qwen3-32B</code>; it does not need a paid model API key.
 Upstream requests Qwen3-32B judging for leaderboard submissions.</p>
 <p>For an API-based check using GPT-6 Luna, export <code>OPENAI_API_KEY</code> and run our launcher for the upstream alternate judge:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pocketcontextagent.run.benchmarks.browsecomp_plus_judge<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>benchmarks.browsecomp_plus_judge<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input-dir<span class="w"> </span>runs/browsecomp-plus/my-model<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--eval-dir<span class="w"> </span>runs/browsecomp-plus/evals-gpt-6-luna
 </code></pre></div>

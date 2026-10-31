@@ -3185,6 +3185,10 @@
 
 
 <h1 id="context-benchmarks-browsecomp-plus-and-swe-bench-verified">Context benchmarks: BrowseComp-Plus and SWE-bench Verified</h1>
+<p>Benchmark runners and controller helpers live in the repository-root <code>benchmarks/</code> package.
+The existing <code>mini-extra</code> subcommands remain available; direct Python invocations use paths such as <code>python -m benchmarks.browsecomp_plus</code>.
+The former <code>pocketcontextagent.run.benchmarks</code> namespace remains an import alias for saved controller commands.
+Worker wheels include both the agent and benchmark packages, and implementation fingerprints cover both packages.</p>
 <p>Compare <strong>Pocket Context, ReAct, training-free ReSum, and ACM Base</strong> on a fixed cohort within each benchmark. Method IDs are <code>pocket_context</code>, <code>react</code>, <code>resum</code>, and <code>acm</code>. Each method receives the same selected task IDs, model profile and shared budgets; failed attempts stay in the cohort, without retries or replacement tasks.</p>
 <p>This page describes the generic <code>mini-extra benchmark-matrix</code> interface and the existing BrowseComp-Plus matrix workflow. The BrowseComp-Plus corpus, pool lifecycle and grading path remain unchanged; see <a href="../browsecomp_plus/">BrowseComp-Plus setup</a> and <a href="../context_comparison/">method fidelity and comparison</a>. Benchmark-specific prompt/tool adaptations are recorded in provenance. This is a controlled shared-policy comparison, <strong>not a reproduction of published paper scores</strong>, and does not include ReSum-GRPO training.</p>
 <h2 id="evaluation-allocation">Evaluation allocation</h2>
@@ -3394,7 +3398,7 @@ uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> <
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>data/swebench-verified/harness-venv/bin/python<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-e<span class="w"> </span>data/swebench-verified/upstream<span class="w"> </span>-e<span class="w"> </span><span class="s1">'.[daytona]'</span>
 data/swebench-verified/harness-venv/bin/python<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-m<span class="w"> </span>pocketcontextagent.run.benchmarks.swebench_daytona_evaluate<span class="w"> </span>--help
+<span class="w">  </span>-m<span class="w"> </span>benchmarks.swebench_daytona_evaluate<span class="w"> </span>--help
 </code></pre></div>
 <p>For an existing installation, verify its revision and reuse it rather than cloning over it.
 The checkout and environment are ignored local dependencies.

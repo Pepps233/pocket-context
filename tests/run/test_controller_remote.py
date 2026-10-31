@@ -142,6 +142,10 @@ def test_maintenance_rejects_orphaned_child_even_after_runner_lock_releases(cont
     runner = start(path, processes)
     try:
         wait_status(path.parent, "running")
+        deadline = time.monotonic() + 15
+        while not (path.parent / "ready").exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert (path.parent / "ready").exists()
         runner.kill()
         assert runner.wait(timeout=10) == -signal.SIGKILL
         original = (path.parent / "status.json").read_bytes()

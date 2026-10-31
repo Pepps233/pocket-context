@@ -54,10 +54,40 @@ def test_mark_only_last_result_and_archive_it(tmp_path: Path, api: str):
     assert agent.context.assemble(model)[-1] == agent.messages[-1]
 
 
+@pytest.mark.parametrize(("input_tokens",), [(44416,), (48000,), (60799,), (60800,)])  # noqa: PT006
+def test_stopping_threshold_uses_input_without_output_reservation(tmp_path: Path, input_tokens: int):
+    marker = tmp_path / "continued"
+    model = RecordingModel(
+        outputs=[
+            make_output("Investigate", [{"command": f"touch {marker}"}]),
+            make_output("Done", [{"command": "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"}]),
+        ]
+    )
+    agent = DefaultAgent(
+        model,
+        LocalEnvironment(),
+        system_template="Work",
+        instance_template="{{task}}",
+        cost_limit=0,
+        context_token_limit=64000,
+        context_db_path=tmp_path / "context.sqlite",
+    )
+    empty_input_tokens = agent.context_tokens(
+        [model.format_message(role="system", content="Work"), model.format_message(role="user", content="")]
+    )
+    assert agent.run("x" * (4 * (input_tokens - empty_input_tokens)))["exit_status"] == "Submitted"
+    assert marker.exists() == (input_tokens < 60800)
+    assert len(model.requests) == (2 if input_tokens < 60800 else 1)
+    assert model.requests[0][1].get("final_answer", False) == (input_tokens >= 60800)
+    assert agent.context_tokens(model.requests[0][0][:2]) == input_tokens
+    for messages, options in model.requests:
+        assert options["max_tokens"] == min(16384, 64000 - agent.context_tokens(messages))
+
+
 def test_final_generation_reserves_space_and_never_executes_tools(tmp_path: Path):
     model = RecordingModel(
         outputs=[
-            make_output("Read results", [{"command": "printf '%06000d' 0"}]),
+            make_output("Read results", [{"command": "printf '%019000d' 0"}]),
             make_output("Best answer", [{"command": f"touch {tmp_path / 'unwanted'}"}]),
         ]
     )

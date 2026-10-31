@@ -210,7 +210,7 @@ class DefaultAgent:
         if self.config.context_token_limit:
             key, allowance = output_token_setting(self.model, self.config.response_token_limit)
             if (
-                self.context_tokens(self.context.request_projection(self.model)) + allowance
+                self.context_tokens(self.context.request_projection(self.model))
                 >= self.config.context_token_limit * 0.95
             ):
                 self._final_generation = True

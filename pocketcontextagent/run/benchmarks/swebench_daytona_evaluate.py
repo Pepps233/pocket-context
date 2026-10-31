@@ -109,7 +109,8 @@ def evaluate(instance: dict, pred: dict, root: Path, timeout: int, runtime: Runt
         name = f"pca-swe-grading-{uuid4().hex[:16]}"
         journal.record("sandboxes", name, phase="creating", snapshot=snapshot.name)
         sandbox = api.create(
-            sandbox_params(snapshot, "grading", runtime, name=name), timeout=runtime.startup_timeout_seconds
+            sandbox_params(snapshot, "grading", runtime, name=name).model_copy(update={"network_block_all": False}),
+            timeout=runtime.startup_timeout_seconds,
         )
         journal.record("sandboxes", name, id=sandbox.id, phase="running")
         journal.record("sandboxes", name, lifecycle=sandbox_metadata(api.get(sandbox.id).model_dump(), runtime))
@@ -204,6 +205,7 @@ def main(
                 "predictions_sha256": predictions_sha256,
                 "timeout": timeout,
                 "max_workers": max_workers,
+                "network_block_all": False,
             },
             indent=2,
         )

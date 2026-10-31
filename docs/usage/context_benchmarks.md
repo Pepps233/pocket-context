@@ -253,7 +253,8 @@ Run the printed commands on the trusted launcher when grading is authorized.
 The default is one grading sandbox at a time, with 2 CPUs, 8 GiB RAM, 10 GiB disk and a 1,800-second test timeout.
 Use `--max_workers` up to 6, and `--cpu`, `--memory`, `--disk` or `--timeout` to adjust resources after a live smoke test.
 Concurrency applies per command; running all four methods concurrently multiplies the allocation.
-The adapter pins each official image to a registry digest, records owned resources, verifies the clean base checkout, blocks sandbox outbound networking, and downloads test logs before cleanup.
+The adapter pins each official image to a registry digest, records owned resources, restores the declared task base, verifies the clean checkout, and downloads test logs before cleanup.
+Grading sandboxes allow outbound networking for upstream integration tests, such as Requests tests against HTTPBin; coding sandboxes retain their network block.
 A process timeout bounds the tests, and an absolute sandbox lifetime limits orphaned compute if the launcher exits unexpectedly.
 
 Logs default to `logs/run_evaluation/RUN_ID/MODEL/INSTANCE_ID/` and include the exact `patch.diff`, `eval.sh`, test output, `report.json`, image digest and cleanup journal.

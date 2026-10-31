@@ -1,7 +1,7 @@
 # Trusted cloud benchmark controller
 
 Use `mini-extra benchmark-controller` to run trusted SWE-bench Verified or BrowseComp-Plus orchestration on Daytona rather than on your laptop.
-BrowseComp-Plus can run all four methods together or use [one controller per method](method_controllers.md), with six concurrent agents per controller by default when `--method` is specified.
+BrowseComp-Plus and SWE-bench Verified can run all four methods together or use [one controller per method](method_controllers.md), with six concurrent agents per controller by default when `--method` is specified.
 Its existing pool workflow remains available separately.
 See [context benchmarks](context_benchmarks.md) for dataset preparation, matched methods, budgets and separate trusted grading.
 

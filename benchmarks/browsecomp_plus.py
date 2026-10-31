@@ -12,7 +12,17 @@ import typer
 import yaml
 from dotenv import load_dotenv
 
-from pocketcontextagent import __version__
+from benchmarks.browsecomp_plus_daytona import app as daytona_app
+from benchmarks.utils.browsecomp_plus import (
+    DATASET_REVISION,
+    INDEX_REVISION,
+    BM25Retriever,
+    load_instances,
+    prepare_data,
+    reserve_evaluation,
+)
+from benchmarks.utils.metrics import episode_metrics, summarize_results
+from pocketcontextagent import __version__, package_dir
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.comparisons.registry import (
     CONTEXT_WINDOW_HELP,
@@ -25,16 +35,6 @@ from pocketcontextagent.comparisons.report import compare_runs, comparison_markd
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
 from pocketcontextagent.models import get_model, get_model_name
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import app as daytona_app
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
-    DATASET_REVISION,
-    INDEX_REVISION,
-    BM25Retriever,
-    load_instances,
-    prepare_data,
-    reserve_evaluation,
-)
-from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics, summarize_results
 from pocketcontextagent.utils.serialize import recursive_merge
 
 DEFAULT_DATA_DIR = Path("data/browsecomp-plus")
@@ -66,11 +66,11 @@ def reserve(data_dir: Path = typer.Option(DEFAULT_DATA_DIR)) -> None:
 
 
 def implementation_hash() -> str:
-    root = Path(__file__).resolve().parents[2]
     digest = hashlib.sha256()
-    for path in sorted(root.rglob("*.py")):
-        digest.update(str(path.relative_to(root)).encode())
-        digest.update(path.read_bytes())
+    for root in (package_dir, Path(__file__).resolve().parent):
+        for path in sorted(root.rglob("*.py")):
+            digest.update(f"{root.name}/{path.relative_to(root).as_posix()}".encode())
+            digest.update(path.read_bytes())
     return digest.hexdigest()
 
 

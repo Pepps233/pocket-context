@@ -1,5 +1,10 @@
 # Context benchmarks: BrowseComp-Plus and SWE-bench Verified
 
+Benchmark runners and controller helpers live in the repository-root `benchmarks/` package.
+The existing `mini-extra` subcommands remain available; direct Python invocations use paths such as `python -m benchmarks.browsecomp_plus`.
+The former `pocketcontextagent.run.benchmarks` namespace remains an import alias for saved controller commands.
+Worker wheels include both the agent and benchmark packages, and implementation fingerprints cover both packages.
+
 Compare **Pocket Context, ReAct, training-free ReSum, and ACM Base** on a fixed cohort within each benchmark. Method IDs are `pocket_context`, `react`, `resum`, and `acm`. Each method receives the same selected task IDs, model profile and shared budgets; failed attempts stay in the cohort, without retries or replacement tasks.
 
 This page describes the generic `mini-extra benchmark-matrix` interface and the existing BrowseComp-Plus matrix workflow. The BrowseComp-Plus corpus, pool lifecycle and grading path remain unchanged; see [BrowseComp-Plus setup](browsecomp_plus.md) and [method fidelity and comparison](context_comparison.md). Benchmark-specific prompt/tool adaptations are recorded in provenance. This is a controlled shared-policy comparison, **not a reproduction of published paper scores**, and does not include ReSum-GRPO training.
@@ -223,7 +228,7 @@ uv venv --python 3.11 data/swebench-verified/harness-venv
 uv pip install --python data/swebench-verified/harness-venv/bin/python \
   -e data/swebench-verified/upstream -e '.[daytona]'
 data/swebench-verified/harness-venv/bin/python \
-  -m pocketcontextagent.run.benchmarks.swebench_daytona_evaluate --help
+  -m benchmarks.swebench_daytona_evaluate --help
 ```
 
 For an existing installation, verify its revision and reuse it rather than cloning over it.

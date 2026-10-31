@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore
-from pocketcontextagent.run.benchmarks.utils.controller_job import (
+from benchmarks.utils.controller_artifacts import ArtifactStore
+from benchmarks.utils.controller_job import (
     DUPLICATE,
     MODULE,
     SETUP_FAILED,

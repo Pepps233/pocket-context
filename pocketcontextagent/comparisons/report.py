@@ -7,8 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from benchmarks.utils.metrics import summarize_results
 from pocketcontextagent.comparisons.registry import METHOD_AGENT_FIELDS, METHODS, configure_method, method_provenance
-from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
 
 
 def shared_settings(manifest: dict) -> dict:

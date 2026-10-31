@@ -3,6 +3,8 @@ import copy
 import pytest
 from jinja2 import StrictUndefined, Template
 
+from benchmarks.benchmark_matrix import benchmark_config
+from benchmarks.browsecomp_plus_daytona import matrix_config
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.agents.default import AgentConfig
 from pocketcontextagent.agents.utils.context_budget import estimate_tokens
@@ -11,8 +13,6 @@ from pocketcontextagent.comparisons.methods.resum import ReSumConfig
 from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
 from pocketcontextagent.environments.local import LocalEnvironment
 from pocketcontextagent.models import get_model
-from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import matrix_config
 
 
 @pytest.mark.parametrize(("builder",), [(benchmark_config,), (matrix_config,)])  # noqa: PT006

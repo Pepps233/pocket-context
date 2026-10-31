@@ -4,14 +4,14 @@ from pathlib import Path
 
 import typer
 
+from benchmarks.swebench import (
+    DATASET_MAPPING,
+    get_sb_environment,
+)
 from pocketcontextagent import global_config_dir
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.config import builtin_config_dir, get_config_from_spec
 from pocketcontextagent.models import get_model
-from pocketcontextagent.run.benchmarks.swebench import (
-    DATASET_MAPPING,
-    get_sb_environment,
-)
 from pocketcontextagent.utils.log import logger
 from pocketcontextagent.utils.serialize import UNSET, recursive_merge
 

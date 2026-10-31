@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_runtime import RUNTIME_PYTHON, RUNTIME_REQUIREMENTS
+from benchmarks.utils.controller_runtime import RUNTIME_PYTHON, RUNTIME_REQUIREMENTS
 
 _INSTALLED = {item.metadata["Name"].lower().replace("_", "-"): item.version for item in distributions()}
 _PINNED_RUNTIME_AVAILABLE = all(
@@ -50,7 +50,7 @@ def audit(event, args):
         raise RuntimeError("Socket binding forbidden during runtime preflight")
 sys.addaudithook(audit)
 os.environ.pop("LITELLM_LOCAL_MODEL_COST_MAP", None)
-from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
+from benchmarks.utils.controller_runtime import check_runtime
 
 result = check_runtime()
 assert os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] == "True"
@@ -87,7 +87,7 @@ print(json.dumps(result))
 
 def test_controller_image_installs_pinned_extra_before_workload() -> None:
     pytest.importorskip("daytona")
-    from pocketcontextagent.run.benchmarks.benchmark_controller import _runtime_image
+    from benchmarks.benchmark_controller import _runtime_image
 
     recipe = _runtime_image(Path(__file__).resolve().parents[2]).dockerfile()
     assert "FROM python:3.11-slim-bookworm" in recipe
@@ -115,7 +115,7 @@ except PackageNotFoundError as error:
 else:
     raise AssertionError("A Python process without site-packages must fail preflight")
 """,
-            str(Path(__file__).resolve().parents[2] / "pocketcontextagent/run/benchmarks/utils/controller_runtime.py"),
+            str(Path(__file__).resolve().parents[2] / "benchmarks/utils/controller_runtime.py"),
         ],
         capture_output=True,
         text=True,

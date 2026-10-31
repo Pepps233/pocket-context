@@ -4,9 +4,9 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
+from benchmarks.benchmark_allocation import allocation
+from benchmarks.browsecomp_plus import app
 from pocketcontextagent.config import builtin_config_dir
-from pocketcontextagent.run.benchmarks.benchmark_allocation import allocation
-from pocketcontextagent.run.benchmarks.browsecomp_plus import app
 
 
 def test_allocation_keeps_full_reserved_corpus_and_samples_125_coding_tasks(tmp_path: Path):

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_setup import (
+from benchmarks.utils.controller_setup import (
     ControllerConfig,
     extract_artifacts,
     parse_remote_json,

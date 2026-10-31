@@ -10,15 +10,11 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from pocketcontextagent.comparisons.registry import METHODS
-from pocketcontextagent.comparisons.report import compare_runs
-from pocketcontextagent.config import builtin_config_dir
-from pocketcontextagent.models.test_models import make_toolcall_output
-from pocketcontextagent.run.benchmarks.benchmark_matrix import archive_trajectories
-from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash, run_instance
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import matrix_query_bytes, publish_matrix_task
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore
-from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import (
+from benchmarks.benchmark_matrix import archive_trajectories
+from benchmarks.browsecomp_plus import implementation_hash, run_instance
+from benchmarks.browsecomp_plus_daytona import matrix_query_bytes, publish_matrix_task
+from benchmarks.utils.controller_artifacts import ArtifactStore
+from benchmarks.utils.controller_browsecomp import (
     PUBLIC_ENV,
     RETRIEVAL_CODE,
     RemoteRetriever,
@@ -28,7 +24,11 @@ from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import (
     run_matrix,
     worker_params,
 )
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import RuntimeConfig
+from benchmarks.utils.swebench_daytona import RuntimeConfig
+from pocketcontextagent.comparisons.registry import METHODS
+from pocketcontextagent.comparisons.report import compare_runs
+from pocketcontextagent.config import builtin_config_dir
+from pocketcontextagent.models.test_models import make_toolcall_output
 from tests.run.test_browsecomp_plus import bm25_index  # noqa: F401
 
 

@@ -10,11 +10,11 @@ from pathlib import Path
 import typer
 from rich.live import Live
 
+from benchmarks.utils.batch_progress import RunBatchProgressManager
+from benchmarks.utils.common import ProgressTrackingAgent
 from pocketcontextagent.config import builtin_config_dir, get_config_from_spec
 from pocketcontextagent.environments import get_environment
 from pocketcontextagent.models import get_model
-from pocketcontextagent.run.benchmarks.utils.batch_progress import RunBatchProgressManager
-from pocketcontextagent.run.benchmarks.utils.common import ProgressTrackingAgent
 from pocketcontextagent.utils.log import add_file_handler, logger
 from pocketcontextagent.utils.serialize import UNSET, recursive_merge
 

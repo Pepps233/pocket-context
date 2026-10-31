@@ -18,15 +18,15 @@ from uuid import uuid4
 
 import requests
 
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
-from pocketcontextagent.run.benchmarks.utils.controller_job import launch, read_status
-from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
-from pocketcontextagent.run.benchmarks.utils.controller_setup import (
+from benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
+from benchmarks.utils.controller_job import launch, read_status
+from benchmarks.utils.controller_runtime import check_runtime
+from benchmarks.utils.controller_setup import (
     extract_artifacts,
     provider_endpoint,
     write_private_json,
 )
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount, volume_mount
+from benchmarks.utils.controller_volumes import verify_volume_mount, volume_mount
 
 
 def job_path(root: Path, identifier: str) -> Path:
@@ -92,8 +92,8 @@ def _journal(root: Path, job: Path) -> dict:
 
 
 def _cleanup(root: Path, job: Path, discard: bool) -> dict:
-    from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import client
-    from pocketcontextagent.run.benchmarks.utils.swebench_daytona import delete_resources
+    from benchmarks.browsecomp_plus_daytona import client
+    from benchmarks.utils.swebench_daytona import delete_resources
 
     if _active(_status(job)):
         raise ValueError("Cancel the job before reconciling its workers")
@@ -146,7 +146,7 @@ def archive_directory(
 
 
 def _import_controller(root: Path, store: ArtifactStore, args: dict) -> dict:
-    from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import client
+    from benchmarks.browsecomp_plus_daytona import client
 
     identifier = args["job"]
     job_path(root, identifier)

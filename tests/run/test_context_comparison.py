@@ -6,10 +6,10 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from benchmarks.browsecomp_plus import app
+from benchmarks.utils.metrics import episode_metrics
 from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
 from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
-from pocketcontextagent.run.benchmarks.browsecomp_plus import app
-from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics
 
 
 def write_runs(root: Path) -> None:

@@ -11,12 +11,8 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from pocketcontextagent.comparisons.registry import METHODS
-from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
-from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment, subprocess_backend
-from pocketcontextagent.models.test_models import make_toolcall_output
-from pocketcontextagent.run.benchmarks.benchmark_grading import export_evaluation, import_evaluation
-from pocketcontextagent.run.benchmarks.benchmark_matrix import (
+from benchmarks.benchmark_grading import export_evaluation, import_evaluation
+from benchmarks.benchmark_matrix import (
     archive_trajectories,
     benchmark_config,
     bounded_command,
@@ -26,9 +22,13 @@ from pocketcontextagent.run.benchmarks.benchmark_matrix import (
     run_manifest,
     sandbox_params,
 )
-from pocketcontextagent.run.benchmarks.browsecomp_plus import app
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import publish_matrix_task, run_matrix_workers
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import PreparedSnapshot, RuntimeConfig
+from benchmarks.browsecomp_plus import app
+from benchmarks.browsecomp_plus_daytona import publish_matrix_task, run_matrix_workers
+from benchmarks.utils.swebench_daytona import PreparedSnapshot, RuntimeConfig
+from pocketcontextagent.comparisons.registry import METHODS
+from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
+from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment, subprocess_backend
+from pocketcontextagent.models.test_models import make_toolcall_output
 
 
 def test_partial_trajectory_archive_is_not_treated_as_successful_collection(tmp_path):

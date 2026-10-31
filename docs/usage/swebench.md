@@ -34,7 +34,7 @@
         ```bash
         mini-extra swebench --help
         # or
-        python pocketcontextagent/run/benchmarks/swebench.py --help
+        python benchmarks/swebench.py --help
         # Example:
         mini-extra swebench \
             --model anthropic/claude-sonnet-4-5-20250929 \
@@ -70,7 +70,7 @@
         ```bash
         mini-extra swebench-single --help
         # or
-        python pocketcontextagent/run/benchmarks/swebench_single.py --help
+        python benchmarks/swebench_single.py --help
         # Example:
         mini-extra swebench-single \
             --subset verified \
@@ -208,20 +208,20 @@ See [this guide](../advanced/environments.md) for more details.
 
 ??? note "`swebench.py` run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/swebench.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/benchmarks/swebench.py)
     - [API reference](../reference/run/swebench.md)
 
     ```python
-    --8<-- "pocketcontextagent/run/benchmarks/swebench.py"
+    --8<-- "benchmarks/swebench.py"
     ```
 
 ??? note "`swebench_single.py` run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/swebench_single.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/benchmarks/swebench_single.py)
     - [API reference](../reference/run/swebench_single.md)
 
     ```python
-    --8<-- "pocketcontextagent/run/benchmarks/swebench_single.py"
+    --8<-- "benchmarks/swebench_single.py"
     ```
 
 {% include-markdown "../_footer.md" %}

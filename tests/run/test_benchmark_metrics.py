@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics, summarize_results
+from benchmarks.utils.metrics import episode_metrics, summarize_results
 
 
 def test_mixed_provider_usage_compactions_format_errors_and_tool_deduplication():

@@ -4,7 +4,7 @@ from shlex import split
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.swebench_verified import (
+from benchmarks.utils.swebench_verified import (
     DATASET_REVISION,
     HARNESS_REVISION,
     PUBLIC_FIELDS,
@@ -103,7 +103,7 @@ def test_official_command_uses_private_pinned_grading_file_and_image_contract(tm
             predictions_sha256="b" * 64,
         )
     )
-    assert command[:3] == ["python", "-m", "pocketcontextagent.run.benchmarks.swebench_daytona_evaluate"]
+    assert command[:3] == ["python", "-m", "benchmarks.swebench_daytona_evaluate"]
     assert (
         split(
             evaluator_command(

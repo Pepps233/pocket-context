@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
+from benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
 
 FINAL = {"state": "failed", "exit_code": 1, "finished_at": "2026-01-01", "runner_pid": 123, "child_pid": 456}
 

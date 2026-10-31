@@ -19,6 +19,29 @@ from uuid import uuid4
 import typer
 import yaml
 
+from benchmarks.browsecomp_plus import implementation_hash
+from benchmarks.browsecomp_plus_daytona import (
+    client,
+    matrix_provider_key,
+    provider_environment,
+    publish_matrix_task,
+    run_matrix_workers,
+)
+from benchmarks.utils import swebench_verified as swe
+from benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
+from benchmarks.utils.controller_runtime import check_runtime
+from benchmarks.utils.controller_volumes import verify_volume_mount
+from benchmarks.utils.metrics import episode_metrics
+from benchmarks.utils.shared_snapshots import SharedSnapshots
+from benchmarks.utils.swebench_daytona import (
+    PreparedSnapshot,
+    ResourceJournal,
+    RuntimeConfig,
+    create_snapshot,
+    delete_resources,
+    sandbox_metadata,
+    sandbox_params,
+)
 from pocketcontextagent import __version__
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.comparisons.registry import (
@@ -31,29 +54,6 @@ from pocketcontextagent.comparisons.report import compare_runs, comparison_markd
 from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment
 from pocketcontextagent.models import get_model
-from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
-    client,
-    matrix_provider_key,
-    provider_environment,
-    publish_matrix_task,
-    run_matrix_workers,
-)
-from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
-from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount
-from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics
-from pocketcontextagent.run.benchmarks.utils.shared_snapshots import SharedSnapshots
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
-    PreparedSnapshot,
-    ResourceJournal,
-    RuntimeConfig,
-    create_snapshot,
-    delete_resources,
-    sandbox_metadata,
-    sandbox_params,
-)
 from pocketcontextagent.utils.serialize import recursive_merge
 
 
@@ -102,7 +102,7 @@ def pin_instances(instances: list[dict], images: dict[str, str] | None) -> list[
         return instances
     if not isinstance(images, dict):
         raise ValueError("Pinned task images must be a mapping")
-    from pocketcontextagent.run.benchmarks.utils.swebench_daytona import immutable_image
+    from benchmarks.utils.swebench_daytona import immutable_image
 
     result = []
     for row in instances:

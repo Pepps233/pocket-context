@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
+from benchmarks.benchmark_matrix import benchmark_config
+from benchmarks.utils.swebench_daytona import (
     ResourceJournal,
     RuntimeConfig,
     immutable_image,

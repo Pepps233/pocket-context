@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_job import MODULE, SETUP_FAILED, read_status
-from pocketcontextagent.run.benchmarks.utils.controller_remote import action, job_path
-from pocketcontextagent.run.benchmarks.utils.controller_setup import extract_artifacts
+from benchmarks.utils.controller_job import MODULE, SETUP_FAILED, read_status
+from benchmarks.utils.controller_remote import action, job_path
+from benchmarks.utils.controller_setup import extract_artifacts
 
 SECRET = "controller-private-key-38192"
 GATED = """

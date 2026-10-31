@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import (
+from benchmarks.utils.controller_volumes import (
     STORE_ROOT,
     VOLUME_MOUNT,
     _verify_fuse_mountinfo,

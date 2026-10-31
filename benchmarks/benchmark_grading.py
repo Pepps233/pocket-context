@@ -8,10 +8,10 @@ from pathlib import Path
 import typer
 import yaml
 
+from benchmarks.benchmark_matrix import export_predictions
+from benchmarks.utils import swebench_verified as swe
 from pocketcontextagent.comparisons.registry import METHODS
 from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
-from pocketcontextagent.run.benchmarks.benchmark_matrix import export_predictions
-from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
 
 
 def evaluation_binding(runs: Path, settings: dict, run_prefix: str) -> dict:

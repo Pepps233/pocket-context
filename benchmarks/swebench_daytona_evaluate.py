@@ -18,7 +18,7 @@ from uuid import uuid4
 import typer
 from dotenv import load_dotenv
 
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
+from benchmarks.utils.swebench_daytona import (
     ResourceJournal,
     RuntimeConfig,
     create_snapshot,
@@ -26,7 +26,7 @@ from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
     sandbox_metadata,
     sandbox_params,
 )
-from pocketcontextagent.run.benchmarks.utils.swebench_verified import HARNESS_REVISION, prediction, public_task
+from benchmarks.utils.swebench_verified import HARNESS_REVISION, prediction, public_task
 
 if TYPE_CHECKING:
     from daytona import Sandbox

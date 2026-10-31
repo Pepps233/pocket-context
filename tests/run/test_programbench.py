@@ -16,10 +16,10 @@ import pytest
 import yaml
 from pydantic import BaseModel
 
+from benchmarks.programbench import copy_submission, main
 from pocketcontextagent import package_dir
 from pocketcontextagent.environments.docker import DockerEnvironment
 from pocketcontextagent.exceptions import Submitted
-from pocketcontextagent.run.benchmarks.programbench import copy_submission, main
 
 # Lightweight image used for the real-docker tests. Already cached on machines
 # that run mini-swe-agent's docker test suite (see tests/environments/test_docker.py).
@@ -191,7 +191,7 @@ def test_programbench_end_to_end_real_docker(real_programbench_first_instance, t
     # CI runners may not have. Override run_args with the bare minimum (keeping
     # ``--network none`` since the agent is supposed to run offline).
     run_args_override = 'environment.run_args=["--rm", "--network", "none"]'
-    with patch("pocketcontextagent.run.benchmarks.programbench.get_model", side_effect=lambda **kw: _SubmittingModel()):
+    with patch("benchmarks.programbench.get_model", side_effect=lambda **kw: _SubmittingModel()):
         main(
             slice_spec="",
             filter_spec=f"^{instance['instance_id']}$",
@@ -231,8 +231,8 @@ def test_programbench_skip_existing_real_docker(real_programbench_first_instance
     (tmp_path / iid / "submission.tar.gz").write_bytes(b"pre-existing")
 
     with (
-        patch("pocketcontextagent.run.benchmarks.programbench.get_model") as mock_get_model,
-        patch("pocketcontextagent.run.benchmarks.programbench.get_environment") as mock_get_env,
+        patch("benchmarks.programbench.get_model") as mock_get_model,
+        patch("benchmarks.programbench.get_environment") as mock_get_env,
     ):
         main(
             slice_spec="",

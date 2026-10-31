@@ -1,6 +1,6 @@
 """POSIX, trusted-controller jobs; no retries, providers, or model dependencies.
 
-Run with ``python -m pocketcontextagent.run.benchmarks.utils.controller_job /abs/job/request.json``.
+Run with ``python -m benchmarks.utils.controller_job /abs/job/request.json``.
 ``launch`` detaches that runner and returns its PID, not the workload's exit code.
 Requests contain argv, cwd (job directory or an ancestor), secrets_path (outside
 that directory), and public env. Credential values must be single-line strings.
@@ -17,10 +17,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO
 
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount
+from benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
+from benchmarks.utils.controller_volumes import verify_volume_mount
 
-MODULE = "pocketcontextagent.run.benchmarks.utils.controller_job"
+MODULE = "benchmarks.utils.controller_job"
 SETUP_FAILED = 125
 DUPLICATE = 73
 

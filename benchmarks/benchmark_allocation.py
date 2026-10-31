@@ -6,10 +6,10 @@ from pathlib import Path
 import typer
 import yaml
 
+from benchmarks.benchmark_matrix import load_instances
+from benchmarks.browsecomp_plus_daytona import select_matrix_instances
 from pocketcontextagent.comparisons.registry import METHODS
 from pocketcontextagent.config import get_config_from_spec
-from pocketcontextagent.run.benchmarks.benchmark_matrix import load_instances
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import select_matrix_instances
 
 
 def allocation(browsecomp_data: Path, swebench_data: Path, output: Path | None = None) -> dict:

@@ -14,13 +14,9 @@ from uuid import uuid4
 import typer
 import yaml
 
-from pocketcontextagent import __version__
-from pocketcontextagent.comparisons.registry import CONTEXT_WINDOW_HELP, METHODS, configure_method, method_provenance
-from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
-from pocketcontextagent.models import get_model
-from pocketcontextagent.run.benchmarks.benchmark_matrix import archive_trajectories
-from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash, run_instance
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+from benchmarks.benchmark_matrix import archive_trajectories
+from benchmarks.browsecomp_plus import implementation_hash, run_instance
+from benchmarks.browsecomp_plus_daytona import (
     REMOTE_INDEX,
     TOKENIZER,
     client,
@@ -34,17 +30,21 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     select_matrix_instances,
     worker_command,
 )
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
-from pocketcontextagent.run.benchmarks.utils.controller_runtime import check_runtime
-from pocketcontextagent.run.benchmarks.utils.controller_setup import parse_remote_json
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import verify_volume_mount
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
+from benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION
+from benchmarks.utils.controller_artifacts import ArtifactStore, require_free_space
+from benchmarks.utils.controller_runtime import check_runtime
+from benchmarks.utils.controller_setup import parse_remote_json
+from benchmarks.utils.controller_volumes import verify_volume_mount
+from benchmarks.utils.swebench_daytona import (
     ResourceJournal,
     RuntimeConfig,
     delete_resources,
     sandbox_metadata,
 )
+from pocketcontextagent import __version__
+from pocketcontextagent.comparisons.registry import CONTEXT_WINDOW_HELP, METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
+from pocketcontextagent.models import get_model
 
 DEFAULT_SNAPSHOT = "pocket-browsecomp-plus-20261022"
 PROTOCOL = "sdk-process-exec/bm25-json-v1"
@@ -60,7 +60,7 @@ PUBLIC_ENV = {
 RETRIEVAL_CODE = """
 import json, sys
 from pathlib import Path
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import BM25Retriever
+from benchmarks.utils.browsecomp_plus import BM25Retriever
 args = json.loads(sys.argv[1])
 assert set(args) == {'operation', 'arguments', 'index'}
 assert args['operation'] in ('search', 'get_document')
@@ -255,7 +255,7 @@ def check_worker(
 ) -> RemoteRetriever:
     code = (
         "import os,json; from pathlib import Path; "
-        "from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash; "
+        "from benchmarks.browsecomp_plus import implementation_hash; "
         "assert not any(k.endswith(('_API_KEY', '_TOKEN')) for k in os.environ), 'Frozen worker credentials'; "
         f"assert implementation_hash() == {expected_hash!r}, 'Worker implementation differs'; "
         f"assert Path({REMOTE_INDEX!r}).is_dir(); "
@@ -339,12 +339,6 @@ def run_matrix(
             verify_volume_mount(store.root.parent)
 
     admission()
-    if tokenizer := config.get("environment", {}).get("tokenizer_name"):
-        from transformers import AutoTokenizer
-
-        AutoTokenizer.from_pretrained(
-            tokenizer, revision=config["environment"].get("tokenizer_revision"), local_files_only=True
-        )
     if not preflight:
         provider_environment(matrix_provider_key(config))
         if os.getenv("MSWEA_CONTROLLER_ID"):

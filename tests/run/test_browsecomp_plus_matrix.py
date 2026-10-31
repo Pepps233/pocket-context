@@ -11,9 +11,8 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from pocketcontextagent.config import builtin_config_dir
-from pocketcontextagent.run.benchmarks.browsecomp_plus import app
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+from benchmarks.browsecomp_plus import app
+from benchmarks.browsecomp_plus_daytona import (
     matrix_arguments,
     matrix_config,
     matrix_provider_key,
@@ -23,6 +22,7 @@ from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     select_matrix_instances,
     worker_command,
 )
+from pocketcontextagent.config import builtin_config_dir
 
 
 @pytest.fixture

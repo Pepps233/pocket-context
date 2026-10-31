@@ -12,18 +12,18 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from pocketcontextagent.agents.default import DefaultAgent
-from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
-from pocketcontextagent.exceptions import Submitted
-from pocketcontextagent.models.test_models import DeterministicToolcallModel, make_output, make_toolcall_output
-from pocketcontextagent.run.benchmarks.browsecomp_plus import app
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import (
+from benchmarks.browsecomp_plus import app
+from benchmarks.utils.browsecomp_plus import (
     BM25Retriever,
     decrypt,
     reserve_evaluation,
     select_split,
 )
-from pocketcontextagent.run.benchmarks.utils.metrics import episode_metrics, summarize_results
+from benchmarks.utils.metrics import episode_metrics, summarize_results
+from pocketcontextagent.agents.default import DefaultAgent
+from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment, extract_answer
+from pocketcontextagent.exceptions import Submitted
+from pocketcontextagent.models.test_models import DeterministicToolcallModel, make_output, make_toolcall_output
 
 
 @pytest.fixture
@@ -570,16 +570,16 @@ def test_parallel_matrix_commands_preserve_remote_manifests(
 ):
     import shutil
 
-    from pocketcontextagent.comparisons.registry import METHODS, configure_method
-    from pocketcontextagent.comparisons.report import compare_runs
-    from pocketcontextagent.config import get_config_from_spec
-    from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+    from benchmarks.browsecomp_plus_daytona import (
         matrix_arguments,
         matrix_worker_groups,
         publish_matrix_task,
         run_matrix_workers,
         select_matrix_instances,
     )
+    from pocketcontextagent.comparisons.registry import METHODS, configure_method
+    from pocketcontextagent.comparisons.report import compare_runs
+    from pocketcontextagent.config import get_config_from_spec
     from pocketcontextagent.utils.serialize import recursive_merge
 
     queries = tmp_path / "queries.jsonl"

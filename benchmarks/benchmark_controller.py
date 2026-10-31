@@ -14,16 +14,15 @@ from uuid import uuid4
 import typer
 import yaml
 
-from pocketcontextagent.comparisons.registry import CONTEXT_WINDOW_HELP, METHODS
-from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+from benchmarks.browsecomp_plus import implementation_hash
+from benchmarks.browsecomp_plus_daytona import (
     build_wheel,
     client,
     matrix_provider_key,
     provider_environment,
 )
-from pocketcontextagent.run.benchmarks.utils.controller_runtime import RUNTIME_REQUIREMENTS
-from pocketcontextagent.run.benchmarks.utils.controller_setup import (
+from benchmarks.utils.controller_runtime import RUNTIME_REQUIREMENTS
+from benchmarks.utils.controller_setup import (
     ControllerConfig,
     extract_artifacts,
     parse_remote_json,
@@ -31,12 +30,13 @@ from pocketcontextagent.run.benchmarks.utils.controller_setup import (
     sandbox_params,
     write_private_json,
 )
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import (
+from benchmarks.utils.controller_volumes import (
     archive_environment,
     resolve_volume,
     validate_volume_name,
 )
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import RuntimeConfig, delete_resources, sandbox_metadata
+from benchmarks.utils.swebench_daytona import RuntimeConfig, delete_resources, sandbox_metadata
+from pocketcontextagent.comparisons.registry import CONTEXT_WINDOW_HELP, METHODS
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, pretty_exceptions_show_locals=False)
 DEFAULT_MANIFEST = Path("runs/context-evaluation/controller.json")
@@ -65,6 +65,7 @@ def _exec(sandbox, command: list[str], *, timeout: int = 60) -> str:
 
 def _remote(sandbox, operation: str, **arguments) -> dict:
     marker = "PCA_REMOTE_" + uuid4().hex + ":"
+    # Existing controllers still use the legacy import; new installs provide an alias.
     code = (
         "import json,sys; from pocketcontextagent.run.benchmarks.utils.controller_remote import action; print("
         + repr(marker)
@@ -256,7 +257,7 @@ def check(
     config_spec: list[str] = typer.Option([], "-c", "--config"),
 ) -> None:
     """Check provider connectivity FROM THE CLOUD without requesting inference."""
-    from pocketcontextagent.run.benchmarks.benchmark_matrix import benchmark_config
+    from benchmarks.benchmark_matrix import benchmark_config
 
     config = benchmark_config(config_spec)
     provider_endpoint(config["model"])
@@ -362,7 +363,7 @@ def submission_plan(
     context_window: int | None = None,
 ) -> tuple[dict, dict]:
     if benchmark == "browsecomp-plus":
-        from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import plan
+        from benchmarks.utils.controller_browsecomp import plan
 
         return plan(
             data_dir,
@@ -380,7 +381,7 @@ def submission_plan(
     methods = [method] if method is not None else list(METHODS)
     if benchmark != "swebench-verified" or split not in (None, "test"):
         raise ValueError("Select browsecomp-plus/eval150 or swebench-verified/test")
-    from pocketcontextagent.run.benchmarks.benchmark_matrix import (
+    from benchmarks.benchmark_matrix import (
         benchmark_config,
         load_instances,
         pin_instances,
@@ -515,7 +516,7 @@ def submit(
     job_credentials = f"{ROOT}/credentials/{identifier}.json"
     _upload(sandbox, json.dumps(_credentials(key)).encode(), job_credentials)
     if benchmark == "browsecomp-plus":
-        from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
+        from benchmarks.browsecomp_plus_daytona import (
             matrix_query_bytes,
             select_matrix_instances,
         )
@@ -561,7 +562,7 @@ def submit(
         arguments = [
             PYTHON,
             "-m",
-            "pocketcontextagent.run.benchmarks.utils.controller_browsecomp",
+            "benchmarks.utils.controller_browsecomp",
             "--data-dir",
             remote + "/input/data",
             "--limit",

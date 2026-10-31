@@ -1,7 +1,7 @@
 import pytest
 import yaml
 
-from pocketcontextagent.run.benchmarks.utils.batch_progress import RunBatchProgressManager, _shorten_str
+from benchmarks.utils.batch_progress import RunBatchProgressManager, _shorten_str
 
 
 @pytest.fixture

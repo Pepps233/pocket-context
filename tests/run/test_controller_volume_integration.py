@@ -13,24 +13,24 @@ import pytest
 from click import unstyle
 from typer.testing import CliRunner
 
-from pocketcontextagent.run.benchmarks.benchmark_controller import app
-from pocketcontextagent.run.benchmarks.utils.controller_artifacts import ArtifactStore
-from pocketcontextagent.run.benchmarks.utils.controller_job import _artifact_store
-from pocketcontextagent.run.benchmarks.utils.controller_remote import (
+from benchmarks.benchmark_controller import app
+from benchmarks.utils.controller_artifacts import ArtifactStore
+from benchmarks.utils.controller_job import _artifact_store
+from benchmarks.utils.controller_remote import (
     _active,
     _archive_lock,
     _import_controller,
     action,
     archive_directory,
 )
-from pocketcontextagent.run.benchmarks.utils.controller_setup import ControllerConfig, extract_artifacts, sandbox_params
-from pocketcontextagent.run.benchmarks.utils.controller_volumes import STORE_ROOT, VOLUME_MOUNT
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
+from benchmarks.utils.controller_setup import ControllerConfig, extract_artifacts, sandbox_params
+from benchmarks.utils.controller_volumes import STORE_ROOT, VOLUME_MOUNT
+from benchmarks.utils.swebench_daytona import (
     PreparedSnapshot,
     ResourceJournal,
     RuntimeConfig,
 )
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
+from benchmarks.utils.swebench_daytona import (
     sandbox_params as coding_sandbox_params,
 )
 
@@ -355,7 +355,7 @@ def test_archive_lock_excludes_real_child_and_releases_without_changing_job(lega
         "-c",
         "from pathlib import Path\n"
         "import sys\n"
-        "from pocketcontextagent.run.benchmarks.utils.controller_remote import _archive_lock\n"
+        "from benchmarks.utils.controller_remote import _archive_lock\n"
         "with _archive_lock(Path(sys.argv[1])):\n"
         "    print('archive lock acquired')\n",
         str(root),
@@ -383,7 +383,7 @@ def test_maintenance_gate_denies_archive_admission_except_locked_internal_cleanu
         "-c",
         "from pathlib import Path\n"
         "import sys\n"
-        "from pocketcontextagent.run.benchmarks.utils.controller_remote import _archive_lock\n"
+        "from benchmarks.utils.controller_remote import _archive_lock\n"
         "with _archive_lock(Path(sys.argv[1])):\n"
         "    print('external archive admitted')\n",
         str(root),

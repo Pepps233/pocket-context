@@ -11,12 +11,12 @@ import yaml
 from click import unstyle
 from typer.testing import CliRunner
 
+from benchmarks.benchmark_controller import app, submission_plan, validate_remote_plan
+from benchmarks.browsecomp_plus_daytona import app as matrix_app
+from benchmarks.utils import swebench_verified as swe
+from benchmarks.utils.controller_browsecomp import app as corpus_app
 from pocketcontextagent.comparisons.registry import METHODS
 from pocketcontextagent.config import builtin_config_dir
-from pocketcontextagent.run.benchmarks.benchmark_controller import app, submission_plan, validate_remote_plan
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import app as matrix_app
-from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
-from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import app as corpus_app
 
 PRIVATE = "PRIVATE_GRADING_MARKER_92831"
 
@@ -283,7 +283,7 @@ def test_mini_extra_root_help_is_lazy_and_controller_alias_has_commands(tmp_path
                 "sys.argv=['mini-extra',*sys.argv[1:]]; "
                 "runpy.run_module('pocketcontextagent.run.utilities.mini_extra',run_name='__main__'); "
                 "assert sys.argv[1:] != ['--help'] or not "
-                "({'daytona','litellm','pocketcontextagent.run.benchmarks.benchmark_controller'} & sys.modules.keys())",
+                "({'daytona','litellm','benchmarks.benchmark_controller'} & sys.modules.keys())",
                 *arguments,
             ],
             cwd=tmp_path,

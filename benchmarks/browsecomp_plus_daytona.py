@@ -21,6 +21,8 @@ import typer
 import yaml
 from dotenv import load_dotenv
 
+from benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION, load_instances
+from benchmarks.utils.metrics import summarize_results
 from pocketcontextagent.comparisons.registry import (
     CONTEXT_WINDOW_HELP,
     METHODS,
@@ -29,8 +31,6 @@ from pocketcontextagent.comparisons.registry import (
     method_provenance,
 )
 from pocketcontextagent.config import get_config_from_spec
-from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import DATASET_REVISION, INDEX_REVISION, load_instances
-from pocketcontextagent.run.benchmarks.utils.metrics import summarize_results
 from pocketcontextagent.utils.serialize import recursive_merge
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, pretty_exceptions_show_locals=False)
@@ -109,11 +109,12 @@ def build_wheel(project: Path, destination: Path) -> Path:
 
     source = destination / "source"
     source.mkdir()
-    shutil.copytree(
-        project / "pocketcontextagent",
-        source / "pocketcontextagent",
-        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-    )
+    for package in ("pocketcontextagent", "benchmarks"):
+        shutil.copytree(
+            project / package,
+            source / package,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
     for name in ("pyproject.toml", "README.md", "LICENSE.md"):
         shutil.copyfile(project / name, source / name)
     return destination / ProjectBuilder(str(source)).build("wheel", str(destination))
@@ -145,7 +146,7 @@ def check_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
     workers = json.loads(pool.read_text())["sandboxes"]
     code = (
         "from pathlib import Path; "
-        "from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import BM25Retriever; "
+        "from benchmarks.utils.browsecomp_plus import BM25Retriever; "
         "from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusEnvironment; "
         "from pocketcontextagent.config import get_config_from_spec; "
         f"r=BM25Retriever(Path({REMOTE_INDEX!r})); "
@@ -504,14 +505,14 @@ def run_remote_method(
 ) -> None:
     from daytona.common.process import SessionExecuteRequest
 
-    from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
+    from benchmarks.browsecomp_plus import implementation_hash
 
     check = sandbox.process.exec(
         worker_command(
             [
                 "python",
                 "-c",
-                "from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash; "
+                "from benchmarks.browsecomp_plus import implementation_hash; "
                 f"assert implementation_hash() == {implementation_hash()!r}, 'Stale worker package; create a fresh pool'",
             ]
         ),
@@ -675,11 +676,11 @@ def run_matrix(
     ),
 ) -> None:
     """Run matched questions with up to 30 parallel sandboxes per method."""
+    from benchmarks.browsecomp_plus import implementation_hash
     from pocketcontextagent.comparisons.report import compare_runs, comparison_markdown
-    from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
 
     if benchmark == "swebench-verified":
-        from pocketcontextagent.run.benchmarks.benchmark_matrix import run_matrix as run_coding_matrix
+        from benchmarks.benchmark_matrix import run_matrix as run_coding_matrix
 
         if pool != DEFAULT_POOL:
             raise ValueError("Coding tasks create fresh official instance-image sandboxes; omit --pool")
@@ -787,7 +788,7 @@ def delete_pool(pool: Path = typer.Option(DEFAULT_POOL)) -> None:
     api = client()
     document = json.loads(pool.read_text())
     if "snapshots" in document:
-        from pocketcontextagent.run.benchmarks.utils.swebench_daytona import delete_resources
+        from benchmarks.utils.swebench_daytona import delete_resources
 
         delete_resources(api, document)
     else:
@@ -807,11 +808,11 @@ def prepare_benchmark(
 ) -> None:
     """Prepare pinned public tasks and separate private grading data; no model calls."""
     if benchmark == "swebench-verified":
-        from pocketcontextagent.run.benchmarks.benchmark_matrix import prepare
+        from benchmarks.benchmark_matrix import prepare
 
         prepare(data_dir or Path("data/swebench-verified"))
     elif benchmark == "browsecomp-plus":
-        from pocketcontextagent.run.benchmarks.utils.browsecomp_plus import prepare_data
+        from benchmarks.utils.browsecomp_plus import prepare_data
 
         prepare_data(data_dir or Path("data/browsecomp-plus"))
     else:
@@ -825,7 +826,7 @@ def show_allocation(
     output: Path | None = typer.Option(None),
 ) -> None:
     """Freeze all 150 corpus and 125 sampled coding tasks; never starts sandboxes."""
-    from pocketcontextagent.run.benchmarks.benchmark_allocation import allocation
+    from benchmarks.benchmark_allocation import allocation
 
     allocation(browsecomp_data, swebench_data, output)
 
@@ -835,7 +836,7 @@ def compare_matrix(
     runs: Path = typer.Option(...), grades: Path | None = typer.Option(None), output: Path | None = typer.Option(None)
 ) -> None:
     """Compare matched attempts; coding correctness requires official test reports."""
-    from pocketcontextagent.run.benchmarks.browsecomp_plus import compare
+    from benchmarks.browsecomp_plus import compare
 
     compare(runs=runs, grades=grades, output=output)
 
@@ -849,7 +850,7 @@ def export_swebench(
     harness_python: str = typer.Option("python", help="Python executable in the trusted grading environment."),
 ) -> None:
     """Export predictions and print Daytona test-grading commands; never executes them."""
-    from pocketcontextagent.run.benchmarks.benchmark_grading import export_evaluation
+    from benchmarks.benchmark_grading import export_evaluation
 
     export_evaluation(runs, data_dir, run_prefix, max_workers, harness_python)
 
@@ -862,6 +863,6 @@ def import_swebench(
     output: Path = typer.Option(...),
 ) -> None:
     """Validate and import official reports bound to the exact predicted patches."""
-    from pocketcontextagent.run.benchmarks.benchmark_grading import import_evaluation
+    from benchmarks.benchmark_grading import import_evaluation
 
     import_evaluation(runs, logs, run_prefix, output)

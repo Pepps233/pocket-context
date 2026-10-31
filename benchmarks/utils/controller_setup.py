@@ -43,7 +43,7 @@ def sandbox_params(
 ) -> "CreateSandboxFromSnapshotParams":
     from daytona import CreateSandboxFromSnapshotParams
 
-    from pocketcontextagent.run.benchmarks.utils.controller_volumes import volume_mount
+    from benchmarks.utils.controller_volumes import volume_mount
 
     return CreateSandboxFromSnapshotParams(
         snapshot=snapshot,

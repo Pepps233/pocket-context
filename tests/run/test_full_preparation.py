@@ -17,14 +17,14 @@ import pytest
 import yaml
 from jinja2 import StrictUndefined, Template
 
+from benchmarks.benchmark_controller import submission_plan
+from benchmarks.benchmark_matrix import load_instances, pin_instances, run_manifest, run_matrix
+from benchmarks.browsecomp_plus_daytona import matrix_query_bytes
+from benchmarks.utils import controller_runtime
+from benchmarks.utils import swebench_verified as swe
 from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
 from pocketcontextagent.config import builtin_config_dir
 from pocketcontextagent.environments.browsecomp_plus import BrowseCompPlusConfig, BrowseCompPlusEnvironment
-from pocketcontextagent.run.benchmarks.benchmark_controller import submission_plan
-from pocketcontextagent.run.benchmarks.benchmark_matrix import load_instances, pin_instances, run_manifest, run_matrix
-from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import matrix_query_bytes
-from pocketcontextagent.run.benchmarks.utils import controller_runtime
-from pocketcontextagent.run.benchmarks.utils import swebench_verified as swe
 
 PRIVATE = "SYNTHETIC_PRIVATE_GRADING_76391"
 TOKENIZER_REVISION = "c202236235762e1c871ad0ccb60c8ee5ba337b9a"

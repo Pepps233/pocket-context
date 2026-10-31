@@ -7,7 +7,7 @@ from threading import Barrier, Event, Semaphore
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.utils.shared_snapshots import SharedSnapshots
+from benchmarks.utils.shared_snapshots import SharedSnapshots
 
 METHODS = {"a", "b", "c", "d"}
 

@@ -2,8 +2,8 @@
 
 !!! note "SWE-bench run script"
 
-    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/benchmarks/swebench.py)
+    - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/benchmarks/swebench.py)
 
-::: pocketcontextagent.run.benchmarks.swebench
+::: benchmarks.swebench
 
 {% include-markdown "../../_footer.md" %}

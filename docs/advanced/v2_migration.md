@@ -95,7 +95,7 @@ Tool calling is the default. The CLI uses `mini.yaml` and `swebench.yaml` which 
 ```bash
 # Default (tool calling)
 mini
-python -m pocketcontextagent.run.benchmarks.swebench
+python -m benchmarks.swebench
 mini-extra swebench
 
 # Text-based parsing

@@ -4,14 +4,14 @@ import subprocess
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.swebench_daytona_evaluate import (
+from benchmarks.swebench_daytona_evaluate import (
     grading_preflight_command,
     load_inputs,
     publish_journal,
     publish_report,
 )
-from pocketcontextagent.run.benchmarks.utils.swebench_daytona import ResourceJournal
-from pocketcontextagent.run.benchmarks.utils.swebench_verified import import_official_results
+from benchmarks.utils.swebench_daytona import ResourceJournal
+from benchmarks.utils.swebench_verified import import_official_results
 
 
 def prediction() -> dict:

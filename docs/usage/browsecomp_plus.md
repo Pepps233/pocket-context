@@ -301,7 +301,7 @@ Upstream requests Qwen3-32B judging for leaderboard submissions.
 For an API-based check using GPT-6 Luna, export `OPENAI_API_KEY` and run our launcher for the upstream alternate judge:
 
 ```bash
-python -m pocketcontextagent.run.benchmarks.browsecomp_plus_judge \
+python -m benchmarks.browsecomp_plus_judge \
   --input-dir runs/browsecomp-plus/my-model \
   --eval-dir runs/browsecomp-plus/evals-gpt-6-luna
 ```

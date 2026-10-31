@@ -1,6 +1,6 @@
 import pytest
 
-from pocketcontextagent.run.benchmarks.pocket_failed_retry import failed_tasks, launch, submit_command
+from benchmarks.pocket_failed_retry import failed_tasks, launch, submit_command
 
 
 def evidence() -> tuple[dict, dict, list[dict]]:

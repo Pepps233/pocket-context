@@ -148,7 +148,7 @@ def evaluator_command(
         [
             python_executable,
             "-m",
-            "pocketcontextagent.run.benchmarks.swebench_daytona_evaluate",
+            "benchmarks.swebench_daytona_evaluate",
             "--dataset_name",
             str(grading_dataset_path),
             "--predictions_path",

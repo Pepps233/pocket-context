@@ -95,19 +95,31 @@ class SWEBenchVerifiedEnvironment:
     def prepare(self, *, fresh_isolated: bool = False) -> None:
         """Reset tracked files ONLY with the owner's explicit fresh-repo assertion.
 
-        cwd must be the repository root. Nonignored preexisting untracked files
-        are rejected, not deleted. No git clean is ever used. This assertion is
+        cwd must be the repository root. Verified build/lib copies of tracked
+        source are preserved and ignored; other untracked files are rejected.
+        No git clean is ever used. This assertion is
         an ownership contract, not a way to discover whether a repo is disposable.
         """
         if fresh_isolated is not True or self.base_commit is not None:
             raise ValueError("prepare requires a fresh isolated repository and may only run once")
         self._checked('test "$(pwd -P)" = "$(git rev-parse --show-toplevel)"')
-        if self._checked("git ls-files --others --exclude-standard -z"):
-            raise ValueError("Fresh repository contains untracked files; refusing to delete or submit them")
         base = self._checked(f"git rev-parse --verify {quote((self.config.base_commit or 'HEAD') + '^{commit}')}")
         base = base.strip()
         if not re.fullmatch(r"[0-9a-f]{40}", base):
             raise ValueError("Repository did not resolve a full base commit")
+        untracked = self._checked("git ls-files --others --exclude-standard -z").split("\0")[:-1]
+        if untracked:
+            copies = self._run(
+                f"for file in {' '.join(quote(path) for path in untracked)}; do\n"
+                'case "$file" in build/lib/*) ;; *) exit 1;; esac\n'
+                'test -f "$file" && ! test -L "$file" || exit 1\n'
+                f'source=$(git rev-parse --verify "{base}:${{file#build/lib/}}") || exit 1\n'
+                'test "$source" = "$(git hash-object --no-filters -- "$file")" || exit 1\n'
+                "done"
+            )
+            if copies["returncode"] != 0:
+                raise ValueError("Fresh repository contains untracked files; refusing to delete or submit them")
+            self._checked('printf "\\n/build/lib/\\n" >> "$(git rev-parse --git-path info/exclude)"')
         self._checked(f"git reset --hard {base}")
         self.base_commit = base
 

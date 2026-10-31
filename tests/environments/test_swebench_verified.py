@@ -119,6 +119,52 @@ def test_explicit_prepare_only_and_no_clean_outside_owned_repo(repository):
         SWEBenchVerifiedEnvironment(subprocess_backend, cwd=str(child)).prepare(fresh_isolated=True)
 
 
+def test_prepare_preserves_verified_build_copies_without_polluting_patch(repository):
+    (repository / "quoted ' source.py").write_text("original = True\n")
+    shell("git add . && git commit -qm source", repository)
+    build = repository / "build/lib"
+    build.mkdir(parents=True)
+    for name in ("code.py", "quoted ' source.py"):
+        (build / name).write_bytes((repository / name).read_bytes())
+    base = shell("git rev-parse HEAD", repository).strip()
+    (repository / "code.py").write_text("value = 999\n")
+    env = SWEBenchVerifiedEnvironment(subprocess_backend, cwd=str(repository), base_commit=base)
+    env.prepare(fresh_isolated=True)
+    assert env.capture_patch() == ""
+    assert (build / "code.py").read_text() == (repository / "code.py").read_text() == "value = 1\n"
+    (repository / "code.py").write_text("value = 2\n")
+    (build / "code.py").write_text("generated = True\n")
+    (repository / "new.py").write_text("new = True\n")
+    patch = env.capture_patch()
+    assert "+value = 2" in patch and "new.py" in patch and "build/lib" not in patch
+    assert "info/exclude" not in patch and ".gitignore" not in patch
+
+
+@pytest.mark.parametrize(
+    ("unexpected",),  # noqa: PT006
+    [("changed_copy",), ("unknown_copy",), ("outside_build",), ("symlink",)],
+)
+def test_prepare_rejects_unverified_build_files_without_mutation(repository, unexpected):
+    build = repository / "build/lib"
+    build.mkdir(parents=True)
+    (build / "code.py").write_bytes((repository / "code.py").read_bytes())
+    if unexpected == "changed_copy":
+        (build / "code.py").write_text("different = True\n")
+    elif unexpected == "unknown_copy":
+        (build / "unknown.py").write_text("value = 1\n")
+    elif unexpected == "outside_build":
+        (repository / "keep.txt").write_text("keep\n")
+    else:
+        (build / "delete.py").symlink_to(repository / "delete.py")
+    exclude = (repository / ".git/info/exclude").read_bytes()
+    before = shell("git status --porcelain --untracked-files=all", repository)
+    with pytest.raises(ValueError, match="untracked"):
+        environment(repository)
+    assert shell("git status --porcelain --untracked-files=all", repository) == before
+    assert (repository / ".git/info/exclude").read_bytes() == exclude
+    assert (build / "code.py").exists()
+
+
 @pytest.mark.parametrize(
     ("command",),  # noqa: PT006
     [

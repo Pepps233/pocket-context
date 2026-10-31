@@ -660,8 +660,9 @@ def run_matrix(
         1, min=1, max=30, help="Dedicated sandboxes per method; one task per sandbox."
     ),
     benchmark: str = typer.Option("browsecomp-plus", help="browsecomp-plus or swebench-verified."),
+    method: str | None = typer.Option(None, help="SWE: isolate one method on this controller."),
     preflight: bool = typer.Option(
-        False, help="Provision coding sandboxes, verify all four methods, and delete; no model calls."
+        False, help="Provision coding sandboxes, verify selected methods, and delete; no model calls."
     ),
 ) -> None:
     """Run matched questions with up to 30 parallel sandboxes per method."""
@@ -684,8 +685,11 @@ def run_matrix(
             dry_run=dry_run,
             workers_per_method=workers_per_method,
             preflight=preflight,
+            method=method,
         )
         return
+    if method is not None:
+        raise ValueError("Use benchmark-controller submit --method for isolated corpus jobs")
     if benchmark != "browsecomp-plus":
         raise ValueError("Select browsecomp-plus or swebench-verified")
     if preflight:

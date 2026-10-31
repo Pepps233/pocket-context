@@ -167,6 +167,8 @@ def test_four_method_coding_matrix_exports_actual_patches_and_native_grades(
     )
     assert comparison_markdown(report).count("20.00%" if step_limit == 1 or not edit else "13.33%") == 4
     export_predictions(root)
+    for method in METHODS:
+        assert list(export_predictions(root, methods=[method])["methods"]) == [method]
     commands = export_evaluation(root, data, "fixture-run")
     assert all("--dataset_name" in command and "grading_dataset.jsonl" in command for command in commands.values())
     original_grading = (data / "grading_dataset.jsonl").read_bytes()

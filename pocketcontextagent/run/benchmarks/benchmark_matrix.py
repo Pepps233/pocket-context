@@ -278,7 +278,11 @@ def run_matrix(
     dry_run: bool,
     workers_per_method: int,
     preflight: bool = False,
+    method: str | None = None,
 ) -> None:
+    if method is not None and method not in METHODS:
+        raise ValueError(f"Unknown method: {method}")
+    methods = [method] if method is not None else list(METHODS)
     config = benchmark_config(config_spec)
     instances = pin_instances(
         load_instances(data_dir, query_ids=query_ids, limit=limit, seed=seed, split=split), config.get("task_images")
@@ -289,22 +293,25 @@ def run_matrix(
         raise ValueError("Select 1 to 30 workers per method")
     selection = {
         "benchmark": "swebench-verified",
+        "methods": methods,
+        "implementation_sha256": implementation_hash(),
+        "queries_sha256": hashlib.sha256((data_dir / "queries.jsonl").read_bytes()).hexdigest(),
         "split": split,
         "seed": seed,
         "workers_per_method": workers_per_method,
         "active_workers_per_method": active,
         "selected_query_ids": [row["query_id"] for row in instances],
-        "attempts": 0 if preflight else len(instances) * len(METHODS),
-        "planned_method_tasks": len(instances) * len(METHODS),
+        "attempts": 0 if preflight else len(instances) * len(methods),
+        "planned_method_tasks": len(instances) * len(methods),
         "preflight_only": preflight,
-        "maximum_active_sandboxes": active * len(METHODS),
+        "maximum_active_sandboxes": active * len(methods),
         "sandbox_idle_stop_minutes": 0,
         "sandbox_ttl_minutes": runtime.ttl_minutes,
         "task_wall_time_limit_seconds": config["agent"]["wall_time_limit_seconds"],
         "controller_id": os.getenv("MSWEA_CONTROLLER_ID"),
     }
     manifests = {
-        method: run_manifest(config, method, instances, active, data_dir / "queries.jsonl", split) for method in METHODS
+        method: run_manifest(config, method, instances, active, data_dir / "queries.jsonl", split) for method in methods
     }
     typer.echo(yaml.safe_dump(selection, sort_keys=False))
     if dry_run:
@@ -331,13 +338,13 @@ def run_matrix(
                 raise ValueError("The coding matrix requires a native-tool model")
     output.mkdir(parents=True, exist_ok=True)
     (output / "selection.yaml").write_text(yaml.safe_dump(selection, sort_keys=False), encoding="utf-8")
-    locks = {method: threading.Lock() for method in METHODS}
+    locks = {method: threading.Lock() for method in methods}
     archive_lock = threading.Lock()
     journal = ResourceJournal(output / "sandbox-cleanup.json")
     builders = threading.Semaphore(runtime.snapshot_build_workers)
-    readiness = {row["query_id"]: threading.Barrier(len(METHODS)) for row in instances}
-    checks = {method: {} for method in METHODS}
-    groups = {method: [{"id": f"{method}-{i}"} for i in range(active)] for method in METHODS}
+    readiness = {row["query_id"]: threading.Barrier(len(methods)) for row in instances}
+    checks = {method: {} for method in methods}
+    groups = {method: [{"id": f"{method}-{i}"} for i in range(active)] for method in methods}
 
     def create(instance: dict) -> PreparedSnapshot:
         with builders:
@@ -408,6 +415,13 @@ def run_matrix(
                     if preflight:
                         if env._checked("cat /tmp/pca-infrastructure-isolation") != method:
                             raise RuntimeError("Method sandboxes do not have isolated filesystems")
+                        probe = f".pca-preflight-{uuid4().hex}.txt"
+                        env._checked(f"printf '%s' {method} > {probe}")
+                        captured = env.capture_patch()
+                        env._checked(f"rm -- {probe}")
+                        if probe not in captured or f"+{method}" not in captured or env.capture_patch().strip():
+                            raise RuntimeError("Patch capture failed to preserve an edit or restore the clean checkout")
+                        record["patch_capture_verified"] = True
                         record["python_environment"] = env._checked(
                             "set -e; python --version; command -v pytest"
                         ).strip()
@@ -468,7 +482,7 @@ def run_matrix(
     queue_factor = (active + runtime.snapshot_build_workers - 1) // runtime.snapshot_build_workers + 1
     try:
         with SharedSnapshots(
-            set(METHODS),
+            set(methods),
             active,
             create,
             destroy,
@@ -488,19 +502,20 @@ def run_matrix(
             encoding="utf-8",
         )
         typer.echo(
-            f"Verified {sum(map(len, checks.values()))} coding sandboxes across four methods; zero model calls; cleanup confirmed"
+            f"Verified {sum(map(len, checks.values()))} coding sandboxes across {len(methods)} methods; zero model calls; cleanup confirmed"
         )
         return
-    report = export_predictions(output)
+    report = export_predictions(output, methods=methods)
     (output / "comparison.yaml").write_text(yaml.safe_dump(report, sort_keys=False), encoding="utf-8")
     typer.echo(comparison_markdown(report))
     if any(row["completed"] < row["tasks"] for row in report["methods"].values()):
         raise typer.Exit(1)
 
 
-def export_predictions(runs: Path) -> dict:
-    report = compare_runs(runs)
-    for method in METHODS:
+def export_predictions(runs: Path, *, methods: list[str] | None = None) -> dict:
+    methods = list(METHODS) if methods is None else methods
+    report = compare_runs(runs, methods=methods)
+    for method in methods:
         rows = [json.loads(path.read_text()) for path in sorted((runs / method).glob("*.json"))]
         manifest = yaml.safe_load((runs / method / "run.yaml").read_text())
         if manifest["config"].get("benchmark") != "swebench-verified":

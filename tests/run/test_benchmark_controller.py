@@ -136,7 +136,7 @@ def test_corpus_submission_default_and_override_preserve_existing_matrix(prepare
     ("benchmark", "method", "error"),
     [
         ("browsecomp-plus", "typo", "Unknown method"),
-        ("swebench-verified", "react", "require --benchmark browsecomp-plus"),
+        ("swebench-verified", "typo", "Unknown method"),
     ],
 )
 def test_invalid_method_submission_fails_before_data_or_cloud_access(
@@ -251,3 +251,39 @@ def test_mini_extra_root_help_is_lazy_and_controller_alias_has_commands(tmp_path
         if arguments[0] == "benchmark-controller":
             assert all(command in result.stdout for command in ("submit", "status", "logs", "fetch", "cancel"))
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    ("method", "preflight"), [(method, preflight) for method in METHODS for preflight in (True, False)]
+)
+def test_swe_single_method_plan_matches_worker_cli(prepared, method, preflight):
+    args = [
+        "--data-dir",
+        str(prepared),
+        "--limit",
+        "6",
+        "--seed",
+        "42",
+        "--workers-per-method",
+        "6",
+        "--method",
+        method,
+        "--dry-run",
+        *(["--preflight"] if preflight else []),
+    ]
+    submitted = CliRunner().invoke(
+        app, ["submit", "--benchmark", "swebench-verified", *args], env=credential_free_env()
+    )
+    worker = CliRunner().invoke(
+        matrix_app, ["matrix", "--benchmark", "swebench-verified", *args], env=credential_free_env()
+    )
+    assert submitted.exit_code == worker.exit_code == 0, submitted.output + worker.output
+    plan, actual = yaml.safe_load(submitted.stdout), yaml.safe_load(worker.stdout)
+    validate_remote_plan(plan, actual)
+    assert actual["methods"] == [method]
+    assert actual["maximum_active_sandboxes"] == plan["maximum_active_coding_sandboxes"] == 6
+    assert actual["attempts"] == (0 if preflight else 6)
+    assert actual["planned_method_tasks"] == plan["planned_attempts"] == 6
+    assert PRIVATE not in submitted.stdout + worker.stdout
+    with pytest.raises(ValueError, match="methods"):
+        validate_remote_plan(plan, actual | {"methods": list(METHODS)})

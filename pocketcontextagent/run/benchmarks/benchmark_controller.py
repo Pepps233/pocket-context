@@ -14,6 +14,7 @@ from uuid import uuid4
 import typer
 import yaml
 
+from pocketcontextagent.comparisons.registry import METHODS
 from pocketcontextagent.run.benchmarks.browsecomp_plus import implementation_hash
 from pocketcontextagent.run.benchmarks.browsecomp_plus_daytona import (
     build_wheel,
@@ -363,8 +364,9 @@ def submission_plan(
         from pocketcontextagent.run.benchmarks.utils.controller_browsecomp import plan
 
         return plan(data_dir, config_spec, limit, seed, workers, query_ids, split=split or "eval150", method=method)
-    if method is not None:
-        raise ValueError("Single-method controllers currently require --benchmark browsecomp-plus")
+    if method is not None and method not in METHODS:
+        raise ValueError(f"Unknown method: {method}")
+    methods = [method] if method is not None else list(METHODS)
     if benchmark != "swebench-verified" or split not in (None, "test"):
         raise ValueError("Select browsecomp-plus/eval150 or swebench-verified/test")
     from pocketcontextagent.run.benchmarks.benchmark_matrix import (
@@ -384,20 +386,30 @@ def submission_plan(
     provider_endpoint(config["model"])
     return config, {
         "benchmark": "swebench-verified",
+        "methods": methods,
+        "queries_sha256": hashlib.sha256((data_dir / "queries.jsonl").read_bytes()).hexdigest(),
         "selected_query_ids": [row["query_id"] for row in instances],
         "limit": limit,
         "seed": seed,
         "query_ids": query_ids,
         "workers_per_method": workers,
-        "maximum_active_coding_sandboxes": min(workers, len(instances)) * 4,
-        "planned_attempts": len(instances) * 4,
+        "maximum_active_coding_sandboxes": min(workers, len(instances)) * len(methods),
+        "planned_attempts": len(instances) * len(methods),
         "model": config["model"]["model_name"],
         "implementation_sha256": implementation_hash(),
     }
 
 
 def validate_remote_plan(plan: dict, remote: dict) -> None:
-    keys = ["selected_query_ids"]
+    keys = [
+        "selected_query_ids",
+        "methods",
+        "workers_per_method",
+        "attempts",
+        "preflight_only",
+        "implementation_sha256",
+        "queries_sha256",
+    ]
     if plan["benchmark"] == "browsecomp-plus":
         keys += [
             "methods",
@@ -431,7 +443,7 @@ def submit(
     workers_per_method: int | None = typer.Option(
         None, min=1, max=30, help="Defaults to 6 with --method, otherwise 1."
     ),
-    method: str | None = typer.Option(None, help="BrowseComp only: isolate one method on this controller."),
+    method: str | None = typer.Option(None, help="Isolate one method on this controller."),
     query_ids: list[str] = typer.Option([], "--query-id"),
     config_spec: list[str] = typer.Option([], "-c", "--config"),
     min_free_bytes: int = typer.Option(
@@ -554,8 +566,8 @@ def submit(
             "--output",
             remote + "/output",
         ]
-        if method is not None:
-            arguments.extend(["--method", method])
+    if method is not None:
+        arguments.extend(["--method", method])
     for identifier_value in query_ids:
         arguments.extend(["--query-id", identifier_value])
     if preflight:

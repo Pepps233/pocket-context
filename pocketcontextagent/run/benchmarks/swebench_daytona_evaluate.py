@@ -112,6 +112,38 @@ PY
         raise RuntimeError("TCP timeout fixture setup failed; see timeout-network-setup.log")
 
 
+def prepare_legacy_sqlite(sandbox: "Sandbox", instance: dict, directory: Path) -> str:
+    """Keep pre-3.26 table renaming semantics for legacy Django test environments."""
+    if instance["repo"] != "django/django" or instance["version"] not in {"1.11", "2.2"}:
+        return ""
+    setup = """set -eu
+/opt/miniconda3/envs/testbed/bin/python -c 'import sqlite3; print("Original SQLite:", sqlite3.sqlite_version)'
+mkdir /tmp/pca-sqlite-build
+cd /tmp/pca-sqlite-build
+curl --fail --location --retry 2 https://www.sqlite.org/2018/sqlite-autoconf-3240000.tar.gz -o sqlite.tar.gz
+echo 'd9d14e88c6fb6d68de9ca0d1f9797477d82fc3aed613558f87ffbdbbc5ceb74a  sqlite.tar.gz' | sha256sum -c -
+tar -xzf sqlite.tar.gz
+cd sqlite-autoconf-3240000
+./configure --prefix=/tmp/pca-legacy-sqlite --disable-static --disable-readline --enable-fts5
+make -j2
+make install
+LD_PRELOAD=/tmp/pca-legacy-sqlite/lib/libsqlite3.so.0 /opt/miniconda3/envs/testbed/bin/python - <<'PY'
+import json, sqlite3
+connection = sqlite3.connect(':memory:')
+connection.executescript('CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER REFERENCES parent(id)); ALTER TABLE parent RENAME TO parent__old;')
+target = connection.execute('PRAGMA foreign_key_list(child)').fetchone()[2]
+print(json.dumps({'sqlite_version': sqlite3.sqlite_version, 'foreign_key_target': target}))
+assert sqlite3.sqlite_version == '3.24.0' and target == 'parent'
+PY
+"""
+    (directory / "legacy-sqlite-setup.sh").write_text(setup)
+    response = sandbox.process.exec("/bin/bash -c " + quote(setup), cwd="/tmp", timeout=300)
+    (directory / "legacy-sqlite-setup.log").write_text(response.result)
+    if response.exit_code != 0:
+        raise RuntimeError("Legacy SQLite setup failed; see legacy-sqlite-setup.log")
+    return "LD_PRELOAD=/tmp/pca-legacy-sqlite/lib/libsqlite3.so.0 "
+
+
 def verify_harness() -> None:
     import swebench
 
@@ -258,6 +290,7 @@ def evaluate(
             return
         fixture_environment = prepare_httpbin(sandbox, instance, directory)
         prepare_timeout_network(sandbox, instance, directory)
+        fixture_environment += prepare_legacy_sqlite(sandbox, instance, directory)
         if instance["repo"] == "sphinx-doc/sphinx":
             reporting = {"PYTEST_ADDOPTS": "-rA", "TOX_OVERRIDE": "testenv.pass_env+=PYTEST_ADDOPTS"}
             (directory / "test-reporting-environment.json").write_text(json.dumps(reporting))

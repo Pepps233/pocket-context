@@ -140,7 +140,15 @@ def publish_report(spec: "TestSpec", pred: dict, directory: Path, exit_code: int
     return report
 
 
-def evaluate(instance: dict, pred: dict, root: Path, timeout: int, runtime: RuntimeConfig) -> None:
+def publish_journal(journal: ResourceJournal, directory: Path) -> None:
+    destination = directory / "sandbox-cleanup.json"
+    if journal.path != destination and journal.path.exists():
+        destination.write_bytes(journal.path.read_bytes())
+
+
+def evaluate(
+    instance: dict, pred: dict, root: Path, timeout: int, runtime: RuntimeConfig, journal_root: Path | None = None
+) -> None:
     from daytona import Daytona, SessionExecuteRequest
     from swebench.harness.run_evaluation import GIT_APPLY_CMDS
     from swebench.harness.test_spec.test_spec import make_test_spec
@@ -153,18 +161,25 @@ def evaluate(instance: dict, pred: dict, root: Path, timeout: int, runtime: Runt
         return
     spec = make_test_spec(instance, namespace="swebench", arch="x86_64")
     (directory / "eval.sh").write_text(spec.eval_script)
-    journal = ResourceJournal(directory / "sandbox-cleanup.json")
+    journal_directory = journal_root / directory.relative_to(root) if journal_root else directory
+    if journal_root:
+        journal_directory.mkdir(parents=True, exist_ok=False)
+    journal = ResourceJournal(journal_directory / "sandbox-cleanup.json")
+    (directory / "resource-journal-location.json").write_text(json.dumps({"path": str(journal.path.resolve())}))
     api = Daytona()
     try:
         snapshot = create_snapshot(api, runtime, journal, public_task(instance))
+        publish_journal(journal, directory)
         name = f"pca-swe-grading-{uuid4().hex[:16]}"
         journal.record("sandboxes", name, phase="creating", snapshot=snapshot.name)
+        publish_journal(journal, directory)
         sandbox = api.create(
             sandbox_params(snapshot, "grading", runtime, name=name).model_copy(update={"network_block_all": False}),
             timeout=runtime.startup_timeout_seconds,
         )
         journal.record("sandboxes", name, id=sandbox.id, phase="running")
         journal.record("sandboxes", name, lifecycle=sandbox_metadata(api.get(sandbox.id).model_dump(), runtime))
+        publish_journal(journal, directory)
         initial = sandbox.process.exec("git rev-parse HEAD && git status --porcelain", cwd="/testbed", timeout=60)
         (directory / "initial-repository-state.log").write_text(initial.result)
 
@@ -216,8 +231,11 @@ def evaluate(instance: dict, pred: dict, root: Path, timeout: int, runtime: Runt
         report = publish_report(spec, pred, directory, result.exit_code)
         typer.echo(f"{pred['instance_id']}: resolved={report[pred['instance_id']]['resolved']}")
     finally:
-        delete_resources(api, journal.document(), runtime.cleanup_timeout_seconds)
-        (directory / "cleanup-confirmed.json").write_text(json.dumps({"confirmed": True}))
+        try:
+            publish_journal(journal, directory)
+        finally:
+            delete_resources(api, journal.document(), runtime.cleanup_timeout_seconds)
+            (directory / "cleanup-confirmed.json").write_text(json.dumps({"confirmed": True}))
 
 
 @app.command()
@@ -230,6 +248,9 @@ def main(
     max_workers: int = typer.Option(1, "--max_workers", min=1, max=6),
     timeout: int = typer.Option(1800, min=1),
     logs: Path = typer.Option(Path("logs/run_evaluation")),
+    journal_root: Path | None = typer.Option(
+        None, help="Local disk for atomic resource journals when logs use a volume."
+    ),
     cpu: int = typer.Option(2, min=1),
     memory: int = typer.Option(8, min=1),
     disk: int = typer.Option(10, min=1),
@@ -260,13 +281,14 @@ def main(
                 "timeout": timeout,
                 "max_workers": max_workers,
                 "network_block_all": False,
+                "journal_root": str(journal_root.resolve()) if journal_root else None,
             },
             indent=2,
         )
     )
     runtime = RuntimeConfig(cpu=cpu, memory=memory, disk=disk, ttl_minutes=(timeout + 1800) // 60 + 1)
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        list(pool.map(lambda pair: evaluate(*pair, root, timeout, runtime), rows))
+        list(pool.map(lambda pair: evaluate(*pair, root, timeout, runtime, journal_root), rows))
 
 
 if __name__ == "__main__":

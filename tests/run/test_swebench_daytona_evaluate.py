@@ -3,12 +3,28 @@ import json
 
 import pytest
 
-from pocketcontextagent.run.benchmarks.swebench_daytona_evaluate import load_inputs, publish_report
+from pocketcontextagent.run.benchmarks.swebench_daytona_evaluate import load_inputs, publish_journal, publish_report
+from pocketcontextagent.run.benchmarks.utils.swebench_daytona import ResourceJournal
 from pocketcontextagent.run.benchmarks.utils.swebench_verified import import_official_results
 
 
 def prediction() -> dict:
     return {"instance_id": "psf__requests-1", "model_name_or_path": "org/model", "model_patch": "a patch\n"}
+
+
+def test_published_journal_preserves_local_recovery_evidence(tmp_path):
+    directory = tmp_path / "volume"
+    directory.mkdir()
+    journal = ResourceJournal(tmp_path / "local" / "sandbox-cleanup.json")
+    publish_journal(journal, directory)
+    assert not (directory / "sandbox-cleanup.json").exists()
+    journal.record("snapshots", "snapshot", phase="creating")
+    publish_journal(journal, directory)
+    journal.record("sandboxes", "sandbox", id="sandbox-id", phase="running")
+    assert json.loads((directory / "sandbox-cleanup.json").read_text())["sandboxes"] == []
+    publish_journal(journal, directory)
+    assert json.loads((directory / "sandbox-cleanup.json").read_text()) == journal.document()
+    assert journal.path.read_bytes() == (directory / "sandbox-cleanup.json").read_bytes()
 
 
 def test_grading_inputs_bind_exact_bytes_and_reject_duplicates_and_unsafe_paths(tmp_path):

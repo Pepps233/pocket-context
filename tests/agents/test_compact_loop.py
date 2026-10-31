@@ -145,7 +145,7 @@ def make_agent(tmp_path, api, *, args=None, agent_class=DefaultAgent, outputs=No
         instance_template="{{task}}",
         cost_limit=0,
         context_db_path=tmp_path / "context.sqlite3",
-        **kwargs,
+        **({"compact_pressure_fraction": 0} | kwargs),
     )
 
 

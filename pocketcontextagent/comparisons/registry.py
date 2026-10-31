@@ -58,6 +58,7 @@ def configure_context_window(config: dict, context_window: int | None = None) ->
 
 METHOD_AGENT_FIELDS = {
     "context_token_limit",
+    "compact_pressure_fraction",
     "resum_trigger_ratio",
     "resum_headroom_tokens",
     "resum_summary_token_limit",
@@ -79,6 +80,8 @@ def configure_method(config: dict, method: str) -> dict:
     strategy = METHODS[method]
     agent = config.setdefault("agent", {})
     agent["agent_class"] = strategy.agent_class
+    if method == "pocket_context":
+        agent.setdefault("compact_pressure_fraction", 0.5)
     benchmark = config.get("benchmark", "browsecomp-plus")
     if benchmark not in RESEARCH_MODES:
         raise ValueError(f"Unknown benchmark {benchmark!r}")

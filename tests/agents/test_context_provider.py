@@ -54,10 +54,11 @@ def responses_server():
 
 
 @pytest.mark.parametrize(("fail_summary",), [(False,), (True,)])  # noqa: PT006
-def test_production_responses_compaction_and_expansion(tmp_path, responses_server, fail_summary):
+@pytest.mark.parametrize(("pressure",), [(False,), (True,)])  # noqa: PT006
+def test_production_responses_compaction_and_expansion(tmp_path, responses_server, fail_summary, pressure):
     url, requests, outputs = responses_server
     for name, arguments in [
-        ("bash", {"command": "printf 'archive-output'; printf '%03000d' 0"}),
+        ("bash", {"command": f"printf 'archive-output'; printf '%0{60000 if pressure else 3000}d' 0"}),
         ("bash", {"command": "echo retained"}),
         ("compact_block", {"start_id": "b001", "end_id": "b001"}),
         (None, {}),
@@ -92,6 +93,8 @@ def test_production_responses_compaction_and_expansion(tmp_path, responses_serve
         LocalEnvironment(),
         context_db_path=tmp_path / "context.sqlite",
         cost_limit=0,
+        context_token_limit=32000 if pressure else 0,
+        response_token_limit=4000,
         system_template="System",
         instance_template="{{task}}",
     )
@@ -103,6 +106,13 @@ def test_production_responses_compaction_and_expansion(tmp_path, responses_serve
         assert "history preserved. Continue the task" in json.dumps(requests[-1])
         assert "archive-output" + "0" * 3000 in json.dumps(requests[-1])
     assert requests[3]["tool_choice"] == "none"
+    if pressure:
+        assert [tool["name"] for tool in requests[0]["tools"]] == ["bash", "expand_block"]
+        assert "compact_block" in [tool["name"] for tool in requests[2]["tools"]]
+        if not fail_summary:
+            assert [tool["name"] for tool in requests[4]["tools"]] == ["bash", "expand_block"]
+            assert "Eligible context blocks" not in json.dumps(requests[4])
+            assert "[Available archives for expand_block]" in json.dumps(requests[4])
     for request in requests:
         for item in request["input"]:
             if item.get("role") in ("user", "system") and isinstance(item.get("content"), list):

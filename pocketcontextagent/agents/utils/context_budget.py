@@ -17,6 +17,17 @@ def output_token_setting(model, default: int) -> tuple[str, int]:
     return "max_output_tokens" if responses else "max_tokens", default
 
 
+def request_tools(model, *, compact: bool = True) -> list[dict]:
+    tools = (
+        model.get_tools()
+        if hasattr(model, "get_tools")
+        else []
+        if hasattr(model.config, "action_regex")
+        else [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL]
+    )
+    return [tool for tool in tools if compact or tool.get("function", tool).get("name") != "compact_block"]
+
+
 def retained_reasoning_tokens(messages: list[dict]) -> int:
     tokens = 0
     for message in messages:

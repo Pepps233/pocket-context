@@ -73,7 +73,8 @@ def test_stopping_threshold_uses_input_without_output_reservation(tmp_path: Path
         context_db_path=tmp_path / "context.sqlite",
     )
     empty_input_tokens = agent.context_tokens(
-        [model.format_message(role="system", content="Work"), model.format_message(role="user", content="")]
+        [model.format_message(role="system", content="Work"), model.format_message(role="user", content="")],
+        compact=True,
     )
     assert agent.run("x" * (4 * (input_tokens - empty_input_tokens)))["exit_status"] == "Submitted"
     assert marker.exists() == (input_tokens < 60800)

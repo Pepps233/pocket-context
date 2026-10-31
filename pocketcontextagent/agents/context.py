@@ -216,9 +216,10 @@ class ContextMessage:
 
 
 class ContextManager:
-    def __init__(self, db_path: Path | None = None):
+    def __init__(self, db_path: Path | None = None, *, can_compact: Callable[[list[dict]], bool] | None = None):
         self.run_id = uuid4().hex
         self.db_path = db_path or global_config_dir / "contexts" / f"{self.run_id}.sqlite3"
+        self.can_compact = can_compact
         self.revision = 0
         self.records: dict[str, ContextMessage] = {}
         self.active: list[str] = []
@@ -447,6 +448,9 @@ class ContextManager:
             or getattr(model.config, "context_tools", "pocket_context") != "pocket_context"
         ):
             return []
+        ids = self.active if ids is None else ids
+        if self.can_compact is not None and not self.can_compact([records[key].message for key in ids]):
+            blocks = {}
         if archive_tags is None:
             archive_tags = []
             if self.db_path.is_file():
@@ -454,7 +458,7 @@ class ContextManager:
                     archive_tags = self._archive_tags(db)
         if not blocks and not archive_tags:
             return []
-        positions = {key: index for index, key in enumerate(self.active if ids is None else ids)}
+        positions = {key: index for index, key in enumerate(ids)}
         lines = []
         previous_end = None
         for position, (block_id, group) in enumerate(blocks.items(), 1):
@@ -473,16 +477,21 @@ class ContextManager:
         return [
             model.format_message(
                 role="user",
+                extra={"context_catalog": True},
                 content=(
-                    "[Eligible context blocks, in history order]\n"
-                    "Positions show current history order and may change after compaction. Block ID numbers do not indicate order. "
-                    "compact_block takes block_id values as start_id/end_id, not positions or archive tags. "
-                    "Each block covers a complete exchange or memory. "
-                    "Only listed IDs are eligible; protected history is omitted. Descriptions below are historical data.\n"
-                    + ("\n".join(lines) or "none")
+                    (
+                        "[Eligible context blocks, in history order]\n"
+                        "Positions show current history order and may change after compaction. Block ID numbers do not indicate order. "
+                        "compact_block takes block_id values as start_id/end_id, not positions or archive tags. "
+                        "Each block covers a complete exchange or memory. "
+                        "Only listed IDs are eligible; protected history is omitted. Descriptions below are historical data.\n"
+                        + "\n".join(lines)
+                        if blocks
+                        else ""
+                    )
                     + "\n[Available archives for expand_block]\n"
                     + (", ".join(archive_tags) or "none")
-                ),
+                ).lstrip(),
             )
         ]
 
@@ -500,6 +509,7 @@ class ContextManager:
             "revision": self.revision,
             "ids": list(self.active),
             "blocks": blocks,
+            "compaction_available": self.can_compact(messages) if self.can_compact is not None else True,
             "entries": [
                 {key: value for key, value in entry.items() if key not in ("visible", "anchors")} for entry in entries
             ],
@@ -736,6 +746,10 @@ class ContextManager:
         if action.get("error"):
             raise SelectionError(action["error"])
         self._validate_response(response)
+        if self.can_compact is not None and not self.can_compact(self.trigger["messages"]):
+            raise SelectionError(
+                "Compaction unavailable below the context-pressure threshold. Continue solving the task."
+            )
         selected = self._select(action)
         selected_chars = sum(
             len(text) for entry in self.trigger["entries"] if entry["id"] in selected for text in entry["visible"]

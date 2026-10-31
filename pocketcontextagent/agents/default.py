@@ -20,6 +20,7 @@ from pocketcontextagent.agents.utils.context_budget import (
     estimate_tokens,
     fit_observations,
     output_token_setting,
+    request_tools,
     retained_reasoning_tokens,
 )
 from pocketcontextagent.exceptions import FormatError, InterruptAgentFlow, LimitsExceeded, Submitted, TimeExceeded
@@ -47,6 +48,8 @@ class AgentConfig(BaseModel):
     """SQLite context archive; defaults to a separate database for each run."""
     compact_min_chars: int = Field(default=2000, ge=0)
     compact_min_reduction: int = Field(default=512, ge=0)
+    compact_pressure_fraction: float = Field(default=0.5, ge=0, le=1)
+    """Offer compaction at this fraction of context minus output allowance; 0 disables gating."""
     context_token_limit: int = Field(default=0, ge=0)
     """Working context window, including the next response; 0 disables accounting."""
     response_token_limit: int = Field(default=16384, gt=0)
@@ -68,7 +71,7 @@ class DefaultAgent:
         """See the `AgentConfig` class for permitted keyword arguments."""
         self.config = config_class(**kwargs)
         self.messages: list[dict] = []
-        self.context = ContextManager(self.config.context_db_path)
+        self.context = ContextManager(self.config.context_db_path, can_compact=self.compaction_available)
         self._context_results: dict[tuple[int, str], list[dict]] = {}
         self.model = model
         self.env = env
@@ -124,7 +127,7 @@ class DefaultAgent:
         """Run step() until agent is finished. Returns dictionary with exit_status, submission keys."""
         self.extra_template_vars |= {"task": task, **kwargs}
         self.messages = []
-        self.context = ContextManager(self.config.context_db_path)
+        self.context = ContextManager(self.config.context_db_path, can_compact=self.compaction_available)
         self._context_results = {}
         self._final_generation = False
         self.compactions = []
@@ -235,9 +238,18 @@ class DefaultAgent:
                     }
                 )
             options[key] = min(allowance, remaining)
+            if self.config.compact_pressure_fraction and hasattr(self.model, "get_tools"):
+                options["tools"] = request_tools(
+                    self.model, compact=self.compaction_available(self.context.projection())
+                )
         self.n_calls += 1
         message = self.model.query(self.context.assemble(self.model), **options)
         self.cost += message.get("extra", {}).get("cost", 0.0)
+        if self.config.context_token_limit:
+            message.setdefault("extra", {})["context_budget"] = {
+                "estimated_input_tokens": self.context_tokens(self.context.request_projection(self.model)),
+                "compaction_available": self.context.manifests[-1]["compaction_available"],
+            }
         self.add_messages(message)
         return message
 
@@ -250,13 +262,23 @@ class DefaultAgent:
         outputs = [self.env.execute(action) for action in message.get("extra", {}).get("actions", [])]
         return self.add_observations(self.model.format_observation_messages(message, outputs, self.get_template_vars()))
 
-    def context_tokens(self, messages: list[dict]) -> int:
+    def compaction_available(self, messages: list[dict]) -> bool:
+        if not self.config.context_token_limit or not self.config.compact_pressure_fraction:
+            return True
+        _, allowance = output_token_setting(self.model, self.config.response_token_limit)
+        return self.context_tokens(
+            [message for message in messages if not message.get("extra", {}).get("context_catalog")], compact=False
+        ) >= self.config.compact_pressure_fraction * max(0, self.config.context_token_limit - allowance)
+
+    def context_tokens(self, messages: list[dict], *, compact: bool | None = None) -> int:
         return estimate_tokens(
             self.context._prepare(self.model, messages),
             getattr(self.env, "tokenizer", None),
             text_based=hasattr(self.model.config, "action_regex"),
             reasoning_tokens=retained_reasoning_tokens(messages),
-            tools=self.model.get_tools() if hasattr(self.model, "get_tools") else None,
+            tools=request_tools(
+                self.model, compact=self.compaction_available(messages) if compact is None else compact
+            ),
         )
 
     def prepare_observations(self, messages: list[dict], history: list[dict], *, truncate: bool = True) -> list[dict]:

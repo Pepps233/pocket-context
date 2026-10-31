@@ -94,8 +94,7 @@ class PortkeyModel:
         return self.client.chat.completions.create(
             model=self.config.model_name,
             messages=messages,
-            tools=[BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL],
-            **(self.config.model_kwargs | kwargs),
+            **({"tools": [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL]} | self.config.model_kwargs | kwargs),
         )
 
     def _prepare_messages_for_api(self, messages: list[dict]) -> list[dict]:

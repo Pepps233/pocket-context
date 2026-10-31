@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from pocketcontextagent import Model
 from pocketcontextagent.agents.context import ContextOperationError, archived_content, relationships
-from pocketcontextagent.agents.utils.context_budget import estimate_tokens, output_token_setting
+from pocketcontextagent.agents.utils.context_budget import estimate_tokens, output_token_setting, request_tools
 from pocketcontextagent.models.utils.compact_tool import CONTEXT_TOOLS
 from pocketcontextagent.models.utils.response import has_tool_calls, response_text
 
@@ -75,7 +75,7 @@ class CompactionAgent:
                 - estimate_tokens(
                     self.messages,
                     self.tokenizer,
-                    tools=self.model.get_tools() if hasattr(self.model, "get_tools") else None,
+                    tools=request_tools(self.model),
                 ),
             )
             if allowance <= 0:

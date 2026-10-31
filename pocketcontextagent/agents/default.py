@@ -243,7 +243,7 @@ class DefaultAgent:
             options[key] = min(allowance, remaining)
             if (
                 self.config.compact_pressure_fraction
-                and hasattr(self.model, "get_tools")
+                and not hasattr(self.model.config, "action_regex")
                 and getattr(self.model.config, "context_tools", "pocket_context") == "pocket_context"
             ):
                 options["tools"] = request_tools(

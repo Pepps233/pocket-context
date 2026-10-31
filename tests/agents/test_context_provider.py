@@ -33,7 +33,7 @@ def responses_server():
                     "usage": {"input_tokens": 10, "output_tokens": 10, "total_tokens": 20},
                 }
             ).encode()
-            self.send_response(401 if isinstance(output, dict) else 200)
+            self.send_response(401 if isinstance(output, dict) and "error" in output else 200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()

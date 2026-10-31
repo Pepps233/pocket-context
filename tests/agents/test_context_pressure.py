@@ -32,11 +32,13 @@ def tool_names(options: dict) -> list[str]:
     return [tool.get("function", tool)["name"] for tool in options["tools"]]
 
 
-def test_pressure_gates_tools_and_catalog_and_rearms_after_compaction(tmp_path: Path, api: bool):
+@pytest.mark.parametrize(("discoverable",), [(False,), (True,)])  # noqa: PT006
+def test_pressure_gates_tools_and_catalog_and_rearms_after_compaction(tmp_path: Path, api: bool, discoverable: bool):
     agent = make_agent(
         tmp_path, api, context_token_limit=32000, response_token_limit=4000, compact_pressure_fraction=0.5
     )
-    agent.model = (PressureResponseModel if api else PressureChatModel)(**agent.model.config.model_dump())
+    if discoverable:
+        agent.model = (PressureResponseModel if api else PressureChatModel)(**agent.model.config.model_dump())
     agent.model.config.outputs[0] = native_turn(
         "bash", {"command": "printf 'archive-output'; printf '%060000d' 0"}, "a", "Inspect archive-start", api
     )

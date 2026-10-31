@@ -77,8 +77,11 @@ class PortkeyResponseAPIModel:
         return self.client.responses.create(
             model=self.config.model_name,
             input=messages,
-            tools=[BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API],
-            **(self.config.model_kwargs | kwargs),
+            **(
+                {"tools": [BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API]}
+                | self.config.model_kwargs
+                | kwargs
+            ),
         )
 
     def _prepare_messages_for_api(self, messages: list[dict]) -> list[dict]:

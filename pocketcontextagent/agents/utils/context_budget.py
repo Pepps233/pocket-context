@@ -5,7 +5,13 @@ from math import ceil
 
 from pocketcontextagent.agents.context import encode
 from pocketcontextagent.models.utils.actions_toolcall import BASH_TOOL
-from pocketcontextagent.models.utils.compact_tool import COMPACT_TOOL, EXPAND_TOOL
+from pocketcontextagent.models.utils.actions_toolcall_response import BASH_TOOL_RESPONSE_API
+from pocketcontextagent.models.utils.compact_tool import (
+    COMPACT_TOOL,
+    COMPACT_TOOL_RESPONSE_API,
+    EXPAND_TOOL,
+    EXPAND_TOOL_RESPONSE_API,
+)
 
 
 def output_token_setting(model, default: int) -> tuple[str, int]:
@@ -18,13 +24,14 @@ def output_token_setting(model, default: int) -> tuple[str, int]:
 
 
 def request_tools(model, *, compact: bool = True) -> list[dict]:
-    tools = (
-        model.get_tools()
-        if hasattr(model, "get_tools")
-        else []
-        if hasattr(model.config, "action_regex")
-        else [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL]
-    )
+    if hasattr(model, "get_tools"):
+        tools = model.get_tools()
+    elif hasattr(model.config, "action_regex"):
+        tools = []
+    elif any("response_model" in cls.__module__ for cls in type(model).__mro__):
+        tools = [BASH_TOOL_RESPONSE_API, COMPACT_TOOL_RESPONSE_API, EXPAND_TOOL_RESPONSE_API]
+    else:
+        tools = [BASH_TOOL, COMPACT_TOOL, EXPAND_TOOL]
     return [tool for tool in tools if compact or tool.get("function", tool).get("name") != "compact_block"]
 
 

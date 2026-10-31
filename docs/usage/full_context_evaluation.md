@@ -170,13 +170,11 @@ Grading is a separate authorized phase, not a side effect of preparation or subm
 - **BrowseComp:** official grading uses `Qwen/Qwen3-32B` with vLLM on a suitable Linux
   GPU host. Prior GPT-4.1 judging is an explicitly alternate grader, not official Qwen
   evidence; label it separately and do not silently merge grader results.
-- **SWE:** use a trusted Docker-capable Linux x86_64 host, official harness **v4.1.0**,
-  commit `726c5461e2ef52d83cf1ea2107870a8bb3328d57`, and the pinned private grading
-  dataset. Coding-image digests do not pin every harness-generated grading image:
-  generated `:latest` images require recording/pinning their actual digests too.
-- No grading host has currently been created, and Docker is absent from the controller.
-  **Prepared inference plans do not mean official grading is ready.** Verify that
-  environment separately before claiming readiness or correctness.
+- **SWE:** use the [Daytona evaluation adapter](context_benchmarks.md#swe-bench-verified-official-harness), official harness **v4.1.0**, commit `726c5461e2ef52d83cf1ea2107870a8bb3328d57`, and the pinned private grading dataset.
+  The trusted launcher runs the official parser while fresh Daytona grading sandboxes execute the official test scripts.
+  The adapter records the resolved grading-image digest and requires no local Docker daemon.
+- **Prepared inference plans do not mean official grading is ready.**
+  Validate the adapter with a live smoke test before claiming operational readiness or correctness.
 
 Retain all selected attempts when reporting accuracy, and disclose missing grades,
 coverage, budget/time exits and prior exposure. Submitted answers or captured patches

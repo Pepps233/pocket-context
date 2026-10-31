@@ -36,7 +36,8 @@ use `benchmark-controller submit`, rather than assuming a coding sandbox also ho
 - Prepare the pinned BrowseComp-Plus corpus/index, tokenizer and compatible snapshot using the [existing setup](browsecomp_plus.md). These examples retain its `pocket-browsecomp-plus` snapshot name; confirm it exists in your Daytona account and contains the current application and required corpus/runtime dependencies.
 - Use `browsecomp_plus_deepseek` for BrowseComp-Plus and `context_benchmark_deepseek` for SWE-bench Verified, consistently across all four methods within each benchmark. Do not layer provider profiles.
 - Plan provider request/token rate limits, per-task cost/time limits, Daytona sandbox quotas and infrastructure costs before increasing concurrency. Stopping thresholds checked between calls are not hard billing caps. Auxiliary memory/model calls contribute to usage and cost.
-- SWE-bench grading needs a **separate trusted Docker-capable host** and the pinned official harness. It is not run inside a coding sandbox.
+- SWE-bench grading uses the pinned official harness on a trusted launcher and fresh Daytona grading sandboxes.
+  It requires no local Docker daemon and never reuses a coding sandbox.
 
 ### Different Daytona lifecycles
 
@@ -206,18 +207,62 @@ All four SWE methods share the shell submission contract: a command must exit ze
 
 ### SWE-bench Verified official harness
 
-Use official SWE-bench **v4.1.0**, commit **`726c5461e2ef52d83cf1ea2107870a8bb3328d57`**, on a separate trusted Docker-capable Linux x86_64 host. Keep the pinned private grading dataset outside all coding sandboxes. Public/private dataset hashes, expected harness revision, prediction hashes and run fingerprints are bound into the exported handoff. Import requires that matching handoff and run prefix; do not edit data or predictions after export. The v4.1.0 evaluator has no dataset-revision CLI flag; use the prepared pinned grading data rather than silently evaluating against a newly downloaded dataset revision.
+Use official SWE-bench **v4.1.0**, commit **`726c5461e2ef52d83cf1ea2107870a8bb3328d57`**, with our Daytona execution adapter.
+The upstream checkout remains unmodified: the adapter uses its test specifications, patch-application commands, log parsers and `get_eval_report` function.
+Fresh Daytona sandboxes run the official Linux x86_64 instance images directly, without local or nested Docker.
+This is a custom execution backend for the official test-based grader, not the upstream Docker CLI.
 
-Export one prediction file and print the official harness command for each method:
+Install the harness and adapter together in an isolated environment on the trusted launcher:
+
+```bash
+git clone --branch v4.1.0 --depth 1 \
+  https://github.com/SWE-bench/SWE-bench.git data/swebench-verified/upstream
+test "$(git -C data/swebench-verified/upstream rev-parse HEAD)" = \
+  726c5461e2ef52d83cf1ea2107870a8bb3328d57
+uv venv --python 3.11 data/swebench-verified/harness-venv
+uv pip install --python data/swebench-verified/harness-venv/bin/python \
+  -e data/swebench-verified/upstream -e '.[daytona]'
+data/swebench-verified/harness-venv/bin/python \
+  -m pocketcontextagent.run.benchmarks.swebench_daytona_evaluate --help
+```
+
+For an existing installation, verify its revision and reuse it rather than cloning over it.
+The checkout and environment are ignored local dependencies.
+The adapter verifies the installed harness version, Git revision and tracked source before creating resources.
+Keep `DAYTONA_API_KEY` and the pinned private grading dataset on the trusted launcher.
+Only the predicted patch and that instance's official evaluation script go into a fresh grading sandbox; no provider credentials, Daytona credentials, gold solution patch or full dataset is uploaded.
+Agent coding sandboxes never receive private grading inputs.
+
+Export one prediction file and print the Daytona grading command for each method:
 
 ```bash
 mini-extra benchmark-matrix export-swebench \
   --runs runs/swebench-verified-smoke \
   --data-dir data/swebench-verified \
-  --run-prefix swe-smoke-42
+  --run-prefix swe-smoke-42 \
+  --harness-python data/swebench-verified/harness-venv/bin/python
 ```
 
-Exporting does not run the harness. Copy the run artifacts and private grading data to the trusted grading host, preserving the relative paths, and activate its pinned-harness environment before running the printed commands. They default to `python`; use `--harness-python /path/to/grading-venv/bin/python` when exporting for a different interpreter. Review and execute the printed per-method commands only after installing the pinned harness. They perform official patch application and test evaluation using Docker. Use fresh run prefixes and retain the associated logs; do not reuse stale official reports.
+Exporting does not run tests or create Daytona resources.
+Public/private dataset hashes, harness revision, prediction hashes and run fingerprints are bound into the exported handoff.
+Each printed command validates the private dataset and predictions against their exported SHA-256 checksums before execution.
+Append `--dry-run` to a printed command to validate inputs and build official test specifications without contacting Daytona.
+A dry run does not establish live sandbox or test readiness.
+
+Run the printed commands on the trusted launcher when grading is authorized.
+The default is one grading sandbox at a time, with 2 CPUs, 8 GiB RAM, 10 GiB disk and a 1,800-second test timeout.
+Use `--max_workers` up to 6, and `--cpu`, `--memory`, `--disk` or `--timeout` to adjust resources after a live smoke test.
+Concurrency applies per command; running all four methods concurrently multiplies the allocation.
+The adapter pins each official image to a registry digest, records owned resources, verifies the clean base checkout, blocks sandbox outbound networking, and downloads test logs before cleanup.
+A process timeout bounds the tests, and an absolute sandbox lifetime limits orphaned compute if the launcher exits unexpectedly.
+
+Logs default to `logs/run_evaluation/RUN_ID/MODEL/INSTANCE_ID/` and include the exact `patch.diff`, `eval.sh`, test output, `report.json`, image digest and cleanup journal.
+Use `--logs /path/on/mounted/daytona-volume/run_evaluation` on a trusted Daytona controller to persist grading artifacts on its volume, then pass that same log root to the importer.
+Retain these artifacts before removing the controller or local output directory.
+Use a fresh run prefix for every execution: existing run directories are rejected to prevent stale report reuse.
+Infrastructure errors and timeouts do not publish grades; patch-application failures remain missing reports, matching upstream behavior.
+Cleanup runs on both success and failure and targets only the adapter's owned sandboxes and snapshots.
+If cleanup fails, recover the recorded resources using the per-instance `sandbox-cleanup.json` journal.
 
 Import the resulting official reports and saved patches, then compare:
 

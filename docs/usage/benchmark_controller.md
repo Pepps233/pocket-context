@@ -14,11 +14,11 @@ Laptop -- native SSH / management API --> trusted cloud controller
                                          +--> isolated credential-free coding VMs
 ```
 
-The controller owns orchestration, inference, status and cleanup journals. Coding VMs
-receive public task inputs and execute coding commands, not model calls. Neither model
-keys, Daytona keys nor private grading data belong in those VMs. The official grading
-harness still needs a separate trusted Docker-capable host; the controller image is not
-an assumed grading environment.
+The controller owns orchestration, inference, status and cleanup journals.
+Coding VMs receive public task inputs and execute coding commands, not model calls.
+Neither model keys, Daytona keys nor private grading data belong in those VMs.
+The official test-based grader uses fresh Daytona grading sandboxes through the [Daytona evaluation adapter](context_benchmarks.md#swe-bench-verified-official-harness).
+Install the pinned harness and adapter on the trusted launcher before grading; the controller image is not an assumed grading environment.
 
 Daytona was chosen for native SSH attachment and configurable long-running sandboxes.
 **E2B does support real SSH**, through a custom OpenSSH template and WebSocket proxy;

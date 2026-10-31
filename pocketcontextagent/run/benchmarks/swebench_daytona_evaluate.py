@@ -27,9 +27,60 @@ from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
 from pocketcontextagent.run.benchmarks.utils.swebench_verified import HARNESS_REVISION, prediction, public_task
 
 if TYPE_CHECKING:
+    from daytona import Sandbox
     from swebench.harness.test_spec.test_spec import TestSpec
 
 app = typer.Typer(add_completion=False)
+
+HTTPBIN_REQUIREMENTS = """attrs==26.1.0 blinker==1.9.0 brotlicffi==1.2.1.0 cffi==2.1.1
+click==8.5.0 decorator==5.3.1 flasgger==0.9.7.1 Flask==3.1.3 greenlet==2.0.2
+gunicorn==23.0.0 httpbin==0.10.2 itsdangerous==2.2.0 Jinja2==3.1.6 jsonschema==4.26.0
+jsonschema-specifications==2025.9.1 MarkupSafe==3.0.4 mistune==3.4.0 packaging==26.3
+pycparser==3.12 PyYAML==6.0.3 referencing==0.37.0 rpds-py==2026.9.1 six==1.17.0
+typing_extensions==4.16.0 Werkzeug==3.1.9""".split()
+
+
+def prepare_httpbin(sandbox: "Sandbox", instance: dict, directory: Path) -> str:
+    """Provide the legacy tests' supported external fixture without public network flakiness."""
+    if instance["repo"] != "psf/requests" or instance["version"] not in {"1.1", "2.0"}:
+        return ""
+    setup = (
+        "set -eu\n"
+        "test -f /testbed/requests/cacert.pem && ! test -L /testbed/requests/cacert.pem\n"
+        "/opt/miniconda3/bin/python -m venv /tmp/pca-httpbin-env\n"
+        f"/tmp/pca-httpbin-env/bin/pip install --disable-pip-version-check {' '.join(HTTPBIN_REQUIREMENTS)}\n"
+        "openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=localhost "
+        "-addext subjectAltName=DNS:localhost,IP:127.0.0.1 "
+        "-keyout /tmp/pca-httpbin.key -out /tmp/pca-httpbin.crt\n"
+        "sha256sum /testbed/requests/cacert.pem\n"
+        "cat /tmp/pca-httpbin.crt >> /testbed/requests/cacert.pem\n"
+        "sha256sum /testbed/requests/cacert.pem\n"
+        "/tmp/pca-httpbin-env/bin/gunicorn -D -b 127.0.0.1:80 --workers 2 "
+        "--pid /tmp/pca-httpbin-http.pid --error-logfile /tmp/pca-httpbin-http.log httpbin:app\n"
+        "/tmp/pca-httpbin-env/bin/gunicorn -D -b 127.0.0.1:443 --workers 2 "
+        "--pid /tmp/pca-httpbin-https.pid --error-logfile /tmp/pca-httpbin-https.log "
+        "--certfile /tmp/pca-httpbin.crt --keyfile /tmp/pca-httpbin.key httpbin:app\n"
+        "/tmp/pca-httpbin-env/bin/pip freeze\n"
+    )
+    (directory / "httpbin-setup.sh").write_text(setup)
+    response = sandbox.process.exec("/bin/bash -c " + quote(setup), cwd="/tmp", timeout=300)
+    (directory / "httpbin-setup.log").write_text(response.result)
+    if response.exit_code != 0:
+        raise RuntimeError("Local httpbin fixture setup failed; see httpbin-setup.log")
+    sandbox.fs.download_file("/tmp/pca-httpbin.crt", str(directory / "httpbin-ca.pem"))
+    (directory / "httpbin-provenance.json").write_text(
+        json.dumps(
+            {
+                "requirements": HTTPBIN_REQUIREMENTS,
+                "HTTPBIN_URL": "http://localhost/",
+                "certificate_verification": True,
+                "trust_adjustment": "Append the isolated localhost fixture CA to requests/cacert.pem",
+                "official_tests_modified": False,
+            },
+            indent=2,
+        )
+    )
+    return "HTTPBIN_URL=http://localhost/ NO_PROXY=localhost,127.0.0.1 "
 
 
 def verify_harness() -> None:
@@ -147,11 +198,14 @@ def evaluate(instance: dict, pred: dict, root: Path, timeout: int, runtime: Runt
         if not applied:
             (directory / "status.json").write_text(json.dumps({"state": "patch_application_failed"}))
             return
+        fixture_environment = prepare_httpbin(sandbox, instance, directory)
         sandbox.fs.upload_file(spec.eval_script.encode(), "/eval.sh")
         sandbox.process.create_session("evaluation")
         command = sandbox.process.execute_session_command(
             "evaluation",
-            SessionExecuteRequest(command="/bin/bash -c " + quote(evaluation_command(timeout)), run_async=True),
+            SessionExecuteRequest(
+                command="/bin/bash -c " + quote(fixture_environment + evaluation_command(timeout)), run_async=True
+            ),
         )
         deadline = time.monotonic() + timeout + 120
         while (result := sandbox.process.get_session_command("evaluation", command.cmd_id)).exit_code is None:

@@ -423,7 +423,12 @@ def run_matrix(
                             raise RuntimeError("Patch capture failed to preserve an edit or restore the clean checkout")
                         record["patch_capture_verified"] = True
                         record["python_environment"] = env._checked(
-                            "set -e; python --version; command -v pytest"
+                            "set -e; python --version; "
+                            + (
+                                "test -f tests/runtests.py; printf '%s' tests/runtests.py"
+                                if instance["repo"] == "django/django"
+                                else "command -v pytest"
+                            )
                         ).strip()
                         phase("preflight_verified", model_calls=0, preflight_verified=True)
                         with locks[method]:

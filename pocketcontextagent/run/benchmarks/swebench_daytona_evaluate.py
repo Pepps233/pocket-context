@@ -15,6 +15,7 @@ from uuid import uuid4
 import typer
 from dotenv import load_dotenv
 
+from pocketcontextagent.environments.swebench_verified import SWEBenchVerifiedEnvironment
 from pocketcontextagent.run.benchmarks.utils.swebench_daytona import (
     ResourceJournal,
     RuntimeConfig,
@@ -112,6 +113,15 @@ def evaluate(instance: dict, pred: dict, root: Path, timeout: int, runtime: Runt
         )
         journal.record("sandboxes", name, id=sandbox.id, phase="running")
         journal.record("sandboxes", name, lifecycle=sandbox_metadata(api.get(sandbox.id).model_dump(), runtime))
+        initial = sandbox.process.exec("git rev-parse HEAD && git status --porcelain", cwd="/testbed", timeout=60)
+        (directory / "initial-repository-state.log").write_text(initial.result)
+
+        def command_backend(command: str, *, cwd: str, timeout: int) -> dict:
+            response = sandbox.process.exec(command, cwd=cwd, timeout=timeout)
+            return {"output": response.result, "returncode": response.exit_code}
+
+        environment = SWEBenchVerifiedEnvironment(command_backend, base_commit=instance["base_commit"])
+        environment.prepare(fresh_isolated=True)
         check = sandbox.process.exec(
             "/bin/bash -c "
             + quote(

@@ -1,4 +1,7 @@
-"""Run the pinned official SWE-bench tests in fresh Daytona sandboxes."""
+"""Run the pinned official SWE-bench tests in fresh Daytona sandboxes.
+
+The official harness is installed separately in the pinned grading environment.
+"""
 
 import hashlib
 import json
@@ -145,7 +148,7 @@ PY
 
 
 def verify_harness() -> None:
-    import swebench
+    import swebench  # pylint: disable=import-error
 
     checkout = Path(swebench.__file__).resolve().parent.parent
     if (
@@ -197,7 +200,7 @@ def grading_preflight_command(base_commit: str) -> str:
 
 
 def publish_report(spec: "TestSpec", pred: dict, directory: Path, exit_code: int) -> dict:
-    from swebench.harness.grading import get_eval_report
+    from swebench.harness.grading import get_eval_report  # pylint: disable=import-error
 
     (directory / "status.json").write_text(json.dumps({"state": "finished", "exit_code": exit_code}))
     if exit_code in (124, 137):
@@ -221,8 +224,8 @@ def evaluate(
     instance: dict, pred: dict, root: Path, timeout: int, runtime: RuntimeConfig, journal_root: Path | None = None
 ) -> None:
     from daytona import Daytona, SessionExecuteRequest
-    from swebench.harness.run_evaluation import GIT_APPLY_CMDS
-    from swebench.harness.test_spec.test_spec import make_test_spec
+    from swebench.harness.run_evaluation import GIT_APPLY_CMDS  # pylint: disable=import-error
+    from swebench.harness.test_spec.test_spec import make_test_spec  # pylint: disable=import-error
 
     directory = root / pred["model_name_or_path"].replace("/", "__") / pred["instance_id"]
     directory.mkdir(parents=True, exist_ok=False)
@@ -341,7 +344,7 @@ def main(
     dry_run: bool = typer.Option(False, help="Validate inputs and official test specs without calling Daytona."),
 ) -> None:
     """Grade exported predictions using official tests on Daytona, without local Docker."""
-    from swebench.harness.test_spec.test_spec import make_test_spec
+    from swebench.harness.test_spec.test_spec import make_test_spec  # pylint: disable=import-error
 
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", run_id):
         raise ValueError("Use a fresh, safe run ID")

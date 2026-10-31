@@ -153,7 +153,13 @@ def test_benchmark_cli_end_to_end(
                 ),
             ],
         },
-        "agent": {"step_limit": step_limit, "cost_limit": 0, "compact_min_chars": 0, "compact_min_reduction": 0},
+        "agent": {
+            "step_limit": step_limit,
+            "cost_limit": 0,
+            "compact_min_chars": 0,
+            "compact_min_reduction": 0,
+            "compact_pressure_fraction": 0,
+        },
     }
     if memory:
         outputs = configuration["model"]["outputs"]
@@ -419,7 +425,7 @@ def test_context_budget_final_generation(bm25_index: Path, tmp_path: Path, final
                     "model_class": "deterministic",
                     "model_name": "deterministic",
                     "outputs": [
-                        make_output("Investigate. " * 35000, [{"command": "search jazz festival"}]),
+                        make_output("Investigate. " * 37500, [{"command": "search jazz festival"}]),
                         make_output(answer, final_action),
                         make_output("Should never run", [{"command": "submit WRONG"}]),
                     ],
@@ -512,6 +518,7 @@ def test_memory_aware_retrieval(bm25_index: Path, tmp_path: Path, expand: bool):
         cost_limit=0,
         compact_min_chars=0,
         compact_min_reduction=0,
+        compact_pressure_fraction=0,
         context_token_limit=128000,
         context_db_path=tmp_path / "context.sqlite",
     )

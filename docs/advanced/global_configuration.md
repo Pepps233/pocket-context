@@ -122,10 +122,6 @@ MSWEA_SINGULARITY_EXECUTABLE="singularity"
 # Path/name to the docker executable
 # (default: "docker")
 MSWEA_DOCKER_EXECUTABLE="docker"
-
-# Path/name to the bubblewrap executable
-# (default: "bwrap")
-MSWEA_BUBBLEWRAP_EXECUTABLE="bwrap"
 ```
 
 ## Default run files

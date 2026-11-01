@@ -23,18 +23,7 @@ subcommands = [
         ["swebench-single"],
         "Evaluate on SWE-bench (single instance)",
     ),
-    ("benchmarks.programbench", ["programbench"], "Run on ProgramBench (batch mode)"),
     ("benchmarks.browsecomp_plus", ["browsecomp-plus"], "Prepare and run BrowseComp-Plus"),
-    (
-        "benchmarks.browsecomp_plus_daytona",
-        ["benchmark-matrix"],
-        "Run matched corpus and coding methods in Daytona sandboxes",
-    ),
-    (
-        "benchmarks.benchmark_controller",
-        ["benchmark-controller"],
-        "Manage a durable SSH-accessible trusted Daytona benchmark controller",
-    ),
 ]
 
 

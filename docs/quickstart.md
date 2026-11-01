@@ -97,9 +97,7 @@
         To check your installation, you can run `pytest -n auto` in the root folder.
         This should run all tests in parallel (should take ~3min to run).
 
-        Note that there are still some extra dependencies that are not installed by default
-        (basically anything that is in an `.../extra/...` folder).
-        If you truly want to get the maximal package, you can run `pip install -e '.[full]'`
+        Install the `dev` extra when working on tests and documentation.
 
 !!! note "Changelog"
 

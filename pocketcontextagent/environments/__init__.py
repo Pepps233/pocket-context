@@ -9,10 +9,6 @@ _ENVIRONMENT_MAPPING = {
     "docker": "pocketcontextagent.environments.docker.DockerEnvironment",
     "singularity": "pocketcontextagent.environments.singularity.SingularityEnvironment",
     "local": "pocketcontextagent.environments.local.LocalEnvironment",
-    "swerex_docker": "pocketcontextagent.environments.extra.swerex_docker.SwerexDockerEnvironment",
-    "swerex_modal": "pocketcontextagent.environments.extra.swerex_modal.SwerexModalEnvironment",
-    "bubblewrap": "pocketcontextagent.environments.extra.bubblewrap.BubblewrapEnvironment",
-    "contree": "pocketcontextagent.environments.extra.contree.ContreeEnvironment",
 }
 
 

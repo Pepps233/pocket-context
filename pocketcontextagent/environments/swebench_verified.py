@@ -4,7 +4,7 @@ The agent/model runs outside the sandbox. The runner creates one Daytona sandbox
 per task from the official instance image, passes a process.exec adapter here,
 then destroys it. Never inject model/Daytona credentials or grading data there.
 No Docker daemon or nested Docker is needed for coding; official grading is a
-separate trusted process. See run.benchmarks.utils.swebench_verified for evidence.
+separate trusted process. The benchmark runner handles grading separately.
 
 Call prepare(fresh_isolated=True) BEFORE agent.run(), and capture_attempt() in the
 runner's finally block (also for limits/errors). There is deliberately no reset()

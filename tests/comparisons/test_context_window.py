@@ -3,19 +3,44 @@ import copy
 import pytest
 from jinja2 import StrictUndefined, Template
 
-from benchmarks.benchmark_matrix import benchmark_config
-from benchmarks.browsecomp_plus_daytona import matrix_config
 from pocketcontextagent.agents import get_agent
 from pocketcontextagent.agents.default import AgentConfig
 from pocketcontextagent.agents.utils.context_budget import estimate_tokens
 from pocketcontextagent.comparisons.methods.base import ComparisonConfig
 from pocketcontextagent.comparisons.methods.resum import ReSumConfig
-from pocketcontextagent.comparisons.registry import METHODS, configure_method, method_provenance
+from pocketcontextagent.comparisons.registry import (
+    METHODS,
+    configure_context_window,
+    configure_method,
+    method_provenance,
+)
+from pocketcontextagent.config import get_config_from_spec
 from pocketcontextagent.environments.local import LocalEnvironment
 from pocketcontextagent.models import get_model
+from pocketcontextagent.utils.serialize import recursive_merge
 
 
-@pytest.mark.parametrize(("builder",), [(benchmark_config,), (matrix_config,)])  # noqa: PT006
+def coding_config(specs: list[str], context_window: int | None = None) -> dict:
+    return configure_context_window(
+        recursive_merge(
+            get_config_from_spec("swebench_verified_context"),
+            *[get_config_from_spec(spec) for spec in specs or ["context_benchmark_deepseek"]],
+        ),
+        context_window,
+    )
+
+
+def corpus_config(specs: list[str], context_window: int | None = None) -> dict:
+    return configure_context_window(
+        recursive_merge(
+            get_config_from_spec("browsecomp_plus"),
+            *[get_config_from_spec(spec) for spec in specs or ["browsecomp_plus_deepseek"]],
+        ),
+        context_window,
+    )
+
+
+@pytest.mark.parametrize(("builder",), [(coding_config,), (corpus_config,)])  # noqa: PT006
 @pytest.mark.parametrize(("window",), [(32000,), (64000,), (128000,)])  # noqa: PT006
 def test_context_window_override_reaches_all_method_prompts_and_runtime(builder, window):
     default = builder([])
@@ -46,8 +71,8 @@ def test_context_window_override_reaches_all_method_prompts_and_runtime(builder,
 @pytest.mark.parametrize(
     ("builder", "profile"),
     [
-        (benchmark_config, "context_benchmark_deepseek"),
-        (matrix_config, "browsecomp_plus_deepseek"),
+        (coding_config, "context_benchmark_deepseek"),
+        (corpus_config, "browsecomp_plus_deepseek"),
     ],
 )
 def test_context_window_flag_overrides_config_without_changing_provider(builder, profile):
@@ -62,7 +87,7 @@ def test_context_window_flag_overrides_config_without_changing_provider(builder,
 
 @pytest.mark.parametrize(("method",), [("react",), ("resum",), ("acm",)])  # noqa: PT006
 def test_pocket_pressure_does_not_change_baseline_accounting(tmp_path, method):
-    config = configure_method(benchmark_config([], context_window=64000), method)
+    config = configure_method(coding_config([], context_window=64000), method)
     model = get_model(config=config["model"])
     agent = get_agent(model, LocalEnvironment(), config["agent"] | {"context_db_path": tmp_path / "context.sqlite"})
     assert "compact_pressure_fraction" not in config["agent"]

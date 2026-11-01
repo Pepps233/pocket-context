@@ -51,10 +51,6 @@ jobs:
         run: sudo apt-get update
       - name: Install podman
         run: sudo apt-get install -y podman
-      - name: Install bubblewrap
-        run: |
-          sudo apt-get install -y bubblewrap
-          sudo chmod u+s $(which bwrap)  # ensure we can set uid permissions
       - name: Install pinned singularity/apptainer
         run: |
           sudo apt-get install -y fakeroot uidmap libfuse3-3 squashfs-tools
@@ -80,7 +76,7 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
       - name: Install dependencies
         run: |
-            uv pip install --python ${Python_ROOT_DIR} -e '.[full,browsecomp-plus,daytona]'
+            uv pip install --python ${Python_ROOT_DIR} -e '.[dev,browsecomp-plus]'
       - name: Configure mini-swe-agent
         run: |
           mini-extra config set MSWEA_CONFIGURED 'true'

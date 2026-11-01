@@ -16,6 +16,20 @@ data/swebench-verified/
 data/deepswe/
 runs/
 
+# Private evaluation infrastructure kept only in local worktrees.
+suffix_cache_reuse/
+benchmarks/_local/
+benchmarks/utils/_local/
+tests/run/_local/
+tests/comparisons/_local/
+tests/test_data/_local/
+tests/environments/extra/_local/
+pocketcontextagent/environments/extra/_local/
+pocketcontextagent/config/benchmarks/_local/
+docs/usage/_local/
+docs/reference/environments/_local/
+docs/reference/run/_local/
+
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 

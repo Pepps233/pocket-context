@@ -1,6 +1,6 @@
 # Pocket Context library
 
-`context_library/` is a small, provider-neutral library for agent builders.
+`pocket_context/` is a small, provider-neutral library for agent builders.
 It stores messages in the order they arrive, lets your own summarizer replace a range with a summary, and keeps the removed messages in a SQLite archive for later expansion.
 
 It has no model SDK dependencies and accepts ordinary message dictionaries, so the agent loop remains responsible for calling the model and generating summaries.
@@ -8,7 +8,7 @@ It has no model SDK dependencies and accepts ordinary message dictionaries, so t
 ## Quickstart
 
 ```python
-from context_library import ContextStore
+from pocket_context import ContextStore
 
 with ContextStore("agent-context.sqlite3") as context:
     context.record({"role": "user", "content": "Investigate the failing test."})

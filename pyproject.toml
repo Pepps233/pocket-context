@@ -89,7 +89,7 @@ version = {attr = "pocketcontextagent.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["pocketcontextagent*", "benchmarks*", "context_library*"]
+include = ["pocketcontextagent*", "benchmarks*", "pocket_context*"]
 
 [tool.setuptools.package-data]
 pocketcontextagent = ["config/**/*", "comparisons/upstream/*"]

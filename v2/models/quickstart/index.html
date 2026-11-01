@@ -582,14 +582,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/mini/" class="md-nav__link">
+      <a href="../../usage/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    <code>mini</code>
+    <code>pca</code>
   
 
     
@@ -2219,14 +2219,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/run/mini/" class="md-nav__link">
+      <a href="../../reference/run/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    mini
+    pca
   
 
     
@@ -2550,7 +2550,7 @@
 <p class="admonition-title">Setup</p>
 <ul>
 <li>In most cases, you can simply run <code>mini-extra config setup</code> to set up your default model and API keys.
-  This should be run the first time you run <code>mini</code>.</li>
+  This should be run the first time you run <code>pca</code>.</li>
 <li>By default we support all models using <a href="https://github.com/BerriAI/litellm"><code>litellm</code></a>.</li>
 <li>We also offer support for models via <a href="https://openrouter.ai/">Openrouter</a> and <a href="https://portkey.ai/">Portkey</a>.</li>
 </ul>
@@ -2558,8 +2558,8 @@
 <h2 id="setting-api-keys">Setting API keys</h2>
 <p>There are several ways to set your API keys:</p>
 <ul>
-<li><strong>Recommended</strong>: Run our setup script: <code>mini-extra config setup</code>. This should also run automatically the first time you run <code>mini</code>.</li>
-<li>Use <code>mini-extra config set ANTHROPIC_API_KEY &lt;your-api-key&gt;</code> to put the key in the <code>mini</code> <a href="../../advanced/global_configuration/">config file</a>.</li>
+<li><strong>Recommended</strong>: Run our setup script: <code>mini-extra config setup</code>. This should also run automatically the first time you run <code>pca</code>.</li>
+<li>Use <code>mini-extra config set ANTHROPIC_API_KEY &lt;your-api-key&gt;</code> to put the key in the <code>pca</code> <a href="../../advanced/global_configuration/">config file</a>.</li>
 <li>Export your key as an environment variable: <code>export ANTHROPIC_API_KEY=&lt;your-api-key&gt;</code> (this is not persistent if you restart your shell, unless you add it to your shell config, like <code>~/.bashrc</code> or <code>~/.zshrc</code>).</li>
 <li>If you run several agents in parallel, see our note about rotating anthropic keys <a href="../../advanced/global_configuration/">here</a>.</li>
 </ul>
@@ -2626,7 +2626,7 @@ You can find a list of their supported models <a href="https://docs.litellm.ai/d
 Please always include the provider in the model name, e.g., <code>anthropic/claude-...</code>.</p>
 </div>
 <ul>
-<li><strong>Recommended</strong>: <code>mini-extra config setup</code> (should be run the first time you run <code>mini</code>) can set the default model for you</li>
+<li><strong>Recommended</strong>: <code>mini-extra config setup</code> (should be run the first time you run <code>pca</code>) can set the default model for you</li>
 <li>All command line interfaces allow you to set the model name with <code>-m</code> or <code>--model</code>.</li>
 <li>In addition, you can set the default model with <code>mini-extra config set MSWEA_MODEL_NAME &lt;model-name&gt;</code>, by editing the global <a href="../../advanced/global_configuration/">config file</a> (shortcut: <code>mini-extra config edit</code>), or by setting the <code>MSWEA_MODEL_NAME</code> environment variable.</li>
 <li>You can also set your model in a config file (key <code>model_name</code> under <code>model</code>).</li>
@@ -4097,7 +4097,7 @@ xai/grok-vision-beta
 <p>To find the corresponding API key, check the previous section.</p>
 <h2 id="extra-model-settings">Extra model settings</h2>
 <p>To configure reasoning efforts or similar settings, you need to edit the <a href="../../advanced/yaml_configuration/">agent config file</a>.
-In newer versions, the location of the config file is printed when you run <code>mini</code> ("agent config" in the output).</p>
+In newer versions, the location of the config file is printed when you run <code>pca</code> ("agent config" in the output).</p>
 <p>Here's a few general examples:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:5"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio"><input id="__tabbed_1_2" name="__tabbed_1" type="radio"><input id="__tabbed_1_3" name="__tabbed_1" type="radio"><input id="__tabbed_1_4" name="__tabbed_1" type="radio"><input id="__tabbed_1_5" name="__tabbed_1" type="radio"><div class="tabbed-labels"><label for="__tabbed_1_1">Temperature</label><label for="__tabbed_1_2">GPT-5 reasoning effort (Chat Completions API)</label><label for="__tabbed_1_3">GPT-5 with Responses API</label><label for="__tabbed_1_4">OpenRouter</label><label for="__tabbed_1_5">Local models</label></div>
 <div class="tabbed-content">
@@ -4221,7 +4221,7 @@ This will almost always default to <code>litellm</code> (with Anthropic models b
 <div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio"><input id="__tabbed_3_2" name="__tabbed_3" type="radio"><div class="tabbed-labels"><label for="__tabbed_3_1">Openrouter model</label><label for="__tabbed_3_2">Portkey model</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>mini<span class="w"> </span>-m<span class="w"> </span><span class="s2">"moonshotai/kimi-k2-0905"</span><span class="w"> </span>--model-class<span class="w"> </span>openrouter
+<div class="highlight"><pre><span></span><code>pca<span class="w"> </span>-m<span class="w"> </span><span class="s2">"moonshotai/kimi-k2-0905"</span><span class="w"> </span>--model-class<span class="w"> </span>openrouter
 </code></pre></div>
 <p><strong>Alternatively:</strong> In the agent config file:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">model</span><span class="p">:</span>
@@ -4230,7 +4230,7 @@ This will almost always default to <code>litellm</code> (with Anthropic models b
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>mini<span class="w"> </span>-m<span class="w"> </span><span class="s2">"claude-sonnet-4-5-20250929"</span><span class="w"> </span>--model-class<span class="w"> </span>portkey
+<div class="highlight"><pre><span></span><code>pca<span class="w"> </span>-m<span class="w"> </span><span class="s2">"claude-sonnet-4-5-20250929"</span><span class="w"> </span>--model-class<span class="w"> </span>portkey
 </code></pre></div>
 <p><strong>Alternatively:</strong> In the agent config file:
 </p><div class="highlight"><pre><span></span><code><span class="nt">model</span><span class="p">:</span>

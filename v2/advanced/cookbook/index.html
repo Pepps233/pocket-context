@@ -582,14 +582,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/mini/" class="md-nav__link">
+      <a href="../../usage/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    <code>mini</code>
+    <code>pca</code>
   
 
     
@@ -2275,14 +2275,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/run/mini/" class="md-nav__link">
+      <a href="../../reference/run/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    mini
+    pca
   
 
     
@@ -2659,9 +2659,9 @@
 
 <h1 id="cookbook">Cookbook</h1>
 <div class="admonition abstract">
-<p class="admonition-title">Remixing &amp; extending mini</p>
+<p class="admonition-title">Remixing &amp; extending pca</p>
 <ul>
-<li>This guide shows how to mix the different components of the <code>mini</code> agent to create your own custom version.</li>
+<li>This guide shows how to mix the different components of the <code>pca</code> agent to create your own custom version.</li>
 <li>You might want to first take a look at the <a href="../control_flow/">control flow of the default agent</a> first</li>
 </ul>
 </div>
@@ -2671,14 +2671,14 @@
 </div>
 <p>We provide several different entry points to the agent,
 for example <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py">hello world</a>,
-or the <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py">default when calling <code>mini</code></a>.</p>
+or the <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py">default when calling <code>pca</code></a>.</p>
 <p>Want to cook up your custom version and the config is not enough?
 Just follow the recipe below:</p>
 <ol>
 <li>What's the control flow you need? Pick an <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents">agent class</a> (e.g., <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/default.py">simplest example</a>, <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/interactive.py">with human in the loop</a>)</li>
 <li>How should actions be executed? Pick an <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments">environment class</a> (e.g., <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/local.py">local</a>, or <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/docker.py">docker</a>)</li>
 <li>How is the LM queried? Pick a <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models">model class</a> (e.g., <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/litellm_model.py">litellm</a>)</li>
-<li>How to invoke the agent? Bind them all together in a <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run">run script</a>, possibly reading from a <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/config">config</a> (e.g., <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py">hello world</a>, or <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py"><code>mini</code> entry point</a>)</li>
+<li>How to invoke the agent? Bind them all together in a <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run">run script</a>, possibly reading from a <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/config">config</a> (e.g., <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py">hello world</a>, or <a href="https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py"><code>pca</code> entry point</a>)</li>
 </ol>
 <p>We aim to keep all of these components very simple, but offer lots of choice between them -- enough to cover a broad range of
 things that you might want to do.</p>

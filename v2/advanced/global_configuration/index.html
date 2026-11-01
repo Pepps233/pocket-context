@@ -582,14 +582,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/mini/" class="md-nav__link">
+      <a href="../../usage/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    <code>mini</code>
+    <code>pca</code>
   
 
     
@@ -2236,14 +2236,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/run/mini/" class="md-nav__link">
+      <a href="../../reference/run/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    mini
+    pca
   
 
     
@@ -2581,9 +2581,9 @@
 
 <h1 id="global-configuration">Global configuration</h1>
 <div class="admonition abstract">
-<p class="admonition-title">Configuring mini</p>
+<p class="admonition-title">Configuring pca</p>
 <ul>
-<li>This guide shows how to configure the <code>mini</code> agent's global settings (API keys, default model, etc.).
+<li>This guide shows how to configure the <code>pca</code> agent's global settings (API keys, default model, etc.).
   Basically anything that is set as environment variables or similar.</li>
 <li>You should already be familiar with the <a href="../../quickstart/">quickstart guide</a>.</li>
 <li>For more agent specific settings, see the <a href="../yaml_configuration/">yaml configuration file guide</a>.</li>
@@ -2594,7 +2594,7 @@
 <p>Setting up models is also covered in the <a href="../../quickstart/">quickstart guide</a>.</p>
 </div>
 <h2 id="setting-global-configuration">Setting global configuration</h2>
-<p>All global configuration can be either set as environment variables, or in the <code>.env</code> file (the exact location is printed when you run <code>mini</code>).
+<p>All global configuration can be either set as environment variables, or in the <code>.env</code> file (the exact location is printed when you run <code>pca</code>).
 Environment variables take precedence over variables set in the <code>.env</code> file.</p>
 <p>We provide several helper functions to update the global configuration.</p>
 <p>For example, to set the default model and API keys, you can run:</p>
@@ -2653,7 +2653,7 @@ setx<span class="w"> </span>KEY<span class="w"> </span><span class="s2">"value"<
 <span class="c1"># This allows to specify them by names</span>
 <span class="nv">MSWEA_CONFIG_DIR</span><span class="o">=</span><span class="s2">"/path/to/your/own/config/dir"</span>
 
-<span class="c1"># Config path for mini run script</span>
+<span class="c1"># Config path for pca run script</span>
 <span class="c1"># (default: package_dir / "config" / "mini.yaml")</span>
 <span class="nv">MSWEA_MINI_CONFIG_PATH</span><span class="o">=</span><span class="s2">"/path/to/your/own/config"</span>
 

@@ -582,14 +582,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../usage/mini/" class="md-nav__link">
+      <a href="../../usage/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    <code>mini</code>
+    <code>pca</code>
   
 
     
@@ -2291,14 +2291,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/run/mini/" class="md-nav__link">
+      <a href="../../reference/run/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    mini
+    pca
   
 
     
@@ -2703,9 +2703,10 @@ See the <a href="https://mini-swe-agent.com/v1/">v1 documentation</a>.</p>
 </ul>
 <h2 id="what-do-i-need-to-change">What do I need to change?</h2>
 <blockquote>
-<p>I only use the mini CLI with default configs</p>
+<p>I only use the CLI with default configs</p>
 </blockquote>
-<p>No changes needed.</p>
+<p>Run <code>pca</code> instead of <code>mini</code>.
+The default configuration remains <code>mini.yaml</code>.</p>
 <blockquote>
 <p>I use custom configs</p>
 </blockquote>
@@ -2749,9 +2750,9 @@ See the <a href="https://mini-swe-agent.com/v1/">v1 documentation</a>.</p>
 <span class="w">  </span><span class="nt">format_error_template</span><span class="p">:</span><span class="w"> </span><span class="s">"..."</span>
 </code></pre></div>
 <p><strong>CLI now supports multiple configs and key-value overrides:</strong></p>
-<div class="highlight"><pre><span></span><code>mini<span class="w"> </span>-c<span class="w"> </span>mini.yaml<span class="w"> </span>-c<span class="w"> </span>model.model_kwargs.temperature<span class="o">=</span><span class="m">0</span>.5
-mini<span class="w"> </span>-c<span class="w"> </span>swebench.yaml<span class="w"> </span>-c<span class="w"> </span>agent.step_limit<span class="o">=</span><span class="m">100</span>
-mini<span class="w"> </span>-c<span class="w"> </span>mini.yaml<span class="w"> </span>-c<span class="w"> </span>/path/to/model.yaml
+<div class="highlight"><pre><span></span><code>pca<span class="w"> </span>-c<span class="w"> </span>mini.yaml<span class="w"> </span>-c<span class="w"> </span>model.model_kwargs.temperature<span class="o">=</span><span class="m">0</span>.5
+pca<span class="w"> </span>-c<span class="w"> </span>swebench.yaml<span class="w"> </span>-c<span class="w"> </span>agent.step_limit<span class="o">=</span><span class="m">100</span>
+pca<span class="w"> </span>-c<span class="w"> </span>mini.yaml<span class="w"> </span>-c<span class="w"> </span>/path/to/model.yaml
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -2767,13 +2768,13 @@ mini<span class="w"> </span>-c<span class="w"> </span>mini.yaml<span class="w"> 
 <p><strong>How to use it:</strong></p>
 <p>Tool calling is the default. The CLI uses <code>mini.yaml</code> and <code>swebench.yaml</code> which are configured for tool calling.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Default (tool calling)</span>
-mini
+pca
 python<span class="w"> </span>-m<span class="w"> </span>benchmarks.swebench
 mini-extra<span class="w"> </span>swebench
 
 <span class="c1"># Text-based parsing</span>
 mini-extra<span class="w"> </span>swebench<span class="w"> </span>-c<span class="w"> </span>swebench_backticks.yaml
-mini<span class="w"> </span>-c<span class="w"> </span>mini_textbased.yaml
+pca<span class="w"> </span>-c<span class="w"> </span>mini_textbased.yaml
 </code></pre></div>
 <p><strong>For custom configs:</strong></p>
 <div class="highlight"><pre><span></span><code><span class="nt">model</span><span class="p">:</span>
@@ -2800,9 +2801,9 @@ However, if you use the <a href="https://platform.openai.com/docs/api-reference/
 <h2 id="removed-renamed">Removed &amp; renamed</h2>
 <p><strong>Removed features:</strong></p>
 <ul>
-<li><strong>"Visual" UI</strong>: The <code>-v</code> flag for the alternate, textual based <code>mini -v</code> CLI is no longer supported. This was a tough decision to make, but in the end the visual mode didn't see the adoption we wanted and is significantly more complex to maintain than the default interface.</li>
+<li><strong>"Visual" UI</strong>: The <code>-v</code> flag for the alternate, textual based <code>pca -v</code> CLI is no longer supported. This was a tough decision to make, but in the end the visual mode didn't see the adoption we wanted and is significantly more complex to maintain than the default interface.</li>
 <li><strong>Rotating API keys</strong>: <code>ANTHROPIC_API_KEYS</code> with <code>::</code> separator no longer supported. Use single <code>ANTHROPIC_API_KEY</code>.</li>
-<li><strong><code>github_issue</code> run script</strong>: The dedicated <code>github_issue.py</code> run script was removed. Use the <code>mini</code> CLI instead.</li>
+<li><strong><code>github_issue</code> run script</strong>: The dedicated <code>github_issue.py</code> run script was removed. Use the <code>pca</code> CLI instead.</li>
 <li><strong><code>MSWEA_MODEL_API_KEY</code> environment variable</strong>: No longer used to override API keys.</li>
 </ul>
 <p><strong>Removed model classes:</strong></p>

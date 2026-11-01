@@ -582,14 +582,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../usage/mini/" class="md-nav__link">
+      <a href="../usage/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    <code>mini</code>
+    <code>pca</code>
   
 
     
@@ -2206,14 +2206,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/run/mini/" class="md-nav__link">
+      <a href="../reference/run/pca/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    mini
+    pca
   
 
     
@@ -2549,8 +2549,8 @@
 </ul>
 </details>
 <details class="question">
-<summary>How is <code>mini</code> simpler than <code>swe-agent</code>?</summary>
-<p><code>mini</code> is simpler than <code>swe-agent</code> because it:</p>
+<summary>How is <code>pca</code> simpler than <code>swe-agent</code>?</summary>
+<p><code>pca</code> is simpler than <code>swe-agent</code> because it:</p>
 <ul>
 <li>Does not have any tools other than bash — it doesn't even use the tool-calling interface of the LMs.
   This means you don't have to install anything in any environment you're running in. <code>bash</code> is all you need.</li>
@@ -2575,7 +2575,7 @@ As reflected in the high SWE-bench scores, none of the following limitations are
 <details class="question">
 <summary>Where is global configuration stored?</summary>
 <p>The global configuration is stored in the <code>.env</code> file in the config directory.
-The location is printed when you run <code>mini --help</code>.</p>
+The location is printed when you run <code>pca --help</code>.</p>
 <p>The <code>.env</code> file is a simple key-value file that is read by the <code>dotenv</code> library.</p>
 </details>
 <h2 id="models">Models</h2>
@@ -2596,7 +2596,7 @@ unless you set them in your <code>~/.bashrc</code> or similar), or as a permanen
 <div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>OPENAI_API_KEY<span class="w"> </span>sk-test123
 </code></pre></div>
 <p>Alternatively, you can directly edit the <code>.env</code> file in the config directory
-(the location is printed when you run <code>mini --help</code>).</p>
+(the location is printed when you run <code>pca --help</code>).</p>
 </div>
 <div class="admonition question">
 <p class="admonition-title">How can I set the default model?</p>
@@ -2605,7 +2605,7 @@ To permanently change it:</p>
 <div class="highlight"><pre><span></span><code>mini-extra<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>MSWEA_MODEL_NAME<span class="w"> </span>anthropic/claude-sonnet-4-5-20250929
 </code></pre></div>
 <p>Alternatively, you can directly edit the <code>.env</code> file in the config directory
-(the location is printed when you run <code>mini --help</code>).</p>
+(the location is printed when you run <code>pca --help</code>).</p>
 </div>
 <h2 id="minutia">Minutia</h2>
 <details class="question">
@@ -2616,11 +2616,11 @@ However, this is far from trivial:</p>
 <ol>
 <li>It's not obvious when a command has terminated. Essentially you're just pasting input into the shell session, and press enter—but when do you stop reading output?
    We've experimented with various heuristics (watching PIDs, watching for the shell to go back to the prompt, etc.) but all of them were flaky.
-   The <code>mini</code> agent doesn't need any of this!</li>
+   The <code>pca</code> agent doesn't need any of this!</li>
 <li>Particularly bad commands from the LM can kill the shell session. Then what?</li>
 <li>Interrupting a command running in a shell session can also mess up the shell itself and can in particular interfere with all the following outputs you want to extract.</li>
 </ol>
-<p><code>mini</code> is different: There is no running shell session. Every action is executed as a subprocess, that means
+<p><code>pca</code> is different: There is no running shell session. Every action is executed as a subprocess, that means
 every action is independent of the previous ones (it is literally a <code>subprocess.run</code>/<code>os.system</code>/<code>docker exec</code> call).</p>
 <p>This means that the agent cannot even change directories or export environment variables.
 But you don't need this! You can always prefix <code>cd /path/to/project</code> or <code>export FOO=bar</code> to every action

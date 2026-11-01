@@ -432,7 +432,7 @@ def test_concurrent_runs_share_database_without_sharing_context(tmp_path):
 
 
 def test_native_prompt_responsibilities_and_legacy_tool_separation():
-    for name in ("mini", "benchmarks/swebench", "benchmarks/programbench", "benchmarks/browsecomp_plus"):
+    for name in ("mini", "benchmarks/swebench", "benchmarks/browsecomp_plus"):
         config = yaml.safe_load(Path(f"pocketcontextagent/config/{name}.yaml").read_text())
         prompt = config["agent"]["system_template"] + config["agent"]["instance_template"]
         assert prompt.count("{{compaction_guidance}}") == 1

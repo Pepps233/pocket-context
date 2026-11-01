@@ -1,5 +1,7 @@
 site_name: mini-SWE-agent documentation
 site_url: https://mini-swe-agent.com
+exclude_docs: |
+  **/_local/**
 theme:
   name: material
   icon:
@@ -66,14 +68,8 @@ nav:
       - "<code>mini</code>": usage/mini.md
       - "Config": usage/config.md
       - "SWE-bench": usage/swebench.md
-      - "ProgramBench": usage/programbench.md
       - "BrowseComp-Plus": usage/browsecomp_plus.md
       - "Context-method comparison": usage/context_comparison.md
-      - "Corpus and coding matrix": usage/context_benchmarks.md
-      - "Trusted cloud controller": usage/benchmark_controller.md
-      - "One controller per method": usage/method_controllers.md
-      - "Controller artifact volumes": usage/controller_volumes.md
-      - "Full context evaluation": usage/full_context_evaluation.md
       - "Inspector": usage/inspector.md
       - "Output files": usage/output_files.md
     - "Language models":
@@ -111,10 +107,6 @@ nav:
       - "LocalEnvironment": "reference/environments/local.md"
       - "DockerEnvironment": "reference/environments/docker.md"
       - "SingularityEnvironment": "reference/environments/singularity.md"
-      - "SwerexDockerEnvironment": "reference/environments/swerex_docker.md"
-      - "BubblewrapEnvironment": "reference/environments/bubblewrap.md"
-      - "ContreeEnvironment": "reference/environments/contree.md"
-      - "SwerexModalEnvironment": "reference/environments/swerex_modal.md"
     - Run Scripts:
       - "Hello World": "reference/run/hello_world.md"
       - "mini": "reference/run/mini.md"
@@ -123,7 +115,6 @@ nav:
       - "Inspector": "reference/run/inspector.md"
       - "SWE-bench (batch)": "reference/run/swebench.md"
       - "SWE-bench (single)": "reference/run/swebench_single.md"
-      - "ProgramBench": "reference/run/programbench.md"
   - Blog: https://www.swebench.com/blog.html
   - Leaderboard: https://swebench.com
 plugins:

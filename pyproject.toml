@@ -53,28 +53,6 @@ browsecomp-plus = [
     "pyserini==1.2.0",
 ]
 
-daytona = [
-    "daytona==0.226.0",
-    "build",
-]
-
-e2b = [
-    "e2b==2.62.0",
-    "mcp==2.3.0",
-]
-
-full = [
-    "pocketcontextagent[dev]",
-    "swe-rex>=1.4.0",
-    "pocketcontextagent[modal]",
-    "pocketcontextagent[contree]",
-]
-
-modal = [
-    "modal",
-    "boto3",
-]
-
 dev = [
     "pytest",
     "pytest-cov",
@@ -89,11 +67,6 @@ dev = [
     "mkdocs-glightbox",
     "mkdocs-redirects",
     "portkey-ai",
-    "swe-rex",
-]
-
-contree = [
-    "contree-sdk>=0.2.0",
 ]
 
 [project.urls]
@@ -151,7 +124,6 @@ exclude = [
     "site-packages",
     "venv",
     # ---- project specific ----
-    "suffix_cache_reuse",
     "tests/test_data",
     # Exclude commands so they don't get the __future__ imports
     "config/commands",
@@ -289,6 +261,7 @@ disable = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+norecursedirs = [".*", "build", "dist", "*.egg-info", "_local"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [

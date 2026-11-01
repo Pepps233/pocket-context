@@ -157,10 +157,6 @@ In other words: the exact message structure depends on the model you use.
 | `openrouter_textbased` | Text-based parsing for OpenRouter |
 | `openrouter_response` | OpenRouter with response API |
 
-**New environment:**
-
-- **`swerex_modal`**: Run environments on Modal (requires `pip install pocketcontextagent[modal]`)
-
 ## Architecture changes
 
 1. **Responsibility shift**: Models now parse actions and format observations. This enables switching between tool calls and text parsing by changing model classes. The Agent class is now a simpler coordinator.

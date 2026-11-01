@@ -12,7 +12,6 @@ import typer
 import yaml
 from dotenv import load_dotenv
 
-from benchmarks.browsecomp_plus_daytona import app as daytona_app
 from benchmarks.utils.browsecomp_plus import (
     DATASET_REVISION,
     INDEX_REVISION,
@@ -40,7 +39,6 @@ from pocketcontextagent.utils.serialize import recursive_merge
 DEFAULT_DATA_DIR = Path("data/browsecomp-plus")
 DEFAULT_CONFIG = "benchmarks/browsecomp_plus.yaml"
 app = typer.Typer(add_completion=False, no_args_is_help=True)
-app.add_typer(daytona_app, name="daytona")
 
 
 @app.callback()

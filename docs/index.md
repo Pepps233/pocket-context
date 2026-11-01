@@ -33,7 +33,7 @@ We now ask: **What if our agent was 100x simpler, and still worked nearly as wel
 - **Minimal**: Just [100 lines of python](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/default.py) (+100 total for [env](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/local.py),
 [model](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/litellm_model.py), [script](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py)) — no fancy dependencies!
 - **Performant:** Scores >74% on the [SWE-bench verified benchmark](https://www.swebench.com/); starts much faster than Claude Code
-- **Deployable:** Supports **local environments**, **docker/podman**, **singularity/apptainer**, **bublewrap**, **contree**, and more
+- **Deployable:** Supports **local environments**, **docker/podman**, **singularity/apptainer**
 - **Compatible:** Supports all models via **litellm**, **openrouter**, **portkey**, and more. Support for `/completion` and `/response` endpoints, interleaved thinking etc.
 - Built by the Princeton & Stanford team behind [SWE-bench](https://swebench.com), [SWE-agent](https://swe-agent.com), and more
 - **Tested:** [![Codecov](https://img.shields.io/codecov/c/github/swe-agent/mini-swe-agent?style=flat-square)](https://codecov.io/gh/SWE-agent/mini-swe-agent)
@@ -211,7 +211,6 @@ agent.run("Write a sudoku game")</code></pre>
 
 * [mini-swe-agent now powers Ramp SWE-Bench](https://labs.ramp.com/swebench)
 * [mini-swe-agent beats Claude Code and Codex on DeepSWE](https://deepswe.datacurve.ai/blog#evaluation-harness)
-* [Run mini-swe-agent on our new & extremely challenging benchmark, ProgramBench](usage/programbench.md)
 * [New tutorial on building minimal AI agents](https://minimal-agent.com/)
 * Nov 19: [Gemini 3 Pro reaches 74% on SWE-bench verified with mini-swe-agent!](https://x.com/KLieret/status/1991164693839270372)
 * Aug 19: [New blogpost: Randomly switching between GPT-5 and Sonnet 4 boosts performance](https://www.swebench.com/post-250820-mini-roulette.html)

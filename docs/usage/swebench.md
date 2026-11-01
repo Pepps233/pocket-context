@@ -190,7 +190,7 @@ run:
   env_startup_command: "git clone {{ repo_url }} . --force"
 ```
 
-which might be particularly useful when running with environments like [`bubblewrap`](../reference/environments/bubblewrap.md).
+which can help when using an isolated environment.
 
 > What environment can I use for SWE-bench?
 

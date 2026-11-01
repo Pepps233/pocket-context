@@ -76,7 +76,7 @@ Repository = "https://github.com/Pepps233/pocket-context"
 
 [project.scripts]
 pocketcontextagent = "pocketcontextagent.run.mini:app"
-mini = "pocketcontextagent.run.mini:app"
+pca = "pocketcontextagent.run.mini:app"
 mini-swe-agent = "pocketcontextagent.run.mini:app"
 mini-extra = "pocketcontextagent.run.utilities.mini_extra:main"
 mini-e= "pocketcontextagent.run.utilities.mini_extra:main"

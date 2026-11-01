@@ -4,7 +4,7 @@
 
     === "pip"
 
-        Use pip to install `mini` in your current environment:
+        Use pip to install `pca` in your current environment:
 
         ```bash
         pip install pocketcontextagent
@@ -13,19 +13,19 @@
         And try our command line interface
 
         ```bash
-        mini  # CLI
+        pca  # CLI
         mini-extra  # extra utilities
         ```
 
     === "uv (isolated)"
 
-        Use `uv`/`uvx` ([installation](https://docs.astral.sh/uv/getting-started/installation/)) to directly run the `mini` CLI.
-        Use this if you're only interested in the CLI but don't need python bindings (`mini` will be installed in an anonymous virtual environment).
+        Use `uv`/`uvx` ([installation](https://docs.astral.sh/uv/getting-started/installation/)) to directly run the `pca` CLI.
+        Use this if you're only interested in the CLI but don't need python bindings (`pca` will be installed in an anonymous virtual environment).
 
         Quickly install + run:
 
         ```bash
-        uvx pocketcontextagent  # CLI
+        uvx --from pocketcontextagent pca  # CLI
         uvx --from pocketcontextagent mini-extra  # extra utilities
         ```
 
@@ -34,20 +34,20 @@
         ```bash
         uv tool install pocketcontextagent
         # then
-        mini  # CLI
+        pca  # CLI
         mini-extra  # extra utilities
         ```
 
     === "pipx (isolated)"
 
-        Use pipx ([installation](https://pipx.pypa.io/stable/installation/)) to directly run the `mini` CLI.
-        Use this if you're only interested in the CLI but don't need python bindings (`mini` will be installed in an anonymous virtual environment).
+        Use pipx ([installation](https://pipx.pypa.io/stable/installation/)) to directly run the `pca` CLI.
+        Use this if you're only interested in the CLI but don't need python bindings (`pca` will be installed in an anonymous virtual environment).
 
         Quick install + run:
 
         ```bash
         # CLI
-        pipx run pocketcontextagent
+        pipx run --spec pocketcontextagent pca
         # Extra utilities
         pipx run --spec pocketcontextagent mini-extra
         ```
@@ -57,7 +57,7 @@
         ```bash
         pipx install pocketcontextagent
         # then
-        mini  # CLI
+        pca  # CLI
         mini-extra  # extra utilities
         ```
 
@@ -76,7 +76,7 @@
         Then run:
 
         ```bash
-        mini  # CLI
+        pca  # CLI
         mini-extra  # extra utilities
         ```
 
@@ -117,7 +117,7 @@
 
 ## Models
 
-!!! note "Models should be set up the first time you run `mini`"
+!!! note "Models should be set up the first time you run `pca`"
 
     * If you missed the setup wizard, just run `mini-extra config setup`
     * For more information, please check the [model setup quickstart](models/quickstart.md).

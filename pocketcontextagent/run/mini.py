@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Run pocketcontextagent in your local environment. This is the default executable `mini`."""
+"""Run pocketcontextagent in your local environment. This is the default executable `pca`."""
 # Read this first: https://mini-swe-agent.com/latest/usage/mini/  (usage)
 
 import os

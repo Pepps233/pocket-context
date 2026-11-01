@@ -65,7 +65,7 @@ nav:
     - "Overview": index.md
     - "Quick start": quickstart.md
     - "Command line usage":
-      - "<code>mini</code>": usage/mini.md
+      - "<code>pca</code>": usage/mini.md
       - "Config": usage/config.md
       - "SWE-bench": usage/swebench.md
       - "BrowseComp-Plus": usage/browsecomp_plus.md

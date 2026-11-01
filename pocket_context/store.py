@@ -40,6 +40,7 @@ class ContextStore:
         self._messages: dict[str, dict] = {}
         self._active: list[str] = []
         self._protected: set[str] = set()
+        self._archive_tags: set[str] = set()
         self._next_id = 0
         self._next_tag = 0
 
@@ -126,6 +127,7 @@ class ContextStore:
             (tag, json.dumps([self._messages[key] for key in selected], ensure_ascii=False)),
         )
         self._db.commit()
+        self._archive_tags.add(tag)
         message_id = self.record(
             {"_context_block": tag, "role": "user", "content": f"[{tag}]: {summary}\n(Assistant-generated memory.)"}
         )
@@ -134,26 +136,13 @@ class ContextStore:
         return tag
 
     def expand(self, tag: str) -> list[dict]:
-        """Restore an archived block in place and return the restored messages."""
-        index = next(
-            (i for i, key in enumerate(self._active) if self._messages[key].get("_context_block") == tag),
-            None,
-        )
+        """Retrieve archived messages without replacing their active summary."""
+        if tag not in self._archive_tags:
+            raise KeyError(f"unknown context block: {tag}")
         row = self._db.execute("SELECT messages FROM blocks WHERE tag = ?", (tag,)).fetchone()
         if row is None:
             raise KeyError(f"unknown context block: {tag}")
-        if index is None:
-            raise ValueError(f"context block is not currently active: {tag}")
-
-        restored = json.loads(row[0])
-        ids = []
-        for message in restored:
-            self._next_id += 1
-            message_id = f"m{self._next_id:06d}"
-            self._messages[message_id] = message
-            ids.append(message_id)
-        self._active[index : index + 1] = ids
-        return restored
+        return json.loads(row[0])
 
     def assemble(self) -> list[dict]:
         """Return a copy of the current message projection."""
@@ -171,7 +160,7 @@ class ContextStore:
             and used_tokens >= self.compact_at_percent / 100 * max(0, context_token_limit - response_token_limit)
         ):
             tools.append(deepcopy(COMPACT_TOOL))
-        if any(self._messages[key].get("_context_block") for key in self._active):
+        if self._archive_tags:
             tools.append(deepcopy(EXPAND_TOOL))
         return tools
 

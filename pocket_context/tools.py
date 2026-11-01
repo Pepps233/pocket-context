@@ -19,7 +19,7 @@ COMPACT_TOOL = {
 
 EXPAND_TOOL = {
     "name": "expand_block",
-    "description": "Restore an archived range by its context tag when its full detail is needed.",
+    "description": "Retrieve historical messages by archive tag without replacing their active summary.",
     "parameters": {
         "type": "object",
         "properties": {"tag": {"type": "string"}},

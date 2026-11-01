@@ -32,7 +32,7 @@ with ContextStore("agent-context.sqlite3", compact_at_percent=50) as pocket:
 The default `compact_at_percent` is 50.
 The threshold uses active input tokens divided by the context limit after reserving response tokens.
 `compact_block` appears when that threshold is reached.
-`expand_block` remains available whenever an archived summary is active, so an agent can recover details even after compaction reduces usage below the threshold.
+`expand_block` remains available after an archive exists, so an agent can recover details even after compaction reduces usage below the threshold.
 The returned tool definitions use provider-neutral `name`, `description`, and `parameters` fields; map them to your provider's tool format.
 
 ## Compression agent and prompts
@@ -47,7 +47,7 @@ The default system instructions are exported as `COMPRESSION_SYSTEM_PROMPT` and 
 The default user prompt includes history up to the selected end and marks which messages are selected.
 Both prompts can be customized for a task or provider:
 
-The next example runs inside an open `ContextStore` context manager.
+The next example uses a fresh, uncompressed `ContextStore` with an eligible range at indexes 1 and 2.
 
 ```python
 def research_history_prompt(history, start):
@@ -56,13 +56,17 @@ def research_history_prompt(history, start):
     )
 
 
-tag = pocket.compact(
-    1,
-    2,
-    agent=compressor,
-    system_prompt="Preserve citations, decisions, and unresolved questions.",
-    user_prompt_builder=research_history_prompt,
-)
+with ContextStore() as pocket:
+    pocket.record({"role": "system", "content": "You are a research agent."})
+    pocket.record({"role": "user", "content": "Find sources about the result."})
+    pocket.record({"role": "assistant", "content": "Two studies support the result."})
+    tag = pocket.compact(
+        1,
+        2,
+        agent=compressor,
+        system_prompt="Preserve citations, decisions, and unresolved questions.",
+        user_prompt_builder=research_history_prompt,
+    )
 ```
 
 ## Message flow
@@ -72,7 +76,8 @@ System and developer messages are protected automatically; use `record(message, 
 `assemble()` returns a copy of the active projection to send to the next model call.
 These correspond to `ingest()` and `assemble()` in the repository's full agent implementation: a store needs a way to receive new messages and a way to return the compacted request.
 `compact(start, end, agent)` replaces an inclusive, zero-based active range with an archived summary.
-`expand(tag)` restores that range in place and returns the originals.
+`expand(tag)` returns archived messages while keeping the summary in place, matching the full agent's retrieval behavior.
+Format the returned messages as historical evidence or a tool result for your provider, then use `record()` to add that result to the active trajectory.
 Builders must group complete tool exchanges and protect the current task before dispatching compaction tool calls.
 
 The summary entry has `_context_block`, `role`, and `content` keys.

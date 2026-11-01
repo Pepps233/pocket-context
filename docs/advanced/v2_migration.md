@@ -13,9 +13,10 @@
 
 ## What do I need to change?
 
-> I only use the mini CLI with default configs
+> I only use the CLI with default configs
 
-No changes needed.
+Run `pca` instead of `mini`.
+The default configuration remains `mini.yaml`.
 
 > I use custom configs
 
@@ -71,9 +72,9 @@ model:
 **CLI now supports multiple configs and key-value overrides:**
 
 ```bash
-mini -c mini.yaml -c model.model_kwargs.temperature=0.5
-mini -c swebench.yaml -c agent.step_limit=100
-mini -c mini.yaml -c /path/to/model.yaml
+pca -c mini.yaml -c model.model_kwargs.temperature=0.5
+pca -c swebench.yaml -c agent.step_limit=100
+pca -c mini.yaml -c /path/to/model.yaml
 ```
 
 !!! warning
@@ -94,13 +95,13 @@ Tool calling is the default. The CLI uses `mini.yaml` and `swebench.yaml` which 
 
 ```bash
 # Default (tool calling)
-mini
+pca
 python -m benchmarks.swebench
 mini-extra swebench
 
 # Text-based parsing
 mini-extra swebench -c swebench_backticks.yaml
-mini -c mini_textbased.yaml
+pca -c mini_textbased.yaml
 ```
 
 **For custom configs:**
@@ -133,9 +134,9 @@ In other words: the exact message structure depends on the model you use.
 
 **Removed features:**
 
-- **"Visual" UI**: The `-v` flag for the alternate, textual based `mini -v` CLI is no longer supported. This was a tough decision to make, but in the end the visual mode didn't see the adoption we wanted and is significantly more complex to maintain than the default interface.
+- **"Visual" UI**: The `-v` flag for the alternate, textual based `pca -v` CLI is no longer supported. This was a tough decision to make, but in the end the visual mode didn't see the adoption we wanted and is significantly more complex to maintain than the default interface.
 - **Rotating API keys**: `ANTHROPIC_API_KEYS` with `::` separator no longer supported. Use single `ANTHROPIC_API_KEY`.
-- **`github_issue` run script**: The dedicated `github_issue.py` run script was removed. Use the `mini` CLI instead.
+- **`github_issue` run script**: The dedicated `github_issue.py` run script was removed. Use the `pca` CLI instead.
 - **`MSWEA_MODEL_API_KEY` environment variable**: No longer used to override API keys.
 
 **Removed model classes:**

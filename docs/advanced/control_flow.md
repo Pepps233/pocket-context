@@ -7,9 +7,9 @@
 !!! abstract "Understanding the default agent"
 
     * This guide shows the control flow of the default agent.
-    * After this, you're ready to [remix & extend mini](cookbook.md)
+    * After this, you're ready to [remix & extend pca](cookbook.md)
 
-The following diagram shows the control flow of the mini agent:
+The following diagram shows the control flow of the pca agent:
 
 ```mermaid
 flowchart TD

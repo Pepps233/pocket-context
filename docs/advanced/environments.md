@@ -7,7 +7,7 @@
 
 We support various environments for executing code through different backends.
 
-If you run the [`mini`](../usage/mini.md) CLI, you will run in the `local` environment by default.
+If you run the [`pca`](../usage/pca.md) CLI, you will run in the `local` environment by default.
 
 However, particularly for evaluating on SWE-bench, you want to run in isolated environments, so we offer multiple "backends" that you can use.
 

@@ -65,7 +65,7 @@ nav:
     - "Overview": index.md
     - "Quick start": quickstart.md
     - "Command line usage":
-      - "<code>mini</code>": usage/mini.md
+      - "<code>pca</code>": usage/pca.md
       - "Config": usage/config.md
       - "SWE-bench": usage/swebench.md
       - "BrowseComp-Plus": usage/browsecomp_plus.md
@@ -109,7 +109,7 @@ nav:
       - "SingularityEnvironment": "reference/environments/singularity.md"
     - Run Scripts:
       - "Hello World": "reference/run/hello_world.md"
-      - "mini": "reference/run/mini.md"
+      - "pca": "reference/run/pca.md"
       - "mini-extra": "reference/run/mini_extra.md"
       - "Config": "reference/run/config.md"
       - "Inspector": "reference/run/inspector.md"
@@ -121,6 +121,8 @@ plugins:
   - redirects:
       redirect_maps:
         'advanced/local_models.md': 'models/local_models.md'
+        'usage/mini.md': 'usage/pca.md'
+        'reference/run/mini.md': 'reference/run/pca.md'
   - glightbox
   - search
   - include-markdown

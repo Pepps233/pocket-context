@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import sys
+from importlib.metadata import distribution
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -353,10 +354,10 @@ def test_python_m_pocketcontextagent_help():
     assert "pocketcontextagent" in result.stdout
 
 
-def test_mini_script_help():
-    """Test that the mini script entry point help works."""
+def test_pca_script_help():
+    """Exercise the installed pca entry point and ensure mini is no longer registered."""
     result = subprocess.run(
-        ["mini", "--help"],
+        ["pca", "--help"],
         capture_output=True,
         text=True,
         timeout=10,
@@ -364,6 +365,8 @@ def test_mini_script_help():
 
     assert result.returncode == 0
     assert "pocketcontextagent" in result.stdout
+    commands = {entry.name for entry in distribution("pocketcontextagent").entry_points}
+    assert "pca" in commands and "mini" not in commands
 
 
 def test_pocketcontextagent_help():
@@ -586,9 +589,7 @@ def test_output_file_is_created(tmp_path):
     output_file = tmp_path / "trajectory.json"
     result = subprocess.run(
         [
-            sys.executable,
-            "-m",
-            "pocketcontextagent.run.mini",
+            "pca",
             "--task",
             "Test task",
             "--output",

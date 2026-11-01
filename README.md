@@ -31,7 +31,7 @@ On 150 BrowseComp-Plus tasks at a 128K context limit, Pocket Context Agent reach
 ACM reached 80.67% with 65.28K tokens, while ReAct reached 68.00% with 71.59K tokens under the same evaluation settings.
 On 125 SWE-bench Verified tasks, Pocket Context Agent reached **77.60% pass@1 at 32K**, versus 71.20% for ReAct; at 128K, it reached 80.80% versus 84.00% for ReAct.
 These results cover the selected tasks rather than the full benchmarks.
-Read the [full writeup](https://jayyu.dev/blog/pocket-context/) for methods, comparison tables, and limitations.
+See the [comparison setup](docs/usage/context_comparison.md) for evaluation methods.
 
 ## Evaluation tasks
 

@@ -1,8 +1,8 @@
 # Cookbook
 
-!!! abstract "Remixing & extending mini"
+!!! abstract "Remixing & extending pca"
 
-    * This guide shows how to mix the different components of the `mini` agent to create your own custom version.
+    * This guide shows how to mix the different components of the `pca` agent to create your own custom version.
     * You might want to first take a look at the [control flow of the default agent](control_flow.md) first
 
 
@@ -12,7 +12,7 @@
 
 We provide several different entry points to the agent,
 for example [hello world](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py),
-or the [default when calling `mini`](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py).
+or the [default when calling `pca`](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py).
 
 Want to cook up your custom version and the config is not enough?
 Just follow the recipe below:
@@ -20,7 +20,7 @@ Just follow the recipe below:
 1. What's the control flow you need? Pick an [agent class](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents) (e.g., [simplest example](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/default.py), [with human in the loop](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/interactive.py))
 2. How should actions be executed? Pick an [environment class](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments) (e.g., [local](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/local.py), or [docker](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/docker.py))
 3. How is the LM queried? Pick a [model class](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models) (e.g., [litellm](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/models/litellm_model.py))
-4. How to invoke the agent? Bind them all together in a [run script](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run), possibly reading from a [config](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/config) (e.g., [hello world](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py), or [`mini` entry point](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py))
+4. How to invoke the agent? Bind them all together in a [run script](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run), possibly reading from a [config](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/config) (e.g., [hello world](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/hello_world.py), or [`pca` entry point](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py))
 
 We aim to keep all of these components very simple, but offer lots of choice between them -- enough to cover a broad range of
 things that you might want to do.

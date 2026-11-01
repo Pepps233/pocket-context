@@ -1,6 +1,6 @@
-# Local
+# pca CLI reference
 
-!!! note "Mini run script"
+!!! note "pca run script"
 
     - [Read on GitHub](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/run/mini.py)
 

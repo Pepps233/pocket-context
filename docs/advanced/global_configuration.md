@@ -1,8 +1,8 @@
 # Global configuration
 
-!!! abstract "Configuring mini"
+!!! abstract "Configuring pca"
 
-    * This guide shows how to configure the `mini` agent's global settings (API keys, default model, etc.).
+    * This guide shows how to configure the `pca` agent's global settings (API keys, default model, etc.).
       Basically anything that is set as environment variables or similar.
     * You should already be familiar with the [quickstart guide](../quickstart.md).
     * For more agent specific settings, see the [yaml configuration file guide](yaml_configuration.md).
@@ -13,7 +13,7 @@
 
 ## Setting global configuration
 
-All global configuration can be either set as environment variables, or in the `.env` file (the exact location is printed when you run `mini`).
+All global configuration can be either set as environment variables, or in the `.env` file (the exact location is printed when you run `pca`).
 Environment variables take precedence over variables set in the `.env` file.
 
 We provide several helper functions to update the global configuration.
@@ -103,7 +103,7 @@ MSWEA_MODEL_RETRY_STOP_AFTER_ATTEMPT="10"
 # This allows to specify them by names
 MSWEA_CONFIG_DIR="/path/to/your/own/config/dir"
 
-# Config path for mini run script
+# Config path for pca run script
 # (default: package_dir / "config" / "mini.yaml")
 MSWEA_MINI_CONFIG_PATH="/path/to/your/own/config"
 

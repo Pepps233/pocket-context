@@ -55,9 +55,9 @@ model:
   ...
 ```
 
-!!! tip "Updating the default `mini` configuration file"
+!!! tip "Updating the default `pca` configuration file"
 
-    You can set the `MSWEA_MINI_CONFIG_PATH` setting to set path to the default `mini` configuration file.
+    You can set the `MSWEA_MINI_CONFIG_PATH` setting to set path to the default `pca` configuration file.
     This will allow you to override the default configuration file with your own.
     See the [global configuration guide](../advanced/global_configuration.md) for more details.
 

@@ -1,6 +1,6 @@
 # Configs
 
-* `mini.yaml` - Default config for `mini`/`agents/interactive.py` agent.
+* `mini.yaml` - Default config for `pca`/`agents/interactive.py` agent.
 * `default.yaml` - Default config for the `default.py` agent.
 
 ## Benchmarks

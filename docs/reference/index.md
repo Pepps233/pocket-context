@@ -10,6 +10,6 @@ This section provides detailed documentation for all classes and modules in mini
 - **[Agents](agents/default.md)** - Agent implementations and control flow
 - **[Models](models/overview.md)** - Language model interfaces
 - **[Environments](environments/local.md)** - Command execution environments
-- **[Run Scripts](run/mini.md)** - Entry points and CLI interfaces
+- **[Run Scripts](run/pca.md)** - Entry points and CLI interfaces
 
 {% include-markdown "../_footer.md" %}

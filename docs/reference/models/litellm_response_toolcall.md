@@ -33,7 +33,7 @@ model:
 Or via command line:
 
 ```bash
-mini -m "openai/gpt-5.2" --model-class litellm_response
+pca -m "openai/gpt-5.2" --model-class litellm_response
 ```
 
 ::: pocketcontextagent.models.litellm_response_model

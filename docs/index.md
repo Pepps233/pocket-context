@@ -27,7 +27,7 @@ In 2024, [SWE-bench](https://swebench.com) & [SWE-agent](https://swe-agent.com) 
 
 We now ask: **What if our agent was 100x simpler, and still worked nearly as well?**
 
-`mini` is
+`pca` is
 
 - **Widely adopted**: Used by Meta, NVIDIA, Essential AI, IBM, Nebius, Anyscale, Princeton University, Stanford University, and many more.
 - **Minimal**: Just [100 lines of python](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/agents/default.py) (+100 total for [env](https://github.com/Pepps233/pocket-context/blob/main/pocketcontextagent/environments/local.py),
@@ -42,7 +42,7 @@ We now ask: **What if our agent was 100x simpler, and still worked nearly as wel
 
     [SWE-agent](https://swe-agent.com/latest/) jump-started the development of AI agents in 2024. Back then, we placed a lot of emphasis on tools and special interfaces for the agent. However, one year later, a lot of this is not needed at all to build a useful agent!
 
-    In fact, the `mini` agent:
+    In fact, the `pca` agent:
 
     - **Does not have any tools other than bash** — it doesn't even use the tool-calling interface of the LMs.
       This means that you can run it with literally any model.
@@ -54,13 +54,13 @@ We now ask: **What if our agent was 100x simpler, and still worked nearly as wel
       Seriously, this is [a big deal](faq.md#why-no-shell-session), trust me.
 
     This makes it perfect as a baseline system and for a system that puts the language model (rather than the agent scaffold) in the middle of our attention.
-    You can see the result on the [SWE-bench (bash only)](https://www.swebench.com/) leaderboard, that evaluates the performance of different LMs with `mini`.
+    You can see the result on the [SWE-bench (bash only)](https://www.swebench.com/) leaderboard, that evaluates the performance of different LMs with `pca`.
 
 ??? note "Why use mini-SWE-agent as a tool?"
 
     Some agents are overfitted research artifacts. Others are UI-heavy frontend monsters.
 
-    The `mini` agent wants to be a hackable tool, not a black box.
+    The `pca` agent wants to be a hackable tool, not a black box.
 
     - **Simple** enough to understand at a glance
     - **Convenient** enough to use in daily workflows
@@ -100,7 +100,7 @@ We now ask: **What if our agent was 100x simpler, and still worked nearly as wel
 <table>
 <tr>
 <td width="50%">
-<a href="usage/mini"><strong>CLI</strong></a> (<code>mini</code>)
+<a href="usage/pca"><strong>CLI</strong></a> (<code>pca</code>)
 </td>
 <td>
 <a href="usage/swebench/"><strong>Batch inference</strong></a>
@@ -166,13 +166,13 @@ agent.run("Write a sudoku game")</code></pre>
     </div>
   </a>
 
-  <a href="usage/mini/" class="nav-card-link">
+  <a href="usage/pca/" class="nav-card-link">
     <div class="nav-card">
       <div class="nav-card-header">
         <span class="material-icons nav-card-icon">flash_on</span>
         <span class="nav-card-title">Usage: Simple UI</span>
       </div>
-      <p class="nav-card-description">Learn to use the <code>mini</code> command</p>
+      <p class="nav-card-description">Learn to use the <code>pca</code> command</p>
     </div>
   </a>
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """Run pocketcontextagent in your local environment. This is the default executable `pca`."""
-# Read this first: https://mini-swe-agent.com/latest/usage/mini/  (usage)
+# CLI guide: docs/usage/pca.md
 
 import os
 from pathlib import Path
@@ -26,7 +26,7 @@ DEFAULT_OUTPUT_FILE = global_config_dir / "last_mini_run.traj.json"
 _HELP_TEXT = """Run pocketcontextagent in your local environment.
 
 [not dim]
-More information about the usage: [bold green]https://mini-swe-agent.com/latest/usage/mini/[/bold green]
+CLI guide: [bold green]docs/usage/pca.md[/bold green] in the Pocket Context repository.
 [/not dim]
 """
 

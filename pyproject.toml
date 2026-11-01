@@ -87,8 +87,11 @@ include-package-data = true
 [tool.setuptools.dynamic]
 version = {attr = "pocketcontextagent.__version__"}
 
+[tool.setuptools.package-dir]
+pocket_context = "library/pocket_context"
+
 [tool.setuptools.packages.find]
-where = ["."]
+where = [".", "library"]
 include = ["pocketcontextagent*", "benchmarks*", "pocket_context*"]
 
 [tool.setuptools.package-data]

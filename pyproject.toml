@@ -92,6 +92,7 @@ where = ["."]
 include = ["pocketcontextagent*", "benchmarks*", "pocket_context*"]
 
 [tool.setuptools.package-data]
+pocket_context = ["py.typed"]
 pocketcontextagent = ["config/**/*", "comparisons/upstream/*"]
 
 [tool.ruff]

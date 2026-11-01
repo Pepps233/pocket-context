@@ -77,14 +77,6 @@
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
-         <loc>https://mini-swe-agent.com/latest/reference/environments/bubblewrap/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/reference/environments/contree/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
          <loc>https://mini-swe-agent.com/latest/reference/environments/docker/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
@@ -94,14 +86,6 @@
     </url>
     <url>
          <loc>https://mini-swe-agent.com/latest/reference/environments/singularity/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/reference/environments/swerex_docker/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/reference/environments/swerex_modal/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
@@ -165,19 +149,11 @@
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
-         <loc>https://mini-swe-agent.com/latest/reference/run/programbench/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
          <loc>https://mini-swe-agent.com/latest/reference/run/swebench/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
          <loc>https://mini-swe-agent.com/latest/reference/run/swebench_single/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/usage/benchmark_controller/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
@@ -189,27 +165,11 @@
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
-         <loc>https://mini-swe-agent.com/latest/usage/context_benchmarks/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
          <loc>https://mini-swe-agent.com/latest/usage/context_comparison/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
-         <loc>https://mini-swe-agent.com/latest/usage/controller_volumes/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/usage/full_context_evaluation/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
          <loc>https://mini-swe-agent.com/latest/usage/inspector/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/usage/method_controllers/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>
@@ -218,10 +178,6 @@
     </url>
     <url>
          <loc>https://mini-swe-agent.com/latest/usage/output_files/</loc>
-         <lastmod>2026-11-01</lastmod>
-    </url>
-    <url>
-         <loc>https://mini-swe-agent.com/latest/usage/programbench/</loc>
          <lastmod>2026-11-01</lastmod>
     </url>
     <url>

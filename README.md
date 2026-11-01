@@ -25,6 +25,12 @@ A separate compressor writes a short memory, and Pocket Context replaces the sel
 The agent can call `expand_block` to retrieve the original messages when it needs a detail the memory omitted.
 See the [context management guide](docs/advanced/context_compaction.md) for the full behavior.
 
+## Python library
+
+The `pocket_context` package provides `ContextStore` for recording messages, compacting a selected range with your compression agent, expanding archived messages, and exposing context tools at a chosen usage threshold.
+Install `pocketcontextagent` as above, then import `ContextStore` from `pocket_context`.
+See the [library quickstart](library/README.md) for a minimal example and prompt customization.
+
 ## Performance
 
 On 150 BrowseComp-Plus tasks at a 128K context limit, Pocket Context Agent reached **80.67% pass@1** with **61.98K mean peak input tokens** per task.
@@ -40,12 +46,6 @@ The task selections used in the evaluations are in [`evals/`](evals/):
 - [BrowseComp-Plus: 150 tasks](evals/browsecomp-plus-150-task-ids.json)
 - [SWE-bench Verified: 125 tasks](evals/swebench-verified-125-task-ids.json)
 - [DeepSWE v1.1: 50 tasks](evals/deepswe-v1.1-50-task-ids.json)
-
-## Python library
-
-The `pocket_context` package provides `ContextStore` for recording messages, compacting a selected range with your compression agent, expanding archived messages, and exposing context tools at a chosen usage threshold.
-Install `pocketcontextagent` as above, then import `ContextStore` from `pocket_context`.
-See the [library quickstart](library/README.md) for a minimal example and prompt customization.
 
 ## Contributing and license
 

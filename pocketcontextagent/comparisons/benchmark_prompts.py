@@ -2,7 +2,7 @@
 
 from pocketcontextagent.agents.utils.context_prompts import COMPACTION_GUIDANCE
 
-RESEARCH_MODES = {"browsecomp-plus": "corpus", "swebench-verified": "bash"}
+RESEARCH_MODES = {"browsecomp-plus": "corpus", "swebench-verified": "bash", "deepswe": "bash"}
 
 MEMORY_INSTRUCTIONS = {
     "pocket_context": COMPACTION_GUIDANCE,
@@ -14,13 +14,19 @@ When context grows with dead ends or duplicates, call manage_context to free spa
 
 
 def benchmark_prompt(benchmark: str, method: str, window: int) -> str:
-    if benchmark != "swebench-verified":
+    if benchmark not in ("swebench-verified", "deepswe"):
         raise ValueError(f"No domain prompt for {benchmark}")
+    cwd = "/app" if benchmark == "deepswe" else "/testbed"
+    commit_guidance = (
+        "Follow the task instruction to work on a new branch and commit your changes."
+        if benchmark == "deepswe"
+        else "Do not commit changes."
+    )
     return "\n\n".join(
         [
-            """You are a software engineering agent fixing the issue in the supplied repository.
-Use bash(command) to inspect, edit, and test the checkout in /testbed. Commands run in fresh shells; file changes persist.
-Implement a general fix and verify it with relevant tests. Do not fetch reference patches or alter evaluation infrastructure. Do not commit changes. Remove temporary reproduction artifacts before submitting.
+            f"""You are a software engineering agent fixing the issue in the supplied repository.
+Use bash(command) to inspect, edit, and test the checkout in {cwd}. Commands run in fresh shells; file changes persist.
+Implement a general fix and verify it with relevant tests. Do not fetch reference patches or alter evaluation infrastructure. {commit_guidance} Remove temporary reproduction artifacts before submitting.
 When finished, submit by calling bash(command="echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT") separately after your checks. Submission requires a successful command with COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT on its own first or last nonblank output line; test output before a final marker is allowed.
 The framework captures the actual repository diff; prose is not a patch.
 If instructed to conclude without tools, respond with Final Answer: followed by a brief explanation. The framework still captures the working-tree patch.""",
@@ -33,6 +39,6 @@ If instructed to conclude without tools, respond with Final Answer: followed by 
 
 
 def benchmark_stop_prompt(benchmark: str) -> str:
-    if benchmark != "swebench-verified":
+    if benchmark not in ("swebench-verified", "deepswe"):
         raise ValueError(f"No domain stop prompt for {benchmark}")
     return "The task must now conclude. Do not call tools or manage memory. Review available evidence and respond with Final Answer: followed by a brief description of the changes. This is your final generation."

@@ -8,7 +8,7 @@
 
 !!! tip "Examples"
 
-    * [Issue #303](https://github.com/SWE-agent/mini-swe-agent/issues/303) has several examples of how to use local models.
+    * The examples below cover common local model settings.
     * We also welcome concrete examples of how to use local models per pull request into this guide.
 
 ## Using litellm

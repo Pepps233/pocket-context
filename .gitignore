@@ -13,6 +13,7 @@ CLAUDE.md
 notes.md
 data/browsecomp-plus/
 data/swebench-verified/
+data/deepswe/
 runs/
 
 # Created by https://www.toptal.com/developers/gitignore/api/python
@@ -191,4 +192,3 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
-

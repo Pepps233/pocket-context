@@ -1,5 +1,6 @@
 """Digest-pinned snapshot provisioning and owned-resource cleanup for SWE-bench."""
 
+import hashlib
 import json
 import os
 import re
@@ -74,6 +75,11 @@ def immutable_image(image: str) -> str:
     return f"docker.io/{repository}@{digest}"
 
 
+def shared_snapshot_name(image: str, config: RuntimeConfig) -> str:
+    key = f"{immutable_image(image)}:{config.cpu}:{config.memory}:{config.disk}"
+    return f"pca-swe-shared-{hashlib.sha256(key.encode()).hexdigest()[:20]}"
+
+
 class ResourceJournal:
     def __init__(self, path: Path):
         self.path = path
@@ -105,11 +111,36 @@ class ResourceJournal:
             return {key: list(rows.values()) for key, rows in self.records.items()}
 
 
-def snapshots(api) -> list:
-    first = api.snapshot.list(page=1, limit=100)
+def _retry_daytona_gateway(operation, deadline: float):
+    from daytona.common.errors import DaytonaBadGatewayError
+
+    delay = 1
+    while True:
+        try:
+            return operation()
+        except DaytonaBadGatewayError:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, 8)
+
+
+def snapshots(api, *, deadline: float | None = None) -> list:
+    deadline = deadline or time.monotonic() + 180
+    first = _retry_daytona_gateway(lambda: api.snapshot.list(page=1, limit=100), deadline)
     return first.items + [
-        item for page in range(2, first.total_pages + 1) for item in api.snapshot.list(page=page, limit=100).items
+        item
+        for page in range(2, first.total_pages + 1)
+        for item in _retry_daytona_gateway(lambda: api.snapshot.list(page=page, limit=100), deadline).items
     ]
+
+
+def snapshot_names_for_cleanup(document: dict, *, preserve_retained: bool) -> set[str]:
+    names = {row["name"] for row in document.get("snapshots", [])}
+    retained = {row.get("snapshot") for row in document.get("sandboxes", []) if preserve_retained and row.get("retain")}
+    retained.update(row["name"] for row in document.get("snapshots", []) if preserve_retained and row.get("retain"))
+    return names - retained
 
 
 def delete_resources(api, document: dict, timeout: int = 180, *, preserve_retained: bool = False) -> None:
@@ -133,43 +164,63 @@ def delete_resources(api, document: dict, timeout: int = 180, *, preserve_retain
         if time.monotonic() >= deadline:
             raise TimeoutError("Sandbox deletion was not confirmed")
         time.sleep(3)
-    snapshot_names = {row["name"] for row in document.get("snapshots", [])} - {row.get("snapshot") for row in retained}
-    for snapshot in snapshots(api) if snapshot_names else []:
+    snapshot_names = snapshot_names_for_cleanup(document, preserve_retained=preserve_retained)
+    snapshot_deadline = time.monotonic() + timeout
+    for snapshot in snapshots(api, deadline=snapshot_deadline) if snapshot_names else []:
         if snapshot.name in snapshot_names and getattr(snapshot.state, "value", snapshot.state) != "removing":
-            api.snapshot.delete(snapshot.name)
-    deadline = time.monotonic() + timeout
+            _retry_daytona_gateway(lambda: api.snapshot.delete(snapshot.name), snapshot_deadline)
     if snapshot_names:
-        while snapshot_names & {row.name for row in snapshots(api)}:
-            if time.monotonic() >= deadline:
+        while snapshot_names & {row.name for row in snapshots(api, deadline=snapshot_deadline)}:
+            if time.monotonic() >= snapshot_deadline:
                 raise TimeoutError("Snapshot deletion was not confirmed; retry cleanup using the resource journal")
             time.sleep(3)
 
 
 def create_snapshot(api, config: RuntimeConfig, journal: ResourceJournal, instance: dict) -> PreparedSnapshot:
     from daytona import CreateSnapshotParams, Resources
+    from daytona.common.errors import DaytonaBadGatewayError, DaytonaConflictError, DaytonaNotFoundError
 
-    name = f"pca-swe-snapshot-{uuid4().hex[:16]}"
+    image = immutable_image(instance["image"])
+    name = shared_snapshot_name(image, config)
     journal.record(
-        "snapshots", name, phase="resolving", requested_image=instance["image"], query_id=instance["query_id"]
+        "snapshots", name, phase="resolving", requested_image=instance["image"], image=image, query_id=instance["query_id"], retain=True
     )
     success = False
     try:
-        image = immutable_image(instance["image"])
         journal.record("snapshots", name, phase="importing", image=image)
         typer.echo(f"{instance['query_id']}: importing shared snapshot {name}")
-        snapshot = api.snapshot.create(
-            CreateSnapshotParams(
-                name=name, image=image, resources=Resources(cpu=config.cpu, memory=config.memory, disk=config.disk)
-            ),
-            timeout=config.snapshot_timeout_seconds,
+        params = CreateSnapshotParams(
+            name=name, image=image, resources=Resources(cpu=config.cpu, memory=config.memory, disk=config.disk)
         )
+        deadline = time.monotonic() + config.snapshot_timeout_seconds
+        delay = 1
+        while True:
+            snapshot = next((row for row in snapshots(api, deadline=deadline) if row.name == name), None)
+            state = getattr(snapshot.state, "value", snapshot.state) if snapshot else None
+            if state == "active":
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(f"Timed out waiting for shared snapshot: {name}")
+            if state == "error":
+                try:
+                    _retry_daytona_gateway(lambda: api.snapshot.delete(name), deadline)
+                except DaytonaNotFoundError:
+                    pass
+            elif snapshot is None:
+                try:
+                    snapshot = api.snapshot.create(params, timeout=max(1, int(remaining)))
+                except (DaytonaBadGatewayError, DaytonaConflictError):
+                    pass
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, 8)
         if getattr(snapshot.state, "value", snapshot.state) != "active" or (
             snapshot.cpu,
             snapshot.mem,
             snapshot.disk,
         ) != (config.cpu, config.memory, config.disk):
             raise RuntimeError("Snapshot is not active with the requested resources")
-        journal.record("snapshots", name, phase="active", image=image)
+        journal.record("snapshots", name, phase="active", image=image, retain=True)
         success = True
         return PreparedSnapshot(name, image)
     finally:

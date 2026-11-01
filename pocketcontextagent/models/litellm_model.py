@@ -154,7 +154,7 @@ class LitellmModel:
                     "globally with export MSWEA_COST_TRACKING='ignore_errors'. "
                     "Alternatively check the 'Cost tracking' section in the documentation at "
                     "https://klieret.short.gy/mini-local-models. "
-                    " Still stuck? Please open a github issue at https://github.com/SWE-agent/mini-swe-agent/issues/new/choose!"
+                    " Still stuck? Please open a GitHub issue at https://github.com/Pepps233/pocket-context/issues/new/choose!"
                 )
                 logger.critical(msg)
                 raise RuntimeError(msg) from e

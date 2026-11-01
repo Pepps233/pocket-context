@@ -159,8 +159,8 @@ plugins:
               - "!^_"
               - "!^model_config"
               - "!^model_post_init"
-repo_url: https://github.com/SWE-agent/mini-SWE-agent
-repo_name: SWE-agent/mini-SWE-agent
+repo_url: https://github.com/Pepps233/pocket-context
+repo_name: Pepps233/pocket-context
 edit_uri: edit/main/docs/
 extra_javascript:
   - assets/js/sh-annotation.js

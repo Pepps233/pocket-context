@@ -363,6 +363,9 @@ def run_matrix(
             return create_snapshot(api, runtime, journal, instance)
 
     def destroy(snapshot: PreparedSnapshot) -> None:
+        if snapshot.name.startswith("pca-swe-shared-"):
+            journal.record("snapshots", snapshot.name, phase="retained", retain=True)
+            return
         if any(row.get("retain") and row.get("snapshot") == snapshot.name for row in journal.document()["sandboxes"]):
             journal.record("snapshots", snapshot.name, phase="retained")
             return

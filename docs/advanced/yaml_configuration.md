@@ -77,7 +77,7 @@ However, you can also do fairly complicated logic like this directly from your t
 
 In all builtin agents, you can use the following variables:
 
-- Environment variables (`LocalEnvironment` only, see discussion [here](https://github.com/SWE-agent/mini-swe-agent/pull/425))
+- Environment variables (`LocalEnvironment` only)
 - Agent config variables (i.e., anything that was set in the `agent` section of the config file, e.g., `step_limit`, `cost_limit`, etc.)
 - Environment config variables (i.e., anything that was set in the `environment` section of the config file, e.g., `cwd`, `timeout`, etc.)
 - Variables passed to the `run` method of the agent (by default that's only `task`, but you can pass other variables if you want to)

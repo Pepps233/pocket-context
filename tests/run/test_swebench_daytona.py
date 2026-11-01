@@ -9,6 +9,8 @@ from benchmarks.utils.swebench_daytona import (
     RuntimeConfig,
     immutable_image,
     sandbox_metadata,
+    shared_snapshot_name,
+    snapshot_names_for_cleanup,
 )
 
 
@@ -56,6 +58,26 @@ def test_official_digest_is_immutable_and_arbitrary_registry_inputs_are_rejected
     ]:
         with pytest.raises(ValueError, match="canonical official"):
             immutable_image(invalid)
+
+
+def test_snapshot_identity_is_shared_for_the_same_immutable_task_image():
+    image = "docker.io/swebench/sweb.eval.x86_64.fixture_1776_repo-1@sha256:" + "a" * 64
+    assert shared_snapshot_name(image, RuntimeConfig()) == "pca-swe-shared-8f3131b78ca1c71e2020"
+
+
+def test_cleanup_preserves_cross_controller_snapshots_until_explicitly_released():
+    document = {
+        "snapshots": [
+            {"name": "pca-swe-shared-image", "retain": True},
+            {"name": "owned-temporary"},
+        ],
+        "sandboxes": [{"snapshot": "retained-by-worker", "retain": True}],
+    }
+    assert snapshot_names_for_cleanup(document, preserve_retained=True) == {"owned-temporary"}
+    assert snapshot_names_for_cleanup(document, preserve_retained=False) == {
+        "pca-swe-shared-image",
+        "owned-temporary",
+    }
 
 
 def test_resource_journal_persists_intended_names_before_ids_and_retains_errors(tmp_path):

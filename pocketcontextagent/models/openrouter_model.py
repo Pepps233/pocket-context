@@ -156,7 +156,7 @@ class OpenRouterModel:
                 f"Usage {usage}, cost {cost}. Cost must be > 0.0. Set cost_tracking: 'ignore_errors' in your config file or "
                 "export MSWEA_COST_TRACKING='ignore_errors' to ignore cost tracking errors "
                 "(for example for free/local models), more information at https://klieret.short.gy/mini-local-models "
-                "for more details. Still stuck? Please open a github issue at https://github.com/SWE-agent/mini-swe-agent/issues/new/choose!"
+                "for more details. Still stuck? Please open a GitHub issue at https://github.com/Pepps233/pocket-context/issues/new/choose!"
             )
         return {"cost": cost, "cost_available": "cost" in usage and cost >= 0.0}
 

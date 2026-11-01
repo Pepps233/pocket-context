@@ -103,7 +103,7 @@
 
 !!! note "Changelog"
 
-    Please see the [github release notes](https://github.com/SWE-agent/mini-swe-agent/releases) for recent changes.
+    Please see the [GitHub release notes](https://github.com/Pepps233/pocket-context/releases) for recent changes.
 
 !!! info "Upgrading to v2?"
 

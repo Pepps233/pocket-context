@@ -10,8 +10,8 @@
 <a href="https://join.slack.com/t/swe-bench/shared_invite/zt-36pj9bu5s-o3_yXPZbaH2wVnxnss1EkQ">
     <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white" alt="Slack">
 </a>
-<a href="https://github.com/SWE-agent/mini-swe-agent">
-    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/swe-agent/mini-swe-agent?style=for-the-badge&logo=github&label=GitHub&labelColor=black&color=green" alt="GitHub Release">
+<a href="https://github.com/Pepps233/pocket-context">
+    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/Pepps233/pocket-context?style=for-the-badge&logo=github&label=GitHub&labelColor=black&color=green" alt="GitHub Release">
 </a>
 <a href="https://pypi.org/project/mini-swe-agent/">
     <img src="https://img.shields.io/pypi/v/mini-swe-agent?style=for-the-badge&logo=python&logoColor=white&labelColor=black&color=deeppink" alt="PyPI - Version">
@@ -21,7 +21,7 @@
 
 !!! warning "This is mini-swe-agent v2"
 
-    Read the [migration guide](https://mini-swe-agent.com/latest/advanced/v2_migration/). For the previous version, check out the [v1 documentation](https://mini-swe-agent.com/v1/) or the [v1 branch](https://github.com/SWE-agent/mini-swe-agent/tree/v1).
+    Read the [migration guide](advanced/v2_migration.md). The previous version is documented at [mini-swe-agent.com](https://mini-swe-agent.com/v1/).
 
 In 2024, [SWE-bench](https://swebench.com) & [SWE-agent](https://swe-agent.com) helped kickstart the coding agent revolution.
 
@@ -218,7 +218,7 @@ agent.run("Write a sudoku game")</code></pre>
 
 ## 📣 New features
 
-Please check the [github release notes](https://github.com/SWE-agent/mini-swe-agent/releases) for the latest updates.
+Please check the [GitHub release notes](https://github.com/Pepps233/pocket-context/releases) for the latest updates.
 
 ## 📣 Documentation updates
 

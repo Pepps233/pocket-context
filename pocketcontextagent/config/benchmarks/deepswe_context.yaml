@@ -1,0 +1,25 @@
+benchmark: deepswe
+agent:
+  context_token_limit: 128000
+  step_limit: 0
+  cost_limit: 1.0
+  wall_time_limit_seconds: 10800
+environment:
+  cwd: /app
+  timeout: 120
+model:
+  model_kwargs:
+    timeout: 180
+    num_retries: 0
+  observation_template: |
+    <returncode>{{output.returncode}}</returncode>
+    {% if output.output | length > 16000 %}
+    <output_truncated original_characters="{{output.output | length }}">
+    {{output.output[:8000]}}
+    ... middle output omitted; use narrower commands or file redirection ...
+    {{output.output[-8000:]}}
+    </output_truncated>
+    {% else %}
+    <output>{{output.output}}</output>
+    {% endif %}
+    Main model calls used: {{n_model_calls}}.

@@ -4,7 +4,7 @@
 
     **mini-swe-agent v2.0** brings major improvements but requires migration.
     To stay with v1.x, pin your dependency: `mini-swe-agent~=1.0`.
-    See the [v1 documentation](https://mini-swe-agent.com/v1/) or the [v1 branch on GitHub](https://github.com/SWE-agent/mini-swe-agent/tree/v1).
+    See the [v1 documentation](https://mini-swe-agent.com/v1/).
 
 ## What's new
 
